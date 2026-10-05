@@ -91,6 +91,13 @@ tasks = sa.Table(
         "client_id",
         name="uq_tasks_task_owner",
     ),
+    sa.UniqueConstraint(
+        "task_id",
+        "session_id",
+        "tenant_id",
+        "client_id",
+        name="uq_tasks_task_session_owner",
+    ),
     sa.ForeignKeyConstraint(
         ["session_id", "tenant_id", "client_id"],
         [
