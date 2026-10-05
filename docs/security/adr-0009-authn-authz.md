@@ -129,6 +129,7 @@ Provides:
 - customer membership;
 - Backoffice role/privileges;
 - effective provider permissions;
+- effective provider/model/reasoning-profile target entitlements;
 - execution policy/quota assignment;
 - resource ownership.
 
@@ -141,6 +142,7 @@ Client/service scopes:
 - sessions:write
 - tasks:read
 - tasks:write
+- tasks:target
 - tasks:cancel
 - usage:read
 - estimates:write
@@ -178,10 +180,17 @@ For protected action:
 4. load authoritative target ownership/state;
 5. verify tenant/client relationship;
 6. evaluate action/function authorization;
-7. evaluate property/field authorization;
-8. apply step-up/security conditions where required;
-9. execute;
-10. audit privileged or sensitive action/read where policy requires.
+7. if task creation requests EXPLICIT_TARGET, require `tasks:target` in addition to `tasks:write`;
+8. validate the requested provider/model/reasoning profile against the server-side client envelope from #21;
+9. evaluate property/field authorization;
+10. apply quota/rate/policy ceilings without accepting client overrides;
+11. apply step-up/security conditions where required;
+12. execute;
+13. audit privileged or sensitive action/read where policy requires.
+
+For AUTO task creation, `tasks:write` is sufficient at the target-selection scope layer; `tasks:target` is not required because the client did not select a provider/model/profile.
+
+Possession of `tasks:target` never grants a provider/model/profile not present in the effective client entitlement.
 
 Failure is deny-by-default.
 
@@ -231,6 +240,11 @@ Mandatory:
 - unsupported/none/symmetric algorithm confusion;
 - unknown key after bounded refresh;
 - missing required scope;
+- AUTO succeeds with `tasks:write` without requiring `tasks:target`;
+- EXPLICIT_TARGET without `tasks:target` is denied;
+- `tasks:target` without `tasks:write` is denied;
+- `tasks:target` cannot bypass provider/model/profile entitlement;
+- explicit target request cannot elevate max cycles/retry/delay/timeout/quota;
 - service client attempts Backoffice privilege;
 - valid tenant A token requests tenant B object;
 - token client identity conflicts with request client_id;
@@ -261,6 +275,15 @@ ORQETIA configuration uses standards-level values:
 Vendor-specific IdP admin/provisioning adapters, if needed for Client Portal credential lifecycle, remain behind an IdentityProviderAdminPort.
 
 Changing IdP should not alter authorization semantics.
+
+## Revalidation result — 2026-10-05
+
+Revalidated for #12 against #21/#80:
+- `tasks:write` remains the base task-creation scope;
+- `tasks:target` is an additional capability only for EXPLICIT_TARGET;
+- provider/model/reasoning entitlements are authoritative server-side data, not token/request claims;
+- target scope cannot elevate administrative orchestration controls;
+- client-facing task/evidence schemas remain free of provider secrets and monetary provider data.
 
 ## Consequences
 

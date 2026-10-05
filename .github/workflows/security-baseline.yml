@@ -37,3 +37,6 @@ jobs:
 
       - name: Tenant target envelope revalidation tests
         run: python3 -m unittest tests.contracts.test_tenancy_target_reference -v
+
+      - name: Explicit target authorization revalidation tests
+        run: python3 -m unittest tests.contracts.test_authz_target_reference -v

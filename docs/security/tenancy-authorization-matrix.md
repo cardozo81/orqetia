@@ -18,7 +18,7 @@ Legend:
 | Create own integration credential | scope-dependent | ALLOW for administered OWN client | ADMIN/support only with explicit privilege |
 | Rotate/revoke own credential | scope-dependent | ALLOW for administered OWN client | ADMIN/support only with explicit privilege |
 | Create execution session/task — AUTO | ALLOW OWN + base execution scope | ALLOW OWN when product UI permits | ADMIN only for explicit operational action |
-| Create task — EXPLICIT_TARGET | OWN + base execution authorization + enabled target entitlement; exact `tasks:target` scope in #12 | OWN + role + enabled target entitlement when product UI permits | ADMIN only with explicit operational privilege + target entitlement |
+| Create task — EXPLICIT_TARGET | OWN + tasks:write + tasks:target + enabled target entitlement | OWN + role + enabled target entitlement when product UI permits | ADMIN only with explicit operational privilege + target entitlement |
 | Read task/result | OWN + scope | OWN + role/scope | ADMIN privilege + purpose/audit |
 | Cancel task | OWN + scope | OWN + role/scope | ADMIN privilege |
 | Read technical usage | OWN + scope | OWN + role/scope | ADMIN privilege |

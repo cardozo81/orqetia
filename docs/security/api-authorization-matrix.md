@@ -4,7 +4,8 @@
 |---|---|---|---|
 | POST /sessions | OWN + sessions:write | OWN + permitted role | explicit operational privilege only |
 | GET /sessions/{id} | OWN + sessions:read | OWN + role | privileged/audited |
-| POST /sessions/{id}/tasks | OWN + tasks:write | OWN + role | explicit operational privilege only |
+| POST /sessions/{id}/tasks — AUTO | OWN + tasks:write | OWN + role | explicit operational privilege only |
+| POST /sessions/{id}/tasks — EXPLICIT_TARGET | OWN + tasks:write + tasks:target + effective target entitlement | OWN + role + target entitlement when product policy permits | explicit operational privilege + target entitlement |
 | GET /tasks/{id} | OWN + tasks:read | OWN + role | privileged/audited |
 | GET /tasks/{id}/result | OWN + tasks:read | OWN + role | privileged/audited |
 | POST /tasks/{id}/cancel | OWN + tasks:cancel | OWN + role | privileged |
