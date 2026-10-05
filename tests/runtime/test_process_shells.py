@@ -32,6 +32,7 @@ class FakeQueue:
         self.claim_count = 0
         self.renew_count = 0
         self.completed: list[WorkLease] = []
+        self.dead: list[WorkLease] = []
         self.requeued: list[WorkLease] = []
 
     async def enqueue(self, item: object) -> None:
@@ -66,6 +67,16 @@ class FakeQueue:
 
     async def complete(self, lease: WorkLease) -> bool:
         self.completed.append(lease)
+        return True
+
+    async def dead_letter(
+        self,
+        lease: WorkLease,
+        *,
+        error_class: str,
+    ) -> bool:
+        del error_class
+        self.dead.append(lease)
         return True
 
     async def requeue_infrastructure_failure(
@@ -125,6 +136,9 @@ class ProcessShellTests(unittest.TestCase):
 
     def test_unclassified_handler_exception_does_not_auto_retry(self) -> None:
         asyncio.run(self._test_handler_exception())
+
+    def test_unsupported_operation_is_dead_lettered(self) -> None:
+        asyncio.run(self._test_unsupported_operation())
 
     def test_scheduler_duplicate_wakeup_is_only_a_hint(self) -> None:
         asyncio.run(self._test_scheduler_wakeup())
@@ -204,6 +218,23 @@ class ProcessShellTests(unittest.TestCase):
 
         self.assertEqual(queue.completed, [])
         self.assertEqual(queue.requeued, [])
+        self.assertEqual(queue.dead, [])
+
+    async def _test_unsupported_operation(self) -> None:
+        item = lease("unknown")
+        queue = FakeQueue((item,))
+        registry = HandlerRegistry()
+
+        async def noop(_lease: WorkLease) -> HandlerOutcome:
+            return HandlerOutcome.complete()
+
+        registry.register("noop", 1, noop)
+        process = self.process(queue, registry)
+        await process.run_once()
+
+        self.assertEqual(queue.completed, [])
+        self.assertEqual(queue.requeued, [])
+        self.assertEqual([entry.work_id for entry in queue.dead], [item.work_id])
 
     async def _test_operational_heartbeat(self) -> None:
         queue = FakeQueue()

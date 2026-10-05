@@ -23,6 +23,24 @@ The implementation reuses the existing messaging/runtime primitives:
 
 No second queue or broker is introduced.
 
+## Infrastructure retry budget and poison work
+
+`max_infrastructure_attempts` is authoritative for both explicit infrastructure
+requeues and crash/lease-expiry recovery.
+
+When an expired `LEASED` work item has already consumed its configured
+infrastructure-attempt budget, the next queue scan moves it to `DEAD` instead of
+claiming it again. This prevents a repeatedly crashing handler from bypassing the
+retry budget merely by failing before it can explicitly requeue.
+
+The queue also exposes an ownership-checked `dead_letter` operation. A claimed
+operation for which the worker has no registered handler is deterministic poison and
+is dead-lettered as `UNSUPPORTED_OPERATION`; it is not left to expire and cycle
+indefinitely.
+
+Dead-letter, completion and requeue all require the current non-expired lease owner,
+so a stale worker cannot terminalize work after another worker has reclaimed it.
+
 ## Provider attempt journal
 
 `execution.provider_attempts` is the durable dispatch journal. One normal provider dispatch has
