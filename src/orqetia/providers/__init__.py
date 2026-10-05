@@ -11,6 +11,7 @@ from .io import (
     StructuredOutputValidator,
 )
 from .mimo import MIMO_RESPONSES_ENDPOINT, MiMoResponsesAdapter
+from .mistral import MISTRAL_CHAT_COMPLETIONS_ENDPOINT, MistralChatCompletionsAdapter
 from .openai import OPENAI_RESPONSES_ENDPOINT, OpenAIResponsesAdapter
 from .parity import (
     CANONICAL_PROVIDER_PORT_PLAN,
@@ -77,6 +78,7 @@ __all__ = [
     "INITIAL_PROVIDER_TAXONOMY",
     "MANDATORY_ADAPTER_PARITY_GATES",
     "MIMO_RESPONSES_ENDPOINT",
+    "MISTRAL_CHAT_COMPLETIONS_ENDPOINT",
     "AdapterParityGate",
     "AdapterTransportFamily",
     "ORQETIA_TEST_PROVIDER",
@@ -85,6 +87,7 @@ __all__ = [
     "DeterministicTestProvider",
     "HttpxProviderHttpTransport",
     "MiMoResponsesAdapter",
+    "MistralChatCompletionsAdapter",
     "NativeUsage",
     "OpenAIResponsesAdapter",
     "OutputKind",
