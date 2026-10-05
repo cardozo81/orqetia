@@ -66,6 +66,8 @@ class ProviderAttemptRequest:
     missing_requirements: tuple[str, ...]
     task_id: UUID | None = None
     session_id: UUID | None = None
+    correlation_id: UUID | None = None
+    trace_id: str | None = None
 
     def __post_init__(self) -> None:
         if not _OPERATION.fullmatch(self.operation):
@@ -82,6 +84,8 @@ class ProviderAttemptRequest:
             raise ValueError("missing_requirements must not contain duplicates")
         if any(not item.strip() or len(item) > 200 for item in self.missing_requirements):
             raise ValueError("missing_requirements contain an invalid requirement")
+        if self.trace_id is not None and (not self.trace_id.strip() or len(self.trace_id) > 200):
+            raise ValueError("trace_id must contain 1..200 characters when present")
 
 
 @dataclass(frozen=True)
