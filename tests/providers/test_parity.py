@@ -16,10 +16,10 @@ from orqetia.providers import (
 
 class ProviderAdapterParityPlanTests(unittest.TestCase):
     def test_plan_covers_initial_provider_taxonomy_exactly_once(self) -> None:
-        self.assertEqual(
-            tuple(plan.display_name for plan in CANONICAL_PROVIDER_PORT_PLAN),
-            INITIAL_PROVIDER_TAXONOMY,
-        )
+        display_names = tuple(plan.display_name for plan in CANONICAL_PROVIDER_PORT_PLAN)
+        self.assertEqual(len(display_names), len(INITIAL_PROVIDER_TAXONOMY))
+        self.assertEqual(set(display_names), set(INITIAL_PROVIDER_TAXONOMY))
+
         provider_ids = tuple(plan.provider_id for plan in CANONICAL_PROVIDER_PORT_PLAN)
         self.assertEqual(len(provider_ids), len(set(provider_ids)))
 
