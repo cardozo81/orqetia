@@ -230,6 +230,15 @@ class GitHubCopilotAdapter(ProviderAdapter):
                 f"Copilot SDK outcome ambiguous: {type(exc).__name__}"
             ) from exc
 
+        if not output_text.strip():
+            return _failure(
+                request,
+                ProviderOutcome.MALFORMED_OUTPUT,
+                error_class="COPILOT_OUTPUT_TEXT_MISSING",
+                started=started,
+            )
+
+        output_text = output_text.strip()
         output_kind = OutputKind.TEXT
         durable_content = output_text
         structured = materialized.structured_output
