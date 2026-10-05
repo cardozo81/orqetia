@@ -86,7 +86,10 @@ def test_provider_total_wins_and_reasoning_is_not_double_counted() -> None:
         provider_total_tokens=151,
     )
     assert usage.total_tokens == 151
-    assert TechnicalUsage(input_tokens=100, output_tokens=50, reasoning_tokens=40).total_tokens == 150
+    assert (
+        TechnicalUsage(input_tokens=100, output_tokens=50, reasoning_tokens=40).total_tokens
+        == 150
+    )
 
 
 def test_token_pricing_cache_split_is_fail_closed() -> None:
@@ -231,6 +234,24 @@ def test_context_time_request_and_credit_models_resolve() -> None:
         occurred_at=NOW,
     )
     assert credit_quote.cost.amount == Decimal("0.07")
+
+    zero_credit_quote = _resolver(
+        _rule(
+            model=PricingModel.PROVIDER_CREDITS,
+            native_unit="CREDIT",
+            native_rate=Decimal("0.01"),
+        )
+    ).quote(
+        provider_id="openai",
+        model_id="gpt-x",
+        reasoning_profile="medium",
+        usage=TechnicalUsage(
+            native=(NativeUsageQuantity("credits", Decimal("0"), "CREDIT"),)
+        ),
+        occurred_at=NOW,
+    )
+    assert zero_credit_quote.cost.amount == Decimal("0")
+    assert zero_credit_quote.cost.basis is CostBasis.USAGE_DERIVED_ESTIMATE
 
 
 @pytest.mark.asyncio

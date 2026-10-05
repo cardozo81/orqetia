@@ -156,14 +156,13 @@ class PricingRule:
         elif self.pricing_model is PricingModel.PER_REQUEST:
             if self.request_rate is None:
                 raise ValueError("PER_REQUEST requires request_rate")
-        elif self.pricing_model is PricingModel.PROVIDER_CREDITS:
-            if (
-                self.native_unit is None
-                or not self.native_unit.strip()
-                or len(self.native_unit) > 100
-                or self.native_rate is None
-            ):
-                raise ValueError("PROVIDER_CREDITS requires native_unit and native_rate")
+        elif self.pricing_model is PricingModel.PROVIDER_CREDITS and (
+            self.native_unit is None
+            or not self.native_unit.strip()
+            or len(self.native_unit) > 100
+            or self.native_rate is None
+        ):
+            raise ValueError("PROVIDER_CREDITS requires native_unit and native_rate")
 
     @property
     def reference(self) -> str:
@@ -293,11 +292,10 @@ class PricingResolver:
         else:
             assert rule.native_unit is not None
             assert rule.native_rate is not None
-            native = sum(
-                (item.quantity for item in usage.native if item.unit == rule.native_unit),
-                Decimal("0"),
+            native_items = tuple(
+                item for item in usage.native if item.unit == rule.native_unit
             )
-            if native == 0:
+            if not native_items:
                 amount, reason = None, "NATIVE_USAGE_MISSING"
             elif any(
                 value is not None
@@ -305,6 +303,7 @@ class PricingResolver:
             ):
                 amount, reason = None, "MIXED_NATIVE_AND_TOKEN_USAGE"
             else:
+                native = sum((item.quantity for item in native_items), Decimal("0"))
                 amount, reason = native * rule.native_rate, None
 
         if amount is None:

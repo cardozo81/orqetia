@@ -66,7 +66,8 @@ accounting_ledger = sa.Table(
         name="cached_tokens_non_negative",
     ),
     sa.CheckConstraint(
-        "cached_input_tokens IS NULL OR input_tokens IS NULL OR cached_input_tokens <= input_tokens",
+        "cached_input_tokens IS NULL OR input_tokens IS NULL "
+        "OR cached_input_tokens <= input_tokens",
         name="cached_not_above_input",
     ),
     sa.CheckConstraint(
