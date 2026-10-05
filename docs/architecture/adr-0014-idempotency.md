@@ -5,6 +5,7 @@
 - Depends on: #33, #50
 - Related: #51, #52, #15
 - Security controls: SEC-006, SEC-010, SEC-011
+- Amended by: ADR-0018 (#86/#87) for stable attempt identity and normal retry/fallback identity semantics
 
 ## Decision
 
@@ -192,7 +193,12 @@ A lease expiring means another worker may resume the work; it does not mean alre
 
 ## Provider attempts
 
-A provider call has a durable provider_attempt ID created **before** network dispatch.
+A provider call has a durable `attempt_id` created **before** network dispatch.
+
+ADR-0018 clarifies:
+- a normal orchestration retry/fallback that causes a new provider dispatch creates a **new** attempt_id, even when the request payload is identical;
+- only recovery of the same ambiguous dispatch through a verified provider-side idempotency mechanism may reuse the same attempt_id;
+- request fingerprint/hash never substitutes for attempt identity.
 
 Logical uniqueness includes enough context to distinguish intended calls, e.g.:
 - task;
