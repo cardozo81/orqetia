@@ -46,4 +46,5 @@ jobs:
             tests.providers.test_qwen \
             tests.providers.test_mistral \
             tests.providers.test_kimi \
+            tests.providers.test_gemini \
             -v
