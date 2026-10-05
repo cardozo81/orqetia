@@ -311,8 +311,9 @@ class PostgresProviderAttemptStore:
             raise ValueError("provider attempt session does not match task session")
         if cast(str, task_row["operation"]) != attempt.operation:
             raise ValueError("provider attempt operation does not match task operation")
-        if TaskStatus(cast(str, task_row["status"])).terminal:
-            raise ValueError("cannot schedule provider attempt for terminal task")
+        task_status = TaskStatus(cast(str, task_row["status"]))
+        if task_status is not TaskStatus.RUNNING:
+            raise ValueError("provider attempt can only be scheduled for RUNNING task")
 
         mode = ExecutionMode(cast(str, task_row["requested_execution_mode"]))
         if mode is ExecutionMode.EXPLICIT_TARGET:
