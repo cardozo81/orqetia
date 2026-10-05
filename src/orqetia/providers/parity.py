@@ -48,7 +48,7 @@ class ProviderPortPlan:
             raise ValueError("provider_id must contain 1..100 characters")
         if not self.display_name.strip() or len(self.display_name) > 200:
             raise ValueError("display_name must contain 1..200 characters")
-        if not MANDATORY_ADAPTER_PARITY_GATES <= self.required_gates:
+        if not self.required_gates >= MANDATORY_ADAPTER_PARITY_GATES:
             raise ValueError("provider port plan is missing mandatory parity gates")
 
 
