@@ -1,5 +1,13 @@
 """Provider adapter contracts, registry contracts and deterministic test-provider support."""
 
+from .parity import (
+    CANONICAL_PROVIDER_PORT_PLAN,
+    MANDATORY_ADAPTER_PARITY_GATES,
+    AdapterParityGate,
+    AdapterTransportFamily,
+    ProviderPortPlan,
+    provider_port_plan,
+)
 from .protocol import (
     NativeUsage,
     OutputKind,
@@ -41,7 +49,11 @@ from .simulator import (
 )
 
 __all__ = [
+    "CANONICAL_PROVIDER_PORT_PLAN",
     "INITIAL_PROVIDER_TAXONOMY",
+    "MANDATORY_ADAPTER_PARITY_GATES",
+    "AdapterParityGate",
+    "AdapterTransportFamily",
     "ORQETIA_TEST_PROVIDER",
     "AdapterResolution",
     "DeterministicTestProvider",
@@ -54,6 +66,7 @@ __all__ = [
     "ProviderCostMetadata",
     "ProviderModelSpec",
     "ProviderOutcome",
+    "ProviderPortPlan",
     "ProviderRegistry",
     "ProviderRegistryError",
     "ProviderRegistryReader",
@@ -74,4 +87,5 @@ __all__ = [
     "SimulatorScenario",
     "SimulatorStep",
     "TargetIdentity",
+    "provider_port_plan",
 ]
