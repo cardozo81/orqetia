@@ -189,8 +189,6 @@ class DeepSeekResponsesAdapterTests(unittest.IsolatedAsyncioTestCase):
         assert isinstance(body, dict)
         self.assertEqual(body["model"], "deepseek-fixture")
         self.assertEqual(body["reasoning"], {"effort": "high"})
-        self.assertEqual(body["store"], False)
-        self.assertEqual(body["tools"], [])
         self.assertNotIn("service_tier", body)
         self.assertNotIn("store", body)
         self.assertNotIn("tools", body)
@@ -438,7 +436,7 @@ class DeepSeekResponsesAdapterTests(unittest.IsolatedAsyncioTestCase):
         request = ProviderAttemptRequest(
             attempt_id=self.request.attempt_id,
             operation=self.request.operation,
-            target=ProviderTarget("deepseek", "deepseek-fixture", "HIGH"),
+            target=ProviderTarget("openai", "gpt-fixture", "HIGH"),
             cycle=self.request.cycle,
             attempt_index=self.request.attempt_index,
             request_reference=self.request.request_reference,
