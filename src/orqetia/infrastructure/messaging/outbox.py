@@ -41,8 +41,12 @@ def build_outbox_table(metadata: sa.MetaData) -> sa.Table:
         sa.Column("claimed_by", sa.Text(), nullable=True),
         sa.Column("claim_until", sa.DateTime(timezone=True), nullable=True),
         sa.Column("published_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.CheckConstraint("state IN ('PENDING','CLAIMED','PUBLISHED','DEAD')", name="outbox_state_known"),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.CheckConstraint(
+            "state IN ('PENDING','CLAIMED','PUBLISHED','DEAD')", name="outbox_state_known"
+        ),
     )
 
 
@@ -55,10 +59,14 @@ def build_inbox_table(metadata: sa.MetaData) -> sa.Table:
         sa.Column("event_id", UUID(as_uuid=True), primary_key=True),
         sa.Column("event_type", sa.Text(), nullable=False),
         sa.Column("event_version", sa.Integer(), nullable=False),
-        sa.Column("received_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "received_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
         sa.Column("state", sa.Text(), nullable=False, server_default="RECEIVED"),
         sa.Column("processed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("attempts", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("last_error_class", sa.Text(), nullable=True),
-        sa.CheckConstraint("state IN ('RECEIVED','PROCESSING','PROCESSED','DEAD')", name="inbox_state_known"),
+        sa.CheckConstraint(
+            "state IN ('RECEIVED','PROCESSING','PROCESSED','DEAD')", name="inbox_state_known"
+        ),
     )
