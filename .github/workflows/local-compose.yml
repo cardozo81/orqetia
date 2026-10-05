@@ -56,6 +56,29 @@ jobs:
           PY
           docker compose exec -T postgres             psql -U orqetia -d orqetia -Atc             "SELECT count(*) FROM information_schema.schemata WHERE schema_name IN ('identity','control','execution','accounting','estimation','audit','readmodel','messaging');"             | grep -qx "8"
 
+      - name: Verify canonical OpenAPI from Uvicorn
+        run: |
+          python3 - <<'PY'
+          import json
+          import time
+          import urllib.request
+
+          expected = json.load(open("contracts/openapi/orqetia-v1.openapi.json", encoding="utf-8"))
+          last_error = None
+          for _ in range(20):
+              try:
+                  with urllib.request.urlopen("http://127.0.0.1:8000/openapi.json", timeout=2) as response:
+                      actual = json.load(response)
+                  if actual != expected:
+                      raise SystemExit("served OpenAPI differs from canonical contract")
+                  break
+              except Exception as exc:
+                  last_error = exc
+                  time.sleep(1)
+          else:
+              raise SystemExit(f"API did not become ready: {last_error}")
+          PY
+
       - name: Clean process restart smoke
         run: |
           docker compose restart worker scheduler
