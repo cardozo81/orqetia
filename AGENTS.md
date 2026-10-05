@@ -81,3 +81,19 @@ A PR should state:
 - residual risk;
 - whether a human gate is actually required;
 - final checkpoint/resume status when relevant.
+
+
+## Closed issue revalidation
+
+Follow #84.
+
+A closed/completed issue is a historical contract snapshot, not permission for silent semantic edits.
+
+Before modifying a closed issue:
+- classify the change as material or non-material;
+- typo/link/formatting fixes may remain closed;
+- any material change to behavior, API, architecture, authorization, security/privacy, persistence, dependencies, tests or acceptance criteria requires reopening the issue **before editing** or creating an explicit delta/addendum issue;
+- if reopened, all dependent issues treat it as blocking again;
+- never use `closed` status alone as proof that the current contract is valid.
+
+When resuming work, check for open revalidation/delta issues that amend a dependency.
