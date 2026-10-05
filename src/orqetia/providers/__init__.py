@@ -1,5 +1,6 @@
 """Provider adapter contracts, registry contracts and deterministic test-provider support."""
 
+from .chat_completions import ChatCompletionsHttpAdapter
 from .deepseek import DEEPSEEK_RESPONSES_ENDPOINT, DeepSeekResponsesAdapter
 from .io import (
     ProviderCredential,
@@ -30,6 +31,7 @@ from .protocol import (
     ProviderTarget,
     ProviderUsage,
 )
+from .qwen import QWEN_CHAT_COMPLETIONS_ENDPOINT, QwenChatCompletionsAdapter
 from .registry import (
     INITIAL_PROVIDER_TAXONOMY,
     AdapterResolution,
@@ -69,6 +71,7 @@ from .xai import XAI_RESPONSES_ENDPOINT, XAIResponsesAdapter
 
 __all__ = [
     "CANONICAL_PROVIDER_PORT_PLAN",
+    "ChatCompletionsHttpAdapter",
     "DEEPSEEK_RESPONSES_ENDPOINT",
     "OPENAI_RESPONSES_ENDPOINT",
     "INITIAL_PROVIDER_TAXONOMY",
@@ -107,6 +110,8 @@ __all__ = [
     "ProviderSpec",
     "ProviderTarget",
     "ProviderUsage",
+    "QWEN_CHAT_COMPLETIONS_ENDPOINT",
+    "QwenChatCompletionsAdapter",
     "PublicProviderTargetMetadata",
     "ReasoningProfileSpec",
     "RegistryEligibilityMode",
