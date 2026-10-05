@@ -249,6 +249,7 @@ class GitHubCopilotAdapter(ProviderAdapter):
                     request,
                     ProviderOutcome.MALFORMED_OUTPUT,
                     error_class="COPILOT_STRUCTURED_OUTPUT_INVALID",
+                    started=started,
                 )
             output_kind = OutputKind.STRUCTURED
             durable_content = json.dumps(
