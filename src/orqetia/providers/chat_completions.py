@@ -374,8 +374,16 @@ def _usage(decoded: Mapping[str, object]) -> ProviderUsage:
     raw = decoded.get("usage")
     if not isinstance(raw, Mapping):
         return ProviderUsage()
-    input_tokens = _nonnegative_int(raw.get("prompt_tokens"))
-    output_tokens = _nonnegative_int(raw.get("completion_tokens"))
+    input_tokens = _nonnegative_int(
+        raw.get("prompt_tokens")
+        if raw.get("prompt_tokens") is not None
+        else raw.get("input_tokens")
+    )
+    output_tokens = _nonnegative_int(
+        raw.get("completion_tokens")
+        if raw.get("completion_tokens") is not None
+        else raw.get("output_tokens")
+    )
     native: list[NativeUsage] = []
 
     input_details = raw.get("prompt_tokens_details")
