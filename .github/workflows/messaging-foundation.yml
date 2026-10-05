@@ -1,0 +1,70 @@
+name: Messaging foundation
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: messaging-foundation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-messaging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: orqetia_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d orqetia_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      ORQETIA_ENVIRONMENT: test
+      ORQETIA_PROCESS_ROLE: worker
+      ORQETIA_DATABASE_DSN: postgresql+psycopg://postgres@127.0.0.1:5432/orqetia_test
+      ORQETIA_SECRET_STORE_MODE: none
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned uv bootstrap tool
+        run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+
+      - name: Verify locked dependencies
+        run: uv lock --check
+
+      - name: Reproduce locked Python 3.14 runtime install
+        run: uv sync --locked --no-dev --python 3.14
+
+      - name: Messaging contract tests
+        run: |
+          uv run --no-sync --python 3.14 python -m unittest \
+            tests.messaging.test_messaging_contract \
+            -v
+
+      - name: Apply migrations
+        run: uv run --no-sync --python 3.14 alembic upgrade head
+
+      - name: PostgreSQL messaging integration tests
+        run: |
+          uv run --no-sync --python 3.14 python -m unittest \
+            tests.messaging.test_postgres_messaging \
+            -v
