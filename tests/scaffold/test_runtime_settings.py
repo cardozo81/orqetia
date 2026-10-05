@@ -18,9 +18,8 @@ TEST_DSN = "postgresql+psycopg://runtime-user:synthetic-password@db:5432/orqetia
 
 class RuntimeSettingsTests(unittest.TestCase):
     def test_database_dsn_is_required(self) -> None:
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(ValidationError):
-                RuntimeSettings()
+        with patch.dict(os.environ, {}, clear=True), self.assertRaises(ValidationError):
+            RuntimeSettings()
 
     def test_local_settings_accept_synthetic_runtime_configuration(self) -> None:
         settings = RuntimeSettings(
