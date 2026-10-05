@@ -184,6 +184,7 @@ class ProviderAttemptHandler:
                 lease,
                 journal,
                 error_class=type(exc).__name__,
+                attempt_status="AMBIGUOUS",
             )
             await self._store.mark_ambiguous(
                 scope=scope,
@@ -211,6 +212,7 @@ class ProviderAttemptHandler:
             input_tokens=result.usage.input_tokens,
             output_tokens=result.usage.output_tokens,
             total_tokens=result.usage.total_tokens,
+            attempt_status="COMPLETED",
         )
         return HandlerOutcome.complete()
 
