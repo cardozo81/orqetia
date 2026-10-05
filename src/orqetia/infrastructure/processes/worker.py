@@ -179,7 +179,13 @@ class WorkerProcess:
     async def _handle(self, lease: WorkLease) -> None:
         handler = self._registry.resolve(lease)
         if handler is None:
-            self._log("work.unsupported", lease)
+            if not await self._queue.dead_letter(
+                lease,
+                error_class="UNSUPPORTED_OPERATION",
+            ):
+                self._log("work.stale_dead_letter_rejected", lease)
+            else:
+                self._log("work.unsupported_dead_lettered", lease)
             return
 
         handler_done = asyncio.Event()
