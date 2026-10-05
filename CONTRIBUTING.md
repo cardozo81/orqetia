@@ -39,3 +39,15 @@ An executable issue should include:
 ## Product state
 
 Do not describe the project as prerelease, RC, stable, production-ready or GA while #46 remains in DEVELOPMENT state.
+
+
+## Closed issue contract changes
+
+Follow #84.
+
+Closed/completed issues must not receive silent material contract changes.
+
+- Non-material fixes: typo, formatting, broken links and references without semantic change.
+- Material changes: requirements, API/schema, authorization, security/privacy, persistence, architecture, dependencies, tests or acceptance criteria.
+
+For a material change, reopen the original issue before editing or create a linked delta/addendum issue that explicitly amends it. Any reopened dependency blocks downstream implementation again until revalidated.
