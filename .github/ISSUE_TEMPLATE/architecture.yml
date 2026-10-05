@@ -1,0 +1,54 @@
+name: Architecture / ADR
+description: Architecture decision or contract definition
+title: "[ADR] "
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: Parent epic
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / decision
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and constraints
+      description: Include RASAi read-only evidence when relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+    validations:
+      required: true
+  - type: textarea
+    id: reuse
+    attributes:
+      label: Reuse impact
+      description: Explain what can be extracted/reused and what would be rewritten.
+    validations:
+      required: true
+  - type: textarea
+    id: consequences
+    attributes:
+      label: Consequences / risks
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Blocked by / Blocks
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Decision acceptance criteria
+    validations:
+      required: true
