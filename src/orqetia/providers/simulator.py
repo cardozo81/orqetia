@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from enum import StrEnum
+from uuid import UUID
 
 from .protocol import (
     OutputKind,
@@ -19,7 +21,7 @@ from .protocol import (
 ORQETIA_TEST_PROVIDER = "ORQETIA_TEST_PROVIDER"
 
 
-class SimulatorScenario(str):
+class SimulatorScenario(StrEnum):
     SUCCESS = "success"
     STRUCTURED_SUCCESS = "structured_success"
     REQUIREMENT_NOT_SATISFIED = "requirement_not_satisfied"
@@ -79,7 +81,7 @@ class SimulatorCandidate:
 
 @dataclass(frozen=True)
 class SimulatorStep:
-    scenario: str
+    scenario: SimulatorScenario
     expected_cycle: int
     expected_attempt_index: int
     expected_target: ProviderTarget | None = None
@@ -128,14 +130,14 @@ class SimulatorInvocation:
     fixture_id: str
     seed: str
     invocation_index: int
-    attempt_id: object
+    attempt_id: UUID
     operation: str
-    task_id: object | None
-    session_id: object | None
+    task_id: UUID | None
+    session_id: UUID | None
     cycle: int
     attempt_index: int
     target: ProviderTarget
-    scenario: str
+    scenario: SimulatorScenario
     outcome: ProviderOutcome
     simulated_latency_ms: int
     retry_after_seconds: int | None
@@ -268,7 +270,7 @@ class DeterministicTestProvider(ProviderAdapter):
         )
 
 
-def _outcome_for_scenario(scenario: str) -> ProviderOutcome:
+def _outcome_for_scenario(scenario: SimulatorScenario) -> ProviderOutcome:
     mapping = {
         SimulatorScenario.REQUIREMENT_NOT_SATISFIED: (
             ProviderOutcome.REQUIREMENT_NOT_SATISFIED
@@ -290,7 +292,7 @@ def _outcome_for_scenario(scenario: str) -> ProviderOutcome:
         raise SimulatorFixtureMismatch(f"scenario has no non-success outcome: {scenario}") from exc
 
 
-def _output_kind_for_scenario(scenario: str) -> OutputKind:
+def _output_kind_for_scenario(scenario: SimulatorScenario) -> OutputKind:
     if scenario == SimulatorScenario.STRUCTURED_SUCCESS:
         return OutputKind.STRUCTURED
     if scenario == SimulatorScenario.SUCCESS:
@@ -302,7 +304,7 @@ def _output_kind_for_scenario(scenario: str) -> OutputKind:
     return OutputKind.NONE
 
 
-def _default_error_class(scenario: str) -> str | None:
+def _default_error_class(scenario: SimulatorScenario) -> str | None:
     mapping = {
         SimulatorScenario.REQUIREMENT_NOT_SATISFIED: "REQUIREMENT_NOT_SATISFIED",
         SimulatorScenario.TRANSIENT_ERROR: "TRANSIENT_PROVIDER_ERROR",
