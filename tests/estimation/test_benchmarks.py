@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from uuid import uuid7
 
 import pytest
@@ -32,6 +33,7 @@ def _sample(
     *,
     total: int = 100,
     occurred_at: datetime = NOW,
+    global_eligible: bool = True,
 ) -> BenchmarkSample:
     return BenchmarkSample(
         tenant_id=tenant_id,
@@ -43,6 +45,7 @@ def _sample(
         reasoning_tokens=10,
         total_tokens=total,
         occurred_at=occurred_at,
+        global_eligible=global_eligible,
     )
 
 
@@ -117,10 +120,32 @@ def test_global_snapshot_strips_owner_and_buckets_public_counts() -> None:
     assert snapshot.sample_count == 49
     assert snapshot.public_sample_size == 40
     assert snapshot.distinct_client_count == 7
-    assert snapshot.public_cohort_size == 0
+    assert snapshot.public_cohort_size == 5
     metadata = snapshot.client_metadata()
     assert metadata["sample_size"] == 40
-    assert metadata["cohort_size"] == 0
+    assert metadata["cohort_size"] == 5
+
+
+def test_global_is_fail_closed_for_samples_not_eligible_for_public_cohort() -> None:
+    samples = []
+    for _ in range(6):
+        tenant_id, client_id = uuid7(), uuid7()
+        samples.extend(
+            _sample(
+                tenant_id,
+                client_id,
+                global_eligible=False,
+            )
+            for _ in range(10)
+        )
+    result = BenchmarkBuilder(BenchmarkPolicy("v1")).build(
+        scope=ReferenceScope.GLOBAL_PUBLIC,
+        samples=tuple(samples),
+        feature_key=KEY,
+        as_of=NOW,
+    )
+    assert not result.available
+    assert result.reason is BenchmarkUnavailableReason.INSUFFICIENT_GLOBAL_SAMPLES
 
 
 def test_global_rejects_owner_filter_to_prevent_cohort_narrowing() -> None:
@@ -183,4 +208,4 @@ def test_drift_is_versioned_comparison_on_same_cohort_shape() -> None:
         client_id=client_id,
     ).snapshot
     assert previous is not None and current is not None
-    assert builder.drift_score(previous=previous, current=current) == pytest.approx(0.5)
+    assert builder.drift_score(previous=previous, current=current) == Decimal("0.5")

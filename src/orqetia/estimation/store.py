@@ -8,7 +8,13 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from .benchmarks import BenchmarkSnapshot, ReferenceScope
+from .benchmarks import (
+    BenchmarkConfidence,
+    BenchmarkFeatureKey,
+    BenchmarkMetrics,
+    BenchmarkSnapshot,
+    ReferenceScope,
+)
 from .tables import benchmark_snapshots
 
 SessionFactory = async_sessionmaker[AsyncSession]
@@ -65,12 +71,6 @@ class PostgresBenchmarkSnapshotStore:
             row = (await database.execute(statement)).mappings().one_or_none()
         if row is None:
             return None
-        from .benchmarks import (
-            BenchmarkConfidence,
-            BenchmarkFeatureKey,
-            BenchmarkMetrics,
-        )
-
         return BenchmarkSnapshot(
             snapshot_id=row["snapshot_id"],
             scope=ReferenceScope(row["scope"]),

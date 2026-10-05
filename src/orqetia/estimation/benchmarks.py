@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -69,6 +70,7 @@ class BenchmarkSample:
     reasoning_tokens: int
     total_tokens: int
     occurred_at: datetime
+    global_eligible: bool = False
 
     def __post_init__(self) -> None:
         for field, value in (
@@ -93,6 +95,7 @@ class BenchmarkPolicy:
     minimum_global_clients: int = 5
     maximum_sample_age_days: int = 90
     public_count_bucket: int = 10
+    public_cohort_bucket: int = 5
 
     def __post_init__(self) -> None:
         if not self.methodology_version.strip() or len(self.methodology_version) > 100:
@@ -103,6 +106,7 @@ class BenchmarkPolicy:
             ("minimum_global_clients", self.minimum_global_clients),
             ("maximum_sample_age_days", self.maximum_sample_age_days),
             ("public_count_bucket", self.public_count_bucket),
+            ("public_cohort_bucket", self.public_cohort_bucket),
         ):
             if value < 1:
                 raise ValueError(f"{field} must be positive")
@@ -251,14 +255,17 @@ class BenchmarkBuilder:
 
         if tenant_id is not None or client_id is not None:
             raise ValueError("GLOBAL_PUBLIC build does not accept tenant/client filters")
-        if len(eligible) < self._policy.minimum_global_samples:
+        global_eligible = tuple(sample for sample in eligible if sample.global_eligible)
+        if len(global_eligible) < self._policy.minimum_global_samples:
             return BenchmarkBuildResult(
                 requested_scope=scope,
                 snapshot=None,
                 reason=BenchmarkUnavailableReason.INSUFFICIENT_GLOBAL_SAMPLES,
                 limitations=("minimum_global_sample_threshold_not_met",),
             )
-        distinct_clients = {(sample.tenant_id, sample.client_id) for sample in eligible}
+        distinct_clients = {
+            (sample.tenant_id, sample.client_id) for sample in global_eligible
+        }
         if len(distinct_clients) < self._policy.minimum_global_clients:
             return BenchmarkBuildResult(
                 requested_scope=scope,
@@ -270,7 +277,7 @@ class BenchmarkBuilder:
             requested_scope=scope,
             snapshot=self._snapshot(
                 scope=scope,
-                samples=eligible,
+                samples=global_eligible,
                 feature_key=feature_key,
                 as_of=as_of,
             ),
@@ -315,12 +322,18 @@ class BenchmarkBuilder:
         public_sample = (
             sample_count
             if scope is ReferenceScope.CLIENT_ONLY
-            else self._bucket_count(sample_count)
+            else self._bucket_count(
+                sample_count,
+                self._policy.public_count_bucket,
+            )
         )
         public_cohort = (
             1
             if scope is ReferenceScope.CLIENT_ONLY
-            else self._bucket_count(client_count)
+            else self._bucket_count(
+                client_count,
+                self._policy.public_cohort_bucket,
+            )
         )
         snapshot_id = uuid7()
         return BenchmarkSnapshot(
@@ -357,8 +370,8 @@ class BenchmarkBuilder:
             return BenchmarkConfidence.MEDIUM
         return BenchmarkConfidence.LOW
 
-    def _bucket_count(self, value: int) -> int:
-        bucket = self._policy.public_count_bucket
+    @staticmethod
+    def _bucket_count(value: int, bucket: int) -> int:
         return value - value % bucket
 
     @staticmethod
@@ -382,8 +395,8 @@ class BenchmarkBuilder:
         )
 
 
-def _median(values: object) -> Decimal:
-    sequence = tuple(values)  # type: ignore[arg-type]
+def _median(values: Iterable[int]) -> Decimal:
+    sequence = tuple(values)
     return Decimal(str(median(sequence)))
 
 
