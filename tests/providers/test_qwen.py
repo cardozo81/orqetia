@@ -6,7 +6,6 @@ from collections.abc import Mapping
 from uuid import uuid7
 
 from orqetia.providers import (
-    QWEN_CHAT_COMPLETIONS_ENDPOINT,
     OutputKind,
     ProviderAttemptRequest,
     ProviderCredential,
@@ -15,8 +14,9 @@ from orqetia.providers import (
     ProviderInvocationPayload,
     ProviderOutcome,
     ProviderTarget,
-    StructuredOutputSpec,
+    QWEN_CHAT_COMPLETIONS_ENDPOINT,
     QwenChatCompletionsAdapter,
+    StructuredOutputSpec,
 )
 
 
