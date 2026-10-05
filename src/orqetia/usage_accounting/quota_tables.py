@@ -23,7 +23,12 @@ quota_windows = sa.Table(
     sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("ends_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("consumed_amount", sa.Numeric(38, 12), nullable=False, server_default="0"),
-    sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+    sa.Column(
+        "updated_at",
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.func.now(),
+    ),
     sa.CheckConstraint("policy_version >= 1", name="quota_window_version_positive"),
     sa.CheckConstraint("consumed_amount >= 0", name="quota_window_consumed_non_negative"),
 )

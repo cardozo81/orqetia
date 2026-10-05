@@ -27,7 +27,12 @@ quota_policies = sa.Table(
     sa.Column("provider_id", sa.Text(), nullable=True),
     sa.Column("effective_from", sa.DateTime(timezone=True), nullable=False),
     sa.Column("effective_to", sa.DateTime(timezone=True), nullable=True),
-    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+    sa.Column(
+        "created_at",
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.func.now(),
+    ),
     sa.PrimaryKeyConstraint("policy_id", "version", name="quota_policy_version"),
     sa.CheckConstraint("version >= 1", name="quota_version_positive"),
     sa.CheckConstraint("limit_amount >= 0", name="quota_limit_non_negative"),

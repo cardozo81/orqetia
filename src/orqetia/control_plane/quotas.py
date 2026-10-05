@@ -91,9 +91,10 @@ class QuotaPolicySnapshot:
         elif self.native_unit is not None:
             raise ValueError("native_unit is valid only for NATIVE_UNITS quota")
 
-        if self.metric is QuotaMetric.PROVIDER_REQUESTS:
-            if self.provider_id is None or not self.provider_id.strip():
-                raise ValueError("PROVIDER_REQUESTS quota requires provider_id")
+        if self.metric is QuotaMetric.PROVIDER_REQUESTS and (
+            self.provider_id is None or not self.provider_id.strip()
+        ):
+            raise ValueError("PROVIDER_REQUESTS quota requires provider_id")
         if self.provider_id is not None and len(self.provider_id) > 100:
             raise ValueError("provider_id exceeds 100 characters")
         if self.native_unit is not None and len(self.native_unit) > 100:

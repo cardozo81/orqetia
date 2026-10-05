@@ -39,7 +39,12 @@ def upgrade() -> None:
         sa.Column("provider_id", sa.Text(), nullable=True),
         sa.Column("effective_from", sa.DateTime(timezone=True), nullable=False),
         sa.Column("effective_to", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
         sa.PrimaryKeyConstraint("policy_id", "version", name="pk_quota_policies"),
         sa.CheckConstraint("version >= 1", name="ck_quota_policies_version_positive"),
         sa.CheckConstraint("limit_amount >= 0", name="ck_quota_policies_limit_non_negative"),
@@ -80,7 +85,12 @@ def upgrade() -> None:
         sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("ends_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("consumed_amount", sa.Numeric(38, 12), nullable=False, server_default="0"),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
         sa.CheckConstraint(
             "policy_version >= 1",
             name="ck_quota_windows_version_positive",
