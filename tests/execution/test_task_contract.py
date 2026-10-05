@@ -7,6 +7,7 @@ from pathlib import Path
 from uuid import uuid7
 
 from orqetia.execution import (
+    VALID_TRANSITIONS,
     ExecutionMode,
     ExecutionTargetSnapshot,
     ExecutionTask,
@@ -15,7 +16,6 @@ from orqetia.execution import (
     TaskCycleDecision,
     TaskPayloadReferences,
     TaskStatus,
-    VALID_TRANSITIONS,
     task_cycle_decisions,
     task_transitions,
     tasks,
