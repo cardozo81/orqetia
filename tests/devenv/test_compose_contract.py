@@ -14,7 +14,10 @@ def valid_config() -> dict[str, object]:
     }
     return {
         "services": {
-            "api": dict(runtime),
+            "api": {
+                **runtime,
+                "ports": [{"host_ip": "127.0.0.1", "published": "8000", "target": 8000}],
+            },
             "worker": dict(runtime),
             "scheduler": dict(runtime),
             "migrate": dict(runtime),
@@ -35,6 +38,14 @@ class ComposeContractTests(unittest.TestCase):
         config["services"]["postgres"]["ports"][0]["host_ip"] = "0.0.0.0"  # type: ignore[index]
         self.assertIn(
             "postgres host port must be loopback-only",
+            validate_compose(config),
+        )
+
+    def test_public_api_binding_is_rejected(self) -> None:
+        config = valid_config()
+        config["services"]["api"]["ports"][0]["host_ip"] = "0.0.0.0"  # type: ignore[index]
+        self.assertIn(
+            "api host port must be loopback-only",
             validate_compose(config),
         )
 

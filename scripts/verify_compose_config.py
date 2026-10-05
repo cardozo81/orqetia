@@ -42,6 +42,19 @@ def validate_compose(config: dict[str, Any]) -> list[str]:
         if port.get("host_ip") not in {"127.0.0.1", "::1"}:
             errors.append("postgres host port must be loopback-only")
 
+    api = services.get("api", {})
+    api_ports = api.get("ports", []) if isinstance(api, dict) else []
+    if not api_ports:
+        errors.append("api must bind a loopback-only development port")
+    for port in api_ports:
+        if not isinstance(port, dict):
+            errors.append("api port must render as structured mapping")
+            continue
+        if port.get("host_ip") not in {"127.0.0.1", "::1"}:
+            errors.append("api host port must be loopback-only")
+        if int(port.get("target", 0)) != 8000:
+            errors.append("api container port must be 8000")
+
     volumes = postgres.get("volumes", []) if isinstance(postgres, dict) else []
     if not any(
         isinstance(item, dict) and str(item.get("target", "")).startswith("/var/lib/postgresql")
