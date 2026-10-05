@@ -12,7 +12,6 @@ import httpx
 from orqetia.identity.authentication import AuthenticatedPrincipal, AuthenticationRejected
 from orqetia.infrastructure.http import create_app
 
-
 ROOT = Path(__file__).resolve().parents[2]
 OPENAPI_PATH = ROOT / "contracts" / "openapi" / "orqetia-v1.openapi.json"
 CANONICAL = json.loads(OPENAPI_PATH.read_text(encoding="utf-8"))
