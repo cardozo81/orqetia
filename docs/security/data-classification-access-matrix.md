@@ -4,6 +4,7 @@
 - Depends on: #13, #53, #55, #56
 - Status: **Accepted**
 - Security controls: SEC-001, SEC-004, SEC-009, SEC-011, SEC-012
+- Amended by: ADR-0019 / #88 for sanitized raw exchange evidence
 
 ## Model
 
@@ -271,6 +272,8 @@ Raw content:
 - provider transmission only under approved task/provider/privacy policy;
 - retention under #55.
 
+Sanitized exchange evidence remains classified by the underlying client/provider content. Secret redaction does **not** automatically declassify it. Sanitized request/response/prompt/schema evidence is normally CLIENT_PRIVATE when it contains client content, may retain privacy flags, and is exposed only through an explicitly authorized raw-evidence contract.
+
 Support tools must use redacted/minimized views unless raw content access is explicitly required, authorized and audited.
 
 ## Logs and traces
@@ -377,6 +380,12 @@ A PR adding/changing persistent/API/event fields must answer:
 - migration/backfill implications.
 
 For client-facing schemas, absence of a field is preferred to runtime redaction of a field the client should never receive.
+
+Raw evidence DTOs must separate:
+- humanizable metadata/labels;
+- sanitized raw evidence body/hash/truncation metadata.
+
+Presentation/localization may not rewrite tokens inside the sanitized raw evidence body.
 
 ## Consequences
 
