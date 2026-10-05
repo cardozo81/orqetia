@@ -21,6 +21,7 @@ from .task_tables import (
     tasks,
 )
 from .tasks import (
+    VALID_TRANSITIONS,
     ExecutionMode,
     ExecutionTask,
     ExecutionTaskStore,
@@ -29,7 +30,6 @@ from .tasks import (
     TaskPayloadReferences,
     TaskReasonEnvelope,
     TaskStatus,
-    VALID_TRANSITIONS,
     validate_requirement_partition,
     validate_transition,
 )
