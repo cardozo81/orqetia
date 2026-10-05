@@ -43,6 +43,7 @@ class ChatCompletionsHttpAdapter(ProviderAdapter):
     endpoint: str
     strict_json_schema = False
     service_tier: str | None = None
+    supports_reasoning_effort = False
     credit_error_markers: tuple[str, ...] = ("credit", "balance", "arrearage")
     quota_error_markers: tuple[str, ...] = ("quota_exhausted", "freetieronly")
     auth_error_markers: tuple[str, ...] = (
@@ -234,12 +235,15 @@ class ChatCompletionsHttpAdapter(ProviderAdapter):
         }
         if self.service_tier is not None:
             body["service_tier"] = self.service_tier
+        reasoning_profile = request.target.reasoning_profile.strip().casefold()
+        if self.supports_reasoning_effort and reasoning_profile != "provider_default":
+            body["reasoning_effort"] = reasoning_profile
         structured = materialized.structured_output
         if structured is not None:
             schema = json.loads(structured.schema_json)
             schema_config: dict[str, object] = {
                 "name": structured.name,
-                "schema": schema,
+                "schema": self._wire_schema(schema),
             }
             if self.strict_json_schema:
                 schema_config["strict"] = True
@@ -248,6 +252,9 @@ class ChatCompletionsHttpAdapter(ProviderAdapter):
                 "json_schema": schema_config,
             }
         return body
+
+    def _wire_schema(self, schema: Mapping[str, object]) -> dict[str, object]:
+        return dict(schema)
 
     def _http_failure(
         self,
