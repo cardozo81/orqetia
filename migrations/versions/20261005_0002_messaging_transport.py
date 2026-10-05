@@ -43,7 +43,9 @@ def upgrade() -> None:
         sa.Column("lease_owner", sa.Text(), nullable=True),
         sa.Column("lease_until", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_error_class", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("dead_at", sa.DateTime(timezone=True), nullable=True),
@@ -51,7 +53,9 @@ def upgrade() -> None:
         sa.Column("causation_id", UUID(as_uuid=True), nullable=True),
         sa.Column("trace_id", sa.Text(), nullable=True),
         sa.Column("logical_operation_id", sa.Text(), nullable=True),
-        sa.CheckConstraint("operation_version >= 1", name="ck_work_items_operation_version_positive"),
+        sa.CheckConstraint(
+            "operation_version >= 1", name="ck_work_items_operation_version_positive"
+        ),
         sa.CheckConstraint("priority BETWEEN -100 AND 100", name="ck_work_items_priority_bounded"),
         sa.CheckConstraint(
             "max_infrastructure_attempts BETWEEN 1 AND 100",
@@ -108,7 +112,9 @@ def upgrade() -> None:
         sa.Column("data_classification", sa.Text(), nullable=False),
         sa.Column("payload", JSONB(), nullable=False),
         sa.Column("state", sa.Text(), nullable=False, server_default="READY"),
-        sa.Column("available_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "available_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
         sa.Column("attempt_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("lease_owner", sa.Text(), nullable=True),
         sa.Column("lease_until", sa.DateTime(timezone=True), nullable=True),
@@ -116,7 +122,9 @@ def upgrade() -> None:
         sa.Column("delivered_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("acked_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("dead_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
         sa.UniqueConstraint(
             "event_id",
             "consumer_name",
@@ -156,7 +164,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_event_deliveries_lease_until", table_name="event_deliveries", schema="messaging")
+    op.drop_index(
+        "ix_event_deliveries_lease_until", table_name="event_deliveries", schema="messaging"
+    )
     op.drop_index("ix_event_deliveries_claim", table_name="event_deliveries", schema="messaging")
     op.drop_table("event_deliveries", schema="messaging")
     op.drop_index("ix_work_items_lease_until", table_name="work_items", schema="messaging")
