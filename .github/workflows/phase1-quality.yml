@@ -66,5 +66,15 @@ jobs:
       - name: Full pytest suite
         run: uv run --no-sync --python 3.14 pytest -q
 
+      - name: Export locked dependencies for audit
+        run: |
+          uv export --locked --all-groups --no-emit-project \
+            --format requirements.txt \
+            --output-file /tmp/orqetia-audit-requirements.txt
+
       - name: Dependency audit
-        run: uv run --no-sync --python 3.14 pip-audit --strict --skip-editable
+        run: |
+          uv run --no-sync --python 3.14 pip-audit \
+            --strict \
+            --requirement /tmp/orqetia-audit-requirements.txt \
+            --require-hashes
