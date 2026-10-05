@@ -246,7 +246,7 @@ class GeminiInteractionsAdapterTests(unittest.IsolatedAsyncioTestCase):
         answer = properties["answer"]
         assert isinstance(answer, dict)
         self.assertNotIn("pattern", answer)
-        self.assertIn("minLength", answer)
+        self.assertNotIn("minLength", answer)
 
     async def test_invalid_structured_output_is_not_persisted(self) -> None:
         reader = Reader(
