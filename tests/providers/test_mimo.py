@@ -378,7 +378,12 @@ class MiMoResponsesAdapterTests(unittest.IsolatedAsyncioTestCase):
     async def test_quota_429_is_not_misclassified_as_generic_rate_limit(self) -> None:
         transport = FakeTransport(
             _response(
-                {"error": {"type": "token_plan_quota_exhausted", "code": "token_plan_quota_exhausted"}},
+                {
+                    "error": {
+                        "type": "token_plan_quota_exhausted",
+                        "code": "token_plan_quota_exhausted",
+                    }
+                },
                 status=429,
             )
         )
