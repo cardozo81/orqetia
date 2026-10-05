@@ -54,6 +54,7 @@ from .responses import (
     ProviderHttpTransport,
     ResponsesHttpAdapter,
 )
+from .xai import XAI_RESPONSES_ENDPOINT, XAIResponsesAdapter
 from .simulator import (
     ORQETIA_TEST_PROVIDER,
     DeterministicTestProvider,
@@ -122,5 +123,7 @@ __all__ = [
     "StructuredOutputSpec",
     "StructuredOutputValidator",
     "TargetIdentity",
+    "XAI_RESPONSES_ENDPOINT",
+    "XAIResponsesAdapter",
     "provider_port_plan",
 ]
