@@ -63,6 +63,43 @@ These rows do not import RASAi business domains. They extract only generic contr
 
 Explicitly RASAI-only: Directed Analysis, Competitive/Search Intelligence, HTML/CSS, report catalog/CATs, pt-BR labels, `safe_visible_fallback()` and RASAi-specific audit tables.
 
+## Revalidation outcome — #80 + RASAi PR #201
+
+The current M0 revalidation is complete at the contract/matrix level.
+
+### Execution selection delta (#80)
+
+| Concern | Historical canonical behavior | ORQETIA result | Classification | Reuse path |
+|---|---|---|---|---|
+| Explicit provider | One-provider/unitary pool | Generalized to a frozen `provider + model + reasoning_profile` unitary target | CANONICAL_PRESERVE for unitary-pool semantics; EVOLUTION_REQUIRES_ADR for the richer target shape | `provider_runtime_policy.py` / PORT_ALGORITHM |
+| AUTO eligibility | Pricing does not gate eligibility | Preserved | CANONICAL_PRESERVE | `provider_runtime_policy.py` + registry boundary |
+| AUTO candidate ordering | Comparable priced candidates before deterministic fallback; UNPRICED remains eligible | Preserved and generalized to explicit comparison groups without implicit FX | CANONICAL_PRESERVE plus ORQETIA policy metadata | `dynamic_ai_routing.py` / PORT_ALGORITHM |
+| Retry/cycle ownership | Orchestrator owns retry/cycle/timer | Preserved for AUTO and EXPLICIT_TARGET | CANONICAL_PRESERVE | `ai_canonical_orchestration.py` / EXTRACT_PURE |
+| Explicit fallback | Explicit provider does not become AUTO | Preserved: EXPLICIT_TARGET never cross-target falls back | CANONICAL_PRESERVE | policy/orchestration port |
+| Attempt provenance | Per-attempt facts | Strengthened by ADR-0018 stable `attempt_id` | GENERALIZE_NAME_ONLY + post-baseline carry-over | execution persistence / REIMPLEMENT_BOUNDARY |
+
+ADR-0020 is the explicit ORQETIA evolution record for the richer explicit target and cross-comparison-group ordering semantics.
+
+### RASAi PR #201 carry-over resolution
+
+- #86 / ADR-0018: stable attempt identity across exchange, usage, pricing and diagnostics — accepted.
+- #87 / ADR-0018: taskless operation boundary without synthetic task/round — accepted.
+- #88 / ADR-0019: sanitized raw evidence integrity and provider identity boundary — accepted.
+- RASAi-specific Directed Analysis, Competitive/Search Intelligence, report catalog/CATs, HTML/CSS, labels, `safe_visible_fallback()` and audit tables remain outside ORQETIA core.
+
+### Reuse classification
+
+The reuse-first mapping from ADR-0001 remains valid:
+- orchestration cycle/timer/outcome core: **EXTRACT_PURE**;
+- AUTO ranking/health and explicit unitary-target mechanics: **PORT_ALGORITHM**;
+- provider/model registry and durable persistence/API boundaries: **REIMPLEMENT_BOUNDARY**;
+- provider adapters: **COPY_ADAPT** per provider after contract tests;
+- RASAi consumer-domain orchestration hooks: **DO_NOT_PORT_DOMAIN**.
+
+### Source integrity
+
+No mutation of `cardozo81/RASAI-Readiness-Auditor` was required for this revalidation. RASAi remains a read-only source of characterized requirements.
+
 ## State semantics frozen for #34
 
 The characterization suite must cover, at minimum:
