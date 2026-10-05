@@ -30,7 +30,9 @@ work_items = sa.Table(
     sa.Column("lease_owner", sa.Text(), nullable=True),
     sa.Column("lease_until", sa.DateTime(timezone=True), nullable=True),
     sa.Column("last_error_class", sa.Text(), nullable=True),
-    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+    sa.Column(
+        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    ),
     sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("dead_at", sa.DateTime(timezone=True), nullable=True),
@@ -86,7 +88,9 @@ event_deliveries = sa.Table(
     sa.Column("data_classification", sa.Text(), nullable=False),
     sa.Column("payload", JSONB(), nullable=False),
     sa.Column("state", sa.Text(), nullable=False, server_default="READY"),
-    sa.Column("available_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+    sa.Column(
+        "available_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    ),
     sa.Column("attempt_count", sa.Integer(), nullable=False, server_default="0"),
     sa.Column("lease_owner", sa.Text(), nullable=True),
     sa.Column("lease_until", sa.DateTime(timezone=True), nullable=True),
@@ -94,7 +98,9 @@ event_deliveries = sa.Table(
     sa.Column("delivered_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("acked_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("dead_at", sa.DateTime(timezone=True), nullable=True),
-    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+    sa.Column(
+        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    ),
     sa.UniqueConstraint("event_id", "consumer_name", name="uq_event_deliveries_event_consumer"),
     sa.CheckConstraint("event_version >= 1", name="event_version_positive"),
     sa.CheckConstraint("state IN ('READY','LEASED','ACKED','DEAD')", name="state_known"),
