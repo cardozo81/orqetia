@@ -166,6 +166,11 @@ class ProviderAttemptResult:
         if set(self.accepted_requirements) & set(self.missing_requirements):
             raise ValueError("accepted and missing requirements must be disjoint")
 
+    @property
+    def latency_ms(self) -> int:
+        """Canonical latency alias retained over the simulator-era storage field."""
+        return self.simulated_latency_ms
+
 
 class ProviderAdapter(Protocol):
     async def invoke(self, request: ProviderAttemptRequest) -> ProviderAttemptResult:
