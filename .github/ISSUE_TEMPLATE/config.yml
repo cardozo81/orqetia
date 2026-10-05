@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: ORQETIA Development Roadmap
+    url: https://github.com/cardozo81/orqetia/issues/47
+    about: Check execution order and gates before opening new work.
+  - name: Architecture master epic
+    url: https://github.com/cardozo81/orqetia/issues/1
+    about: Review project boundaries and current DEVELOPMENT state.
