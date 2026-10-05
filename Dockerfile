@@ -30,7 +30,6 @@ COPY --chown=10001:10001 alembic.ini ./
 COPY --chown=10001:10001 migrations ./migrations
 COPY --chown=10001:10001 apps ./apps
 COPY --chown=10001:10001 contracts ./contracts
-COPY --chown=10001:10001 scripts/dev_container_process.py ./scripts/dev_container_process.py
 
 USER 10001:10001
 

@@ -62,14 +62,14 @@ services:
     environment:
       <<: *runtime-environment
       ORQETIA_PROCESS_ROLE: worker
-    command: ["python", "/app/scripts/dev_container_process.py", "worker"]
+    command: ["python", "-m", "apps.worker.main"]
 
   scheduler:
     <<: *runtime-service
     environment:
       <<: *runtime-environment
       ORQETIA_PROCESS_ROLE: scheduler
-    command: ["python", "/app/scripts/dev_container_process.py", "scheduler"]
+    command: ["python", "-m", "apps.scheduler.main"]
 
   migrate:
     <<: *runtime-service
