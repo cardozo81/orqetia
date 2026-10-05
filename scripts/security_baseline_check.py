@@ -44,7 +44,7 @@ def check_secrets(paths: list[Path], errors: list[str]) -> None:
     for path in paths:
         try:
             data = path.read_bytes()
-        except (OSError, UnicodeError):
+        except OSError, UnicodeError:
             continue
         if len(data) > 2_000_000:
             continue
