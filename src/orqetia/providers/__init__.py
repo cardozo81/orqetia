@@ -9,6 +9,7 @@ from .io import (
     StructuredOutputSpec,
     StructuredOutputValidator,
 )
+from .mimo import MIMO_RESPONSES_ENDPOINT, MiMoResponsesAdapter
 from .openai import OPENAI_RESPONSES_ENDPOINT, OpenAIResponsesAdapter
 from .parity import (
     CANONICAL_PROVIDER_PORT_PLAN,
@@ -71,6 +72,7 @@ __all__ = [
     "OPENAI_RESPONSES_ENDPOINT",
     "INITIAL_PROVIDER_TAXONOMY",
     "MANDATORY_ADAPTER_PARITY_GATES",
+    "MIMO_RESPONSES_ENDPOINT",
     "AdapterParityGate",
     "AdapterTransportFamily",
     "ORQETIA_TEST_PROVIDER",
@@ -78,6 +80,7 @@ __all__ = [
     "DeepSeekResponsesAdapter",
     "DeterministicTestProvider",
     "HttpxProviderHttpTransport",
+    "MiMoResponsesAdapter",
     "NativeUsage",
     "OpenAIResponsesAdapter",
     "OutputKind",
