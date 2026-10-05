@@ -6,11 +6,10 @@ It freezes behavior characterized in docs/architecture/rasai-canonical-character
 
 from __future__ import annotations
 
+import math
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-import math
-from typing import Callable, Iterable, Mapping, Sequence
-
 
 TERMINAL_ERRORS = frozenset(
     {"AUTH_ERROR", "CREDIT_ERROR", "QUOTA_ERROR", "MODEL_ERROR", "PERMISSION_ERROR"}
@@ -86,7 +85,7 @@ def effective_cycle_delay(
             continue
         try:
             value = float(raw)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
         if not math.isfinite(value) or value < 0:
             continue
@@ -120,7 +119,9 @@ def run_need(
             if result.outcome is Outcome.COMPLETE:
                 return Execution(FinalState.COMPLETE, cycles_executed, calls, True, result.outcome)
             if result.outcome is Outcome.INPUT_BLOCKED:
-                return Execution(FinalState.INPUT_BLOCKED, cycles_executed, calls, progress, result.outcome)
+                return Execution(
+                    FinalState.INPUT_BLOCKED, cycles_executed, calls, progress, result.outcome
+                )
             if result.outcome is Outcome.PARTIAL_PROGRESS:
                 progress = True
             elif result.outcome is Outcome.TRANSIENT_FAILURE:
@@ -203,13 +204,21 @@ def canonical_total_tokens(source: Mapping[str, object]) -> int | None:
 def attempt_monetary_cost(attempt: Mapping[str, object]) -> tuple[float | None, str | None, str]:
     observed = attempt.get("observed_cost")
     if observed not in (None, ""):
-        currency = attempt.get("observed_cost_currency") or attempt.get("cost_currency") or attempt.get("currency")
+        currency = (
+            attempt.get("observed_cost_currency")
+            or attempt.get("cost_currency")
+            or attempt.get("currency")
+        )
         return float(observed), str(currency).upper() if currency else None, "PROVIDER_OBSERVED"
 
     estimated = attempt.get("estimated_cost")
     if estimated not in (None, ""):
         currency = attempt.get("cost_currency") or attempt.get("currency")
-        return float(estimated), str(currency).upper() if currency else None, "USAGE_DERIVED_ESTIMATE"
+        return (
+            float(estimated),
+            str(currency).upper() if currency else None,
+            "USAGE_DERIVED_ESTIMATE",
+        )
 
     legacy = attempt.get("estimated_cost_usd")
     if legacy not in (None, ""):
@@ -236,7 +245,9 @@ def aggregate_attempt_costs(
     for attempt in attempts:
         amount, currency, _basis = attempt_monetary_cost(attempt)
         if amount is None or not currency:
-            if any(attempt.get(key) is not None for key in _USAGE_KEYS) or bool(attempt.get("native_usage")):
+            if any(attempt.get(key) is not None for key in _USAGE_KEYS) or bool(
+                attempt.get("native_usage")
+            ):
                 unpriced += 1
             continue
         totals[currency] = totals.get(currency, 0.0) + amount
@@ -259,7 +270,9 @@ def usage_is_priceable(
         return True
     if input_tokens is None or output_tokens is None:
         return False
-    if cached_input_tokens is None and not math.isclose(input_rate, cached_rate, rel_tol=0.0, abs_tol=1e-12):
+    if cached_input_tokens is None and not math.isclose(
+        input_rate, cached_rate, rel_tol=0.0, abs_tol=1e-12
+    ):
         return False
     return True
 
