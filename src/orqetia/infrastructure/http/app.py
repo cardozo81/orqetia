@@ -1,6 +1,6 @@
 """FastAPI application factory for the canonical client API shell."""
 
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from copy import deepcopy
 from datetime import datetime
@@ -62,7 +62,7 @@ def create_app(
     """Build the client API shell around the versioned canonical OpenAPI document."""
 
     @asynccontextmanager
-    async def lifespan(_app: FastAPI):
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         try:
             yield
         finally:
