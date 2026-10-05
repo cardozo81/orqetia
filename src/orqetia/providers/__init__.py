@@ -54,7 +54,6 @@ from .responses import (
     ProviderHttpTransport,
     ResponsesHttpAdapter,
 )
-from .xai import XAI_RESPONSES_ENDPOINT, XAIResponsesAdapter
 from .simulator import (
     ORQETIA_TEST_PROVIDER,
     DeterministicTestProvider,
@@ -66,6 +65,7 @@ from .simulator import (
     SimulatorScenario,
     SimulatorStep,
 )
+from .xai import XAI_RESPONSES_ENDPOINT, XAIResponsesAdapter
 
 __all__ = [
     "CANONICAL_PROVIDER_PORT_PLAN",
