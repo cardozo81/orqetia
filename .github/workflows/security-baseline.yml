@@ -40,3 +40,6 @@ jobs:
 
       - name: Explicit target authorization revalidation tests
         run: python3 -m unittest tests.contracts.test_authz_target_reference -v
+
+      - name: AUTO and explicit execution selection tests
+        run: python3 -m unittest tests.contracts.test_execution_target_reference -v
