@@ -748,11 +748,11 @@ class CanonicalOrchestrationPolicyTests(unittest.TestCase):
         )
         return ExecutionTask(
             task_id=uuid7(),
-            session_id=self._session_id(),
+            session_id=self.session_id,
             ownership=self.scope,
             operation="TASK_EXECUTION",
             status=TaskStatus.RUNNING,
-            effective_policy_version_id=self._policy_id(),
+            effective_policy_version_id=self.policy_id,
             requested_execution_mode=mode,
             requested_target=requested,
             effective_target=explicit_target,
