@@ -167,6 +167,22 @@ class PostgresWorkQueue(WorkQueuePort):
             rows = (await session.execute(statement)).mappings().all()
         return tuple(_work_lease(row) for row in rows)
 
+    async def renew_lease(self, lease: WorkLease, *, lease_seconds: int) -> bool:
+        deadline = _lease_deadline(lease_seconds)
+        statement = (
+            sa.update(work_items)
+            .where(
+                work_items.c.work_id == lease.work_id,
+                work_items.c.state == WorkState.LEASED.value,
+                work_items.c.lease_owner == lease.lease_owner,
+                work_items.c.lease_until > sa.func.now(),
+            )
+            .values(lease_until=deadline)
+        )
+        async with self._sessions.begin() as session:
+            result = await session.execute(statement)
+        return result.rowcount == 1
+
     async def complete(self, lease: WorkLease) -> bool:
         statement = (
             sa.update(work_items)
@@ -174,7 +190,7 @@ class PostgresWorkQueue(WorkQueuePort):
                 work_items.c.work_id == lease.work_id,
                 work_items.c.state == WorkState.LEASED.value,
                 work_items.c.lease_owner == lease.lease_owner,
-                work_items.c.lease_until == lease.lease_until,
+                work_items.c.lease_until > sa.func.now(),
             )
             .values(
                 state=WorkState.DONE.value,
@@ -204,7 +220,7 @@ class PostgresWorkQueue(WorkQueuePort):
                 work_items.c.work_id == lease.work_id,
                 work_items.c.state == WorkState.LEASED.value,
                 work_items.c.lease_owner == lease.lease_owner,
-                work_items.c.lease_until == lease.lease_until,
+                work_items.c.lease_until > sa.func.now(),
             )
             .values(
                 state=sa.case(
