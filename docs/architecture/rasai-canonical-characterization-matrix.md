@@ -8,7 +8,8 @@ Baseline characterized read-only from:
 - commit: `c66188e6e3088603b08eb750eece272451d6342c`;
 - package/runtime: `0.7.0`;
 - canonical orchestration: RASAi #190 / PR #194;
-- canonical economic telemetry: RASAi #195 / PR #196.
+- canonical economic telemetry: RASAi #195 / PR #196;
+- post-baseline carry-over: RASAi PR #201 / main `8008a3e24550f7c4b199beb0adeefa9c4e618538` (read-only source).
 
 The RASAi repository is an immutable source for this project. No ORQETIA implementation may require a mutation there.
 
@@ -50,6 +51,18 @@ The RASAi repository is an immutable source for this project. No ORQETIA impleme
 | CHAR-025 | Search Intelligence Perplexity is not canonical LLM registry behavior | RASAi #178/#180 and ORQETIA boundary issue #29 | Domain-specific search integration is a distinct boundary; it must not be silently admitted into generic LLM AUTO merely because it uses AI. | EVOLUTION_REQUIRES_ADR | Separate capability boundary | Medium |
 | CHAR-026 | Provider-specific wire behavior is reusable behind a neutral protocol | `provider_extensions.py`, core providers, Copilot provider | Endpoint/auth/payload/error/usage extraction can be characterized and reused, but concrete SDK/env/domain coupling must not leak into consumer contracts. | GENERALIZE_NAME_ONLY | Provider Adapters | High |
 
+## Post-baseline carry-over — RASAi PR #201
+
+These rows do not import RASAi business domains. They extract only generic contracts proven by the post-refactor correction.
+
+| Carry-over | RASAi classification | Generic ORQETIA contract | ORQETIA decision class | Target |
+|---|---|---|---|---|
+| ORQETIA-CARRYOVER-001 | ORCHESTRATION_CANONICAL | One provider dispatch has one stable `attempt_id`; the same ID correlates exchange, usage, pricing and diagnostic evidence. Retry/fallback create distinct attempts even for identical payloads. Fingerprint/time/provider/model/purpose are not identities. | ORCHESTRATION_CORE + PERSISTENCE_CONTRACT + OBSERVABILITY_CONTRACT | ADR-0018 / #86 |
+| ORQETIA-CARRYOVER-002 | SHARED_CONTRACT_BOUNDARY | Attempt, operation and task are separate concepts. A governed operation may be taskless when explicitly allowed; `operation` and `attempt_id` remain mandatory. ORQETIA does not invent a generic round entity. | ORCHESTRATION_CORE + PERSISTENCE_CONTRACT | ADR-0018 / #87 |
+| ORQETIA-CARRYOVER-003 | SHARED_CONTRACT_BOUNDARY | Sanitization occurs before persisted exchange evidence; persisted sanitized raw evidence is not semantically humanized. Provider identity is a typed domain identity, separate from generic status/enum presentation. | OBSERVABILITY_CONTRACT + PUBLIC_API_CONTRACT + PERSISTENCE_CONTRACT | #88 |
+
+Explicitly RASAI-only: Directed Analysis, Competitive/Search Intelligence, HTML/CSS, report catalog/CATs, pt-BR labels, `safe_visible_fallback()` and RASAi-specific audit tables.
+
 ## State semantics frozen for #34
 
 The characterization suite must cover, at minimum:
@@ -67,7 +80,11 @@ The characterization suite must cover, at minimum:
 11. per-attempt monetary precedence;
 12. multi-currency separation;
 13. UNPRICED counted separately from zero;
-14. mixed native/token pricing remains UNPRICED without an explicit rule.
+14. mixed native/token pricing remains UNPRICED without an explicit rule;
+15. one dispatch keeps one stable attempt_id through exchange/usage/pricing/diagnostic facts;
+16. retry/fallback creates a new attempt_id even with identical payload;
+17. taskless operation is valid only with explicit operation contract, without synthetic round/task;
+18. sanitized raw evidence/provider identity boundary from #88.
 
 ## RASAi coupling that must not enter ORQETIA core
 
@@ -98,13 +115,15 @@ Suitable for extraction/generalization:
 
 ## Target issue mapping
 
-- #34 — characterization suite for CHAR-001..CHAR-021 core invariants;
+- #34 — characterization suite for CHAR-001..CHAR-021 plus PR #201 carry-over contract gates;
 - #8 — execution policy/orchestration engine;
 - #9/#10 — registry/adapters;
 - #16 — usage/pricing/accounting;
 - #6/#7/#15 — session/task/worker durability;
 - #29 — Perplexity/search boundary;
-- #43 — reuse strategy by source module.
+- #43 — reuse strategy by source module;
+- #86/#87 — attempt identity and taskless operation;
+- #88 — exchange evidence/provider identity boundary.
 
 ## Change rule
 

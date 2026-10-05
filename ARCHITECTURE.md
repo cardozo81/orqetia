@@ -54,6 +54,20 @@ Unless an ADR explicitly changes them:
 
 See #31, #34 and #43.
 
+## Attempt identity and operation boundary
+
+RASAi PR #201 / main `8008a3e24550f7c4b199beb0adeefa9c4e618538` is a read-only post-baseline requirement source.
+
+ORQETIA generic contracts:
+- each provider dispatch has a stable `attempt_id` created before dispatch;
+- exchange, usage, pricing and diagnostic facts use that same ID;
+- normal retry/fallback creates a new attempt even for an identical request payload;
+- request fingerprints are not attempt identities;
+- an operation may be taskless when its ORQETIA operation contract explicitly allows it;
+- `operation` remains explicit and no RASAi-style generic round is introduced.
+
+See ADR-0018 / #86 / #87.
+
 ## Administration boundary
 
 Only authorized Backoffice users administer tenants, clients, Backoffice users, execution policies, orchestration parameters, providers/models/endpoints, provider credentials, pricing, quotas, rate limits and scopes.
