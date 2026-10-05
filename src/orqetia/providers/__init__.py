@@ -1,5 +1,21 @@
 """Provider adapter contracts, registry contracts and deterministic test-provider support."""
 
+from .io import (
+    ProviderCredential,
+    ProviderInvocationPayload,
+    ProviderRequestPayloadReader,
+    ProviderResponsePayloadWriter,
+    StructuredOutputSpec,
+    StructuredOutputValidator,
+)
+from .openai import (
+    OPENAI_RESPONSES_ENDPOINT,
+    HttpxProviderHttpTransport,
+    OpenAIResponsesAdapter,
+    ProviderDispatchAmbiguousError,
+    ProviderHttpResponse,
+    ProviderHttpTransport,
+)
 from .parity import (
     CANONICAL_PROVIDER_PORT_PLAN,
     MANDATORY_ADAPTER_PARITY_GATES,
@@ -50,6 +66,7 @@ from .simulator import (
 
 __all__ = [
     "CANONICAL_PROVIDER_PORT_PLAN",
+    "OPENAI_RESPONSES_ENDPOINT",
     "INITIAL_PROVIDER_TAXONOMY",
     "MANDATORY_ADAPTER_PARITY_GATES",
     "AdapterParityGate",
@@ -57,10 +74,17 @@ __all__ = [
     "ORQETIA_TEST_PROVIDER",
     "AdapterResolution",
     "DeterministicTestProvider",
+    "HttpxProviderHttpTransport",
     "NativeUsage",
+    "OpenAIResponsesAdapter",
     "OutputKind",
     "ProviderAdapter",
     "ProviderAttemptRequest",
+    "ProviderCredential",
+    "ProviderDispatchAmbiguousError",
+    "ProviderHttpResponse",
+    "ProviderHttpTransport",
+    "ProviderInvocationPayload",
     "ProviderAttemptResult",
     "ProviderCapability",
     "ProviderCostMetadata",
@@ -70,6 +94,8 @@ __all__ = [
     "ProviderRegistry",
     "ProviderRegistryError",
     "ProviderRegistryReader",
+    "ProviderRequestPayloadReader",
+    "ProviderResponsePayloadWriter",
     "ProviderSpec",
     "ProviderTarget",
     "ProviderUsage",
@@ -86,6 +112,8 @@ __all__ = [
     "SimulatorInvocation",
     "SimulatorScenario",
     "SimulatorStep",
+    "StructuredOutputSpec",
+    "StructuredOutputValidator",
     "TargetIdentity",
     "provider_port_plan",
 ]
