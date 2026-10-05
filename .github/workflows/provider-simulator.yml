@@ -1,0 +1,40 @@
+name: Provider simulator
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: provider-simulator-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned uv bootstrap tool
+        run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+
+      - name: Verify locked dependencies
+        run: uv lock --check
+
+      - name: Reproduce locked Python 3.14 development environment
+        run: uv sync --locked --python 3.14
+
+      - name: Provider simulator unit tests
+        run: |
+          uv run --no-sync --python 3.14 python -m unittest \
+            tests.providers.test_simulator \
+            -v
