@@ -35,6 +35,10 @@ Pricing is not an eligibility gate. UNPRICED candidates remain eligible. Currenc
 
 A service client may request an authorized provider, model and reasoning/depth profile. The effective target is then immutable for that task. Retry, Retry-After, timeout, cycles and validation remain ORQETIA responsibilities, but no cross-provider/model/depth fallback is allowed because of cost.
 
+Normal retries create new `attempt_id` values while preserving the same explicit effective target. For AUTO, there is no single fixed task-level target; actual target provenance is stored per attempt.
+
+The full selection contract, economic comparison-group rules and explicit-target hard constraint are defined by ADR-0020 / #80.
+
 ## Canonical execution invariants
 
 Unless an ADR explicitly changes them:
