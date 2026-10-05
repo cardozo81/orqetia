@@ -76,7 +76,7 @@ class JsonEventEmitter:
     """JSON-lines emitter that redacts sensitive or payload-bearing fields."""
 
     def __init__(self, stream: TextIO | None = None) -> None:
-        self._stream = stream or sys.stdout
+        self._stream = stream
 
     def emit(self, event: str, fields: Mapping[str, object]) -> None:
         normalized_event = event.strip()
@@ -88,8 +88,8 @@ class JsonEventEmitter:
         }
         record.update(sanitize_telemetry_mapping(fields))
         print(
-            json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
-            file=self._stream,
+            json.dumps(record, ensure_ascii=False, sort_keys=True),
+            file=self._stream or sys.stdout,
             flush=True,
         )
 
