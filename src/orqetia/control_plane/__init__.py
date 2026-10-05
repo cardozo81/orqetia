@@ -1,5 +1,17 @@
-"""control plane bounded-context package.
+"""Control Plane contracts for provider, policy and administrative configuration."""
 
-This package is intentionally a scaffold only in Phase 1. Business behavior is
-introduced through its owning implementation issues.
-"""
+from .quota_tables import quota_policies
+from .quotas import (
+    QuotaEnforcementMode,
+    QuotaMetric,
+    QuotaPolicySnapshot,
+    QuotaScope,
+)
+
+__all__ = [
+    "QuotaEnforcementMode",
+    "QuotaMetric",
+    "QuotaPolicySnapshot",
+    "QuotaScope",
+    "quota_policies",
+]

@@ -17,6 +17,18 @@ from .domain import (
 )
 from .ledger import AccountingLedger, AccountingService, InMemoryAccountingLedger
 from .postgres import PostgresAccountingLedger
+from .quota_tables import quota_reservations, quota_windows
+from .quotas import (
+    InMemoryQuotaEnforcer,
+    QuotaDecision,
+    QuotaEnforcer,
+    QuotaReconciliation,
+    QuotaReservation,
+    QuotaReservationStatus,
+    QuotaUtilization,
+    QuotaWindow,
+    quota_window,
+)
 from .pricing import (
     ContextTier,
     PricingCatalog,
@@ -39,10 +51,18 @@ __all__ = [
     "CurrencyTotal",
     "InMemoryAccountingLedger",
     "InternalCostSnapshot",
+    "InMemoryQuotaEnforcer",
     "MonetaryAmount",
     "NativeUsageQuantity",
     "PostgresAccountingLedger",
     "PricingCatalog",
+    "QuotaDecision",
+    "QuotaEnforcer",
+    "QuotaReconciliation",
+    "QuotaReservation",
+    "QuotaReservationStatus",
+    "QuotaUtilization",
+    "QuotaWindow",
     "PricingModel",
     "PricingQuote",
     "PricingResolver",
@@ -52,4 +72,7 @@ __all__ = [
     "TimeWindow",
     "TokenRates",
     "aggregate_costs",
+    "quota_reservations",
+    "quota_window",
+    "quota_windows",
 ]
