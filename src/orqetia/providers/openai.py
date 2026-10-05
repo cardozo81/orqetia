@@ -365,8 +365,9 @@ class OpenAIResponsesAdapter(ProviderAdapter):
         error_class: str,
         started: float,
         retry_after_seconds: int | None = None,
-        usage: ProviderUsage = ProviderUsage(),
+        usage: ProviderUsage | None = None,
     ) -> ProviderAttemptResult:
+        normalized_usage = usage if usage is not None else ProviderUsage()
         return ProviderAttemptResult(
             attempt_id=request.attempt_id,
             outcome=outcome,
@@ -380,7 +381,7 @@ class OpenAIResponsesAdapter(ProviderAdapter):
             simulated_latency_ms=_elapsed_ms(started),
             error_class=_safe_token(error_class) or "OPENAI_PROVIDER_ERROR",
             retry_after_seconds=retry_after_seconds,
-            usage=usage,
+            usage=normalized_usage,
         )
 
 
