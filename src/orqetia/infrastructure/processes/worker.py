@@ -29,7 +29,7 @@ class HandlerOutcome:
     error_class: str | None = None
 
     @classmethod
-    def complete(cls) -> "HandlerOutcome":
+    def complete(cls) -> HandlerOutcome:
         return cls(HandlerDisposition.COMPLETE)
 
     @classmethod
@@ -38,7 +38,7 @@ class HandlerOutcome:
         *,
         available_at: datetime,
         error_class: str,
-    ) -> "HandlerOutcome":
+    ) -> HandlerOutcome:
         if not error_class.strip():
             raise ValueError("error_class is required for infrastructure requeue")
         return cls(
