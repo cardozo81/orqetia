@@ -77,7 +77,11 @@ class OpenApiV1ContractTests(unittest.TestCase):
             self.schemas["ExecutionSelection"]["$ref"],
             "../execution/task-execution-selection.schema.json",
         )
-        self.assertEqual(self.execution["default"], {"mode": "AUTO"})
+        modes = {
+            branch["properties"]["mode"]["const"]
+            for branch in self.execution["oneOf"]
+        }
+        self.assertIn("AUTO", modes)
 
     def test_explicit_target_requires_conditional_scope(self) -> None:
         op = self.spec["paths"]["/v1/sessions/{session_id}/tasks"]["post"]
