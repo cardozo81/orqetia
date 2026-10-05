@@ -1,5 +1,12 @@
 """Execution bounded-context contracts and PostgreSQL adapters."""
 
+from .attempt_postgres import (
+    PROVIDER_DISPATCH_OPERATION,
+    PROVIDER_DISPATCH_VERSION,
+    PostgresProviderAttemptStore,
+)
+from .attempt_tables import attempt_metadata, provider_attempts
+from .attempts import ProviderAttempt, ProviderAttemptStatus, ProviderAttemptStore
 from .postgres import PostgresExecutionSessionStore
 from .sessions import (
     ExecutionSession,
@@ -35,6 +42,8 @@ from .tasks import (
 )
 
 __all__ = [
+    "PROVIDER_DISPATCH_OPERATION",
+    "PROVIDER_DISPATCH_VERSION",
     "ExecutionMode",
     "ExecutionSession",
     "ExecutionSessionStore",
@@ -44,6 +53,10 @@ __all__ = [
     "OwnershipScope",
     "PostgresExecutionSessionStore",
     "PostgresExecutionTaskStore",
+    "PostgresProviderAttemptStore",
+    "ProviderAttempt",
+    "ProviderAttemptStatus",
+    "ProviderAttemptStore",
     "QuarantineState",
     "RequestedTargetSnapshot",
     "SessionPolicySnapshot",
@@ -55,8 +68,10 @@ __all__ = [
     "TaskReasonEnvelope",
     "TaskStatus",
     "VALID_TRANSITIONS",
+    "attempt_metadata",
     "execution_metadata",
     "execution_sessions",
+    "provider_attempts",
     "session_target_runtime",
     "task_cycle_decisions",
     "task_metadata",
