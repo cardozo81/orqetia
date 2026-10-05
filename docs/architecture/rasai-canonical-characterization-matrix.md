@@ -63,6 +63,44 @@ These rows do not import RASAi business domains. They extract only generic contr
 
 Explicitly RASAI-only: Directed Analysis, Competitive/Search Intelligence, HTML/CSS, report catalog/CATs, pt-BR labels, `safe_visible_fallback()` and RASAi-specific audit tables.
 
+## ORQETIA evolution accepted by ADR-0020 / #80
+
+These rows are **not** retroactive claims about RASAi. They are explicit ORQETIA evolution decisions built on the characterized baseline.
+
+| ORQETIA behavior | Baseline preserved | Evolution | Classification |
+|---|---|---|---|
+| Omitted target => AUTO | AUTO routing remains canonical and pricing does not gate eligibility | Public API now makes AUTO the explicit default when execution target is omitted | EVOLUTION_REQUIRES_ADR — accepted by ADR-0020 |
+| EXPLICIT_TARGET provider+model+reasoning profile | CHAR-008 explicit provider remains a unitary candidate pool under the same orchestration owner | ORQETIA resolves a complete authorized target and freezes all three dimensions | EVOLUTION_REQUIRES_ADR — accepted by ADR-0020 |
+| Explicit retries/cycles | Retry/cycle/timer/validation remain ORQETIA-owned | Every normal retry creates a new attempt_id but keeps the same effective target | CANONICAL_PRESERVE + ADR-0018 identity contract |
+| AUTO cost escalation | CHAR-009 pricing-independent eligibility, CHAR-010 cost-aware ordering and CHAR-012 partial preservation remain intact | ORQETIA makes the “cheapest comparable first, escalate only if needed” ladder explicit | GENERALIZE_NAME_ONLY / ADR-0020 |
+| Multi-currency/native comparison groups | CHAR-018 forbids implicit FX and heterogeneous-currency summation | Ordering between non-comparable groups uses explicit policy rank rather than fabricated money equivalence | EVOLUTION_REQUIRES_ADR — accepted by ADR-0020 |
+| Invalid explicit target | Canonical explicit mode never needs cross-provider discovery | Invalid/unentitled provider/model/profile is rejected before dispatch; no silent AUTO fallback | EVOLUTION_REQUIRES_ADR — accepted by ADR-0020 |
+
+## Reuse mapping for current ORQETIA contracts
+
+The reuse strategy from ADR-0001/#43 remains valid. The current delta maps as follows:
+
+| Source / learned contract | Strategy | What ORQETIA preserves/reuses | What ORQETIA deliberately reimplements/omits |
+|---|---|---|---|
+| `ai_canonical_orchestration.py` | EXTRACT_PURE | cycle algorithm, single timer owner, Retry-After cap, partial/no-progress/complete semantics | RASAi configuration/domain wiring |
+| `dynamic_ai_routing.py` | PORT_ALGORITHM | eligibility, health/quarantine distinction, deterministic candidate ordering | in-process RASAi session/context structures |
+| `provider_runtime_policy.py` explicit provider | PORT_ALGORITHM | explicit selection as unitary orchestration pool | ORQETIA target resolution/authz is its own control-plane/API contract |
+| `ai_economic_telemetry.py` / cost policy | EXTRACT_PURE / COPY_ADAPT | pricing-independent eligibility, usage/cost semantics, UNPRICED/no-FX invariants | RASAi catalog/config ownership |
+| PR #201 attempt/exchange correlation | REIMPLEMENT_BOUNDARY | stable attempt_id contract and explicit correlation precedence | RASAi SQLite tables, recorder APIs, ID prefixes and report joins |
+| PR #201 taskless execution lesson | REIMPLEMENT_BOUNDARY + DO_NOT_PORT_DOMAIN | explicit operation with optional task when contract permits | DIRECTED_ANALYSIS, RASAi task/round schema and strategic-domain semantics |
+| PR #201 raw-evidence/provider presentation lesson | REIMPLEMENT_BOUNDARY + DO_NOT_PORT_DOMAIN | sanitize-before-persist, immutable sanitized raw evidence, typed provider identity | HTML/CSS, report catalog, pt-BR labels, safe_visible_fallback and visual provider rules |
+
+No near-total rewrite decision is introduced by #80/#86/#87/#88; Python remains compatible with the reuse-first strategy.
+
+## Revalidation conclusion — 2026-10-05
+
+- CHAR-008 remains the historical canonical “explicit provider = unitary pool” contract.
+- ADR-0020 is the approved ORQETIA generalization to provider+model+reasoning target, preserving unitary-pool orchestration semantics.
+- AUTO cost escalation does not alter CHAR-009 eligibility: pricing never becomes an admission gate.
+- PR #201 / main `8008a3e24550f7c4b199beb0adeefa9c4e618538` is recorded only as a read-only post-baseline requirements source.
+- #86/#87/#88 implement only generic contracts; no RASAi-specific domain or presentation rule is imported.
+- No mutation to the RASAi repository was necessary or performed.
+
 ## State semantics frozen for #34
 
 The characterization suite must cover, at minimum:
@@ -122,6 +160,7 @@ Suitable for extraction/generalization:
 - #6/#7/#15 — session/task/worker durability;
 - #29 — Perplexity/search boundary;
 - #43 — reuse strategy by source module;
+- #80 / ADR-0020 — AUTO vs EXPLICIT_TARGET evolution;
 - #86/#87 — attempt identity and taskless operation;
 - #88 — exchange evidence/provider identity boundary.
 
