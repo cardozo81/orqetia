@@ -8,6 +8,7 @@ from uuid import uuid7
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import RowMapping
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from orqetia.shared.messaging import (
@@ -41,7 +42,7 @@ def _limit(value: int) -> int:
     return value
 
 
-def _work_lease(row: sa.RowMapping) -> WorkLease:
+def _work_lease(row: RowMapping) -> WorkLease:
     return WorkLease(
         work_id=row["work_id"],
         queue_name=QueueName(row["queue_name"]),
@@ -63,7 +64,7 @@ def _work_lease(row: sa.RowMapping) -> WorkLease:
     )
 
 
-def _event_envelope(row: sa.RowMapping) -> EventEnvelope:
+def _event_envelope(row: RowMapping) -> EventEnvelope:
     return EventEnvelope(
         event_id=row["event_id"],
         event_type=row["event_type"],
@@ -196,6 +197,7 @@ class PostgresWorkQueue(WorkQueuePort):
         if not error_class.strip():
             raise ValueError("error_class is required")
 
+        exhausted = work_items.c.attempt_count >= work_items.c.max_infrastructure_attempts
         statement = (
             sa.update(work_items)
             .where(
@@ -203,14 +205,20 @@ class PostgresWorkQueue(WorkQueuePort):
                 work_items.c.state == WorkState.LEASED.value,
                 work_items.c.lease_owner == lease.lease_owner,
                 work_items.c.lease_until == lease.lease_until,
-                work_items.c.attempt_count < work_items.c.max_infrastructure_attempts,
             )
             .values(
-                state=WorkState.READY.value,
+                state=sa.case(
+                    (exhausted, WorkState.DEAD.value),
+                    else_=WorkState.READY.value,
+                ),
                 available_at=available_at,
                 lease_owner=None,
                 lease_until=None,
                 last_error_class=error_class,
+                dead_at=sa.case(
+                    (exhausted, sa.func.now()),
+                    else_=work_items.c.dead_at,
+                ),
             )
         )
         async with self._sessions.begin() as session:
