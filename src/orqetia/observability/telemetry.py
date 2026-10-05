@@ -21,12 +21,15 @@ UNSUPPORTED = "[UNSUPPORTED_VALUE]"
 _SENSITIVE_KEYS = frozenset(
     {
         "amount",
+        "access_token",
         "api_key",
         "authorization",
         "balance",
         "client_charge",
         "content",
         "cookie",
+        "credential",
+        "credentials",
         "cost_amount",
         "credit",
         "currency",
@@ -41,6 +44,7 @@ _SENSITIVE_KEYS = frozenset(
         "raw_input",
         "raw_output",
         "raw_prompt",
+        "refresh_token",
         "request_body",
         "response_body",
         "secret",
