@@ -42,9 +42,9 @@ class ChatCompletionsHttpAdapter(ProviderAdapter):
     error_prefix: str
     endpoint: str
     strict_json_schema = False
-    credit_error_markers = ("credit", "balance", "arrearage")
-    quota_error_markers = ("quota_exhausted", "freetieronly")
-    auth_error_markers = (
+    credit_error_markers: tuple[str, ...] = ("credit", "balance", "arrearage")
+    quota_error_markers: tuple[str, ...] = ("quota_exhausted", "freetieronly")
+    auth_error_markers: tuple[str, ...] = (
         "auth",
         "permission",
         "forbidden",
