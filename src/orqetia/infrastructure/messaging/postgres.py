@@ -269,11 +269,12 @@ class PostgresEventTransport(EventTransportPort):
             pg_insert(event_deliveries)
             .values(values)
             .on_conflict_do_nothing(index_elements=["event_id", "consumer_name"])
+            .returning(event_deliveries.c.delivery_id)
         )
 
         async with self._sessions.begin() as session:
-            result = await session.execute(statement)
-        return result.rowcount or 0
+            inserted = (await session.execute(statement)).scalars().all()
+        return len(inserted)
 
     async def claim(
         self,
