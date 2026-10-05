@@ -59,7 +59,7 @@ These rows do not import RASAi business domains. They extract only generic contr
 |---|---|---|---|---|
 | ORQETIA-CARRYOVER-001 | ORCHESTRATION_CANONICAL | One provider dispatch has one stable `attempt_id`; the same ID correlates exchange, usage, pricing and diagnostic evidence. Retry/fallback create distinct attempts even for identical payloads. Fingerprint/time/provider/model/purpose are not identities. | ORCHESTRATION_CORE + PERSISTENCE_CONTRACT + OBSERVABILITY_CONTRACT | ADR-0018 / #86 |
 | ORQETIA-CARRYOVER-002 | SHARED_CONTRACT_BOUNDARY | Attempt, operation and task are separate concepts. A governed operation may be taskless when explicitly allowed; `operation` and `attempt_id` remain mandatory. ORQETIA does not invent a generic round entity. | ORCHESTRATION_CORE + PERSISTENCE_CONTRACT | ADR-0018 / #87 |
-| ORQETIA-CARRYOVER-003 | SHARED_CONTRACT_BOUNDARY | Sanitization occurs before persisted exchange evidence; persisted sanitized raw evidence is not semantically humanized. Provider identity is a typed domain identity, separate from generic status/enum presentation. | OBSERVABILITY_CONTRACT + PUBLIC_API_CONTRACT + PERSISTENCE_CONTRACT | #88 |
+| ORQETIA-CARRYOVER-003 | SHARED_CONTRACT_BOUNDARY | Sanitization occurs before persisted exchange evidence; persisted sanitized raw evidence is not semantically humanized. Provider identity is a typed domain identity, separate from generic status/enum presentation. | OBSERVABILITY_CONTRACT + PUBLIC_API_CONTRACT + PERSISTENCE_CONTRACT | ADR-0019 / #88 |
 
 Explicitly RASAI-only: Directed Analysis, Competitive/Search Intelligence, HTML/CSS, report catalog/CATs, pt-BR labels, `safe_visible_fallback()` and RASAi-specific audit tables.
 
