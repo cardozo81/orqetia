@@ -109,7 +109,7 @@ Therefore:
 - worker infrastructure retry stays separate from logical retry;
 - normal logical retry/fallback creates a new attempt_id;
 - the same provider is never selected twice in one frozen cycle;
-- #9 remains responsible for the real provider registry/capability implementation.
+- #9 supplies provider-registry/capability eligibility; this engine consumes it without duplicating registry policy.
 
 ## Observability
 
