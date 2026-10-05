@@ -1,5 +1,7 @@
 """FastAPI application factory for the canonical client API shell."""
 
+from collections.abc import Awaitable, Callable, Sequence
+from contextlib import asynccontextmanager
 from copy import deepcopy
 from datetime import datetime
 import re
@@ -10,6 +12,7 @@ from fastapi import Depends, FastAPI, Header, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.cors import CORSMiddleware
 
 from orqetia.identity.authentication import (
     AuthenticatedPrincipal,
@@ -17,6 +20,7 @@ from orqetia.identity.authentication import (
     AuthenticationRejected,
     BearerAuthenticator,
 )
+from orqetia.infrastructure.health import ReadinessProbe
 
 from .models import (
     ErrorDetail,
@@ -50,8 +54,20 @@ def create_app(
     *,
     openapi_document: dict[str, Any],
     authenticator: BearerAuthenticator,
+    readiness_probe: ReadinessProbe | None = None,
+    cors_allowed_origins: Sequence[str] = (),
+    enable_hsts: bool = False,
+    shutdown_callback: Callable[[], Awaitable[None]] | None = None,
 ) -> FastAPI:
     """Build the client API shell around the versioned canonical OpenAPI document."""
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        try:
+            yield
+        finally:
+            if shutdown_callback is not None:
+                await shutdown_callback()
 
     app = FastAPI(
         title="ORQETIA Client API",
@@ -59,7 +75,23 @@ def create_app(
         docs_url=None,
         redoc_url=None,
         openapi_url="/openapi.json",
+        lifespan=lifespan,
     )
+
+    if cors_allowed_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(cors_allowed_origins),
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            allow_headers=[
+                "Authorization",
+                "Content-Type",
+                "Idempotency-Key",
+                "X-Correlation-ID",
+            ],
+            expose_headers=["Location", "Retry-After", "X-Correlation-ID"],
+        )
 
     def canonical_openapi() -> dict[str, Any]:
         return deepcopy(openapi_document)
@@ -87,6 +119,20 @@ def create_app(
             status_code=status_code,
             content=envelope.model_dump(mode="json"),
         )
+
+    @app.middleware("http")
+    async def security_headers_middleware(request: Request, call_next: Any) -> Any:
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Cache-Control"] = "no-store"
+        response.headers[
+            "Content-Security-Policy"
+        ] = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+        if enable_hsts:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
 
     @app.middleware("http")
     async def correlation_middleware(request: Request, call_next: Any) -> Any:
@@ -276,6 +322,26 @@ def create_app(
     ) -> None:
         del _provider_id
         not_implemented()
+
+    @app.get("/health/live", include_in_schema=False)
+    async def health_live() -> dict[str, str]:
+        return {"status": "live"}
+
+    @app.get("/health/ready", include_in_schema=False)
+    async def health_ready() -> JSONResponse:
+        if readiness_probe is None:
+            return JSONResponse(status_code=200, content={"status": "ready", "checks": {}})
+        try:
+            await readiness_probe.check()
+        except Exception:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "not_ready", "checks": {"database": "unavailable"}},
+            )
+        return JSONResponse(
+            status_code=200,
+            content={"status": "ready", "checks": {"database": "ready"}},
+        )
 
     @app.get("/v1/usage", response_model=None)
     async def get_usage(
