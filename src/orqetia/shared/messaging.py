@@ -197,6 +197,13 @@ class WorkQueuePort(Protocol):
 
     async def complete(self, lease: WorkLease) -> bool: ...
 
+    async def dead_letter(
+        self,
+        lease: WorkLease,
+        *,
+        error_class: str,
+    ) -> bool: ...
+
     async def requeue_infrastructure_failure(
         self,
         lease: WorkLease,
