@@ -324,7 +324,10 @@ class ResponsesHttpAdapter(ProviderAdapter):
         error_type, error_code = _error_tokens(response.body)
         token = " ".join(item.casefold() for item in (error_type, error_code) if item)
 
-        if response.status_code in {401, 403}:
+        auth_failure = any(
+            item in token for item in ("auth", "permission", "forbidden", "api_key")
+        )
+        if response.status_code in {401, 403} or auth_failure:
             outcome = ProviderOutcome.AUTH_FAILURE
         elif response.status_code == 402 or "credit" in token or "balance" in token:
             outcome = ProviderOutcome.CREDIT_EXHAUSTED
