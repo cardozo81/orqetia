@@ -1,0 +1,58 @@
+name: Project scaffold
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-scaffold-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  locked-project:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned uv bootstrap tool
+        run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+
+      - name: Bootstrap lockfile when absent
+        if: ${{ hashFiles('uv.lock') == '' }}
+        run: |
+          uv lock
+          python3 - <<'PY'
+          import base64
+          from pathlib import Path
+          data = base64.b64encode(Path("uv.lock").read_bytes()).decode("ascii")
+          print("UV_LOCK_B64_BEGIN")
+          print(data)
+          print("UV_LOCK_B64_END")
+          PY
+          echo "uv.lock is not committed yet; copy the generated lock from this job log and commit it."
+          exit 1
+
+      - name: Verify lockfile is current
+        if: ${{ hashFiles('uv.lock') != '' }}
+        run: uv lock --check
+
+      - name: Reproduce locked Python 3.14 runtime install
+        if: ${{ hashFiles('uv.lock') != '' }}
+        run: uv sync --locked --no-dev --python 3.14
+
+      - name: Import installed package
+        if: ${{ hashFiles('uv.lock') != '' }}
+        run: uv run --no-sync --python 3.14 python -c "import orqetia; print(orqetia.__version__)"
+
+      - name: Scaffold contract tests
+        if: ${{ hashFiles('uv.lock') != '' }}
+        run: PYTHONPATH=src python3 -m unittest tests.scaffold.test_project_scaffold -v
