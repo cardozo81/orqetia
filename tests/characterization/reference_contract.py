@@ -262,3 +262,17 @@ def usage_is_priceable(
     if cached_input_tokens is None and not math.isclose(input_rate, cached_rate, rel_tol=0.0, abs_tol=1e-12):
         return False
     return True
+
+
+def billable_output_tokens(
+    output_tokens: int | None,
+    reasoning_tokens: int | None,
+    *,
+    reasoning_billing_mode: str,
+) -> int:
+    """Freeze CHAR-021: reasoning billing is catalog-controlled."""
+    output = max(int(output_tokens or 0), 0)
+    reasoning = max(int(reasoning_tokens or 0), 0)
+    if reasoning_billing_mode == "ADD_REASONING_TO_OUTPUT":
+        return output + reasoning
+    return output
