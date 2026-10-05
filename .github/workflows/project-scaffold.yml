@@ -53,6 +53,10 @@ jobs:
         if: ${{ hashFiles('uv.lock') != '' }}
         run: uv run --no-sync --python 3.14 python -c "import orqetia; print(orqetia.__version__)"
 
-      - name: Scaffold contract tests
+      - name: Scaffold and runtime settings contract tests
         if: ${{ hashFiles('uv.lock') != '' }}
-        run: PYTHONPATH=src python3 -m unittest tests.scaffold.test_project_scaffold -v
+        run: |
+          uv run --no-sync --python 3.14 python -m unittest \
+            tests.scaffold.test_project_scaffold \
+            tests.scaffold.test_runtime_settings \
+            -v
