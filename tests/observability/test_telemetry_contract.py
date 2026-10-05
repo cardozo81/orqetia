@@ -119,6 +119,10 @@ class TelemetryContractTests(unittest.TestCase):
         emitter.emit(
             "test.safe",
             {
+                "access_token": "oauth-access-secret",
+                "refresh_token": "oauth-refresh-secret",
+                "credential": "provider-credential-secret",
+                "credentials": "provider-credentials-secret",
                 "api_key": "provider-secret",
                 "prompt": "private prompt",
                 "payload": {"raw_output": "private output"},
@@ -130,6 +134,10 @@ class TelemetryContractTests(unittest.TestCase):
         )
 
         record = json.loads(stream.getvalue())
+        self.assertEqual(record["access_token"], REDACTED)
+        self.assertEqual(record["refresh_token"], REDACTED)
+        self.assertEqual(record["credential"], REDACTED)
+        self.assertEqual(record["credentials"], REDACTED)
         self.assertEqual(record["api_key"], REDACTED)
         self.assertEqual(record["prompt"], REDACTED)
         self.assertEqual(record["payload"], REDACTED)
