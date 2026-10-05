@@ -232,7 +232,7 @@ class PostgreSQLMessagingIntegrationTests(unittest.TestCase):
     async def _test_database_classification_checks(self) -> None:
         engine, _ = await self._resources()
         try:
-            with self.assertRaises(Exception):
+            with self.assertRaises(sa.exc.IntegrityError):
                 async with engine.begin() as connection:
                     await connection.execute(
                         sa.insert(work_items).values(
@@ -249,7 +249,7 @@ class PostgreSQLMessagingIntegrationTests(unittest.TestCase):
                         )
                     )
 
-            with self.assertRaises(Exception):
+            with self.assertRaises(sa.exc.IntegrityError):
                 async with engine.begin() as connection:
                     await connection.execute(
                         sa.insert(work_items).values(

@@ -66,11 +66,13 @@ def upgrade() -> None:
             name="ck_work_items_state_known",
         ),
         sa.CheckConstraint(
-            "data_classification IN ('RESTRICTED','CONFIDENTIAL','CLIENT_PRIVATE','INTERNAL','PUBLIC')",
+            "data_classification IN "
+            "('RESTRICTED','CONFIDENTIAL','CLIENT_PRIVATE','INTERNAL','PUBLIC')",
             name="ck_work_items_classification_non_secret",
         ),
         sa.CheckConstraint(
-            "data_classification <> 'CLIENT_PRIVATE' OR (tenant_id IS NOT NULL AND client_id IS NOT NULL)",
+            "data_classification <> 'CLIENT_PRIVATE' OR "
+            "(tenant_id IS NOT NULL AND client_id IS NOT NULL)",
             name="ck_work_items_client_private_scoped",
         ),
         sa.CheckConstraint(
@@ -136,11 +138,13 @@ def upgrade() -> None:
             name="ck_event_deliveries_state_known",
         ),
         sa.CheckConstraint(
-            "data_classification IN ('RESTRICTED','CONFIDENTIAL','CLIENT_PRIVATE','INTERNAL','PUBLIC')",
+            "data_classification IN "
+            "('RESTRICTED','CONFIDENTIAL','CLIENT_PRIVATE','INTERNAL','PUBLIC')",
             name="ck_event_deliveries_classification_non_secret",
         ),
         sa.CheckConstraint(
-            "data_classification <> 'CLIENT_PRIVATE' OR (tenant_id IS NOT NULL AND client_id IS NOT NULL)",
+            "data_classification <> 'CLIENT_PRIVATE' OR "
+            "(tenant_id IS NOT NULL AND client_id IS NOT NULL)",
             name="ck_event_deliveries_client_private_scoped",
         ),
         sa.CheckConstraint(

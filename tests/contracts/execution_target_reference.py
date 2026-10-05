@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from tests.characterization.reference_contract import (
     FinalState,
@@ -15,7 +15,7 @@ from tests.characterization.reference_contract import (
 from tests.contracts.attempt_operation_reference import AttemptFactory, OperationContract
 
 
-class Mode(str, Enum):
+class Mode(StrEnum):
     AUTO = "AUTO"
     EXPLICIT_TARGET = "EXPLICIT_TARGET"
 

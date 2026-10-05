@@ -58,9 +58,11 @@ def validate_inline_payload(
     if data_classification is DataClassification.SECRET:
         raise ValueError("SECRET payload is prohibited in messaging")
 
-    if data_classification is DataClassification.CLIENT_PRIVATE:
-        if tenant_id is None or client_id is None:
-            raise ValueError("CLIENT_PRIVATE payload requires tenant_id and client_id")
+    if (
+        data_classification is DataClassification.CLIENT_PRIVATE
+        and (tenant_id is None or client_id is None)
+    ):
+        raise ValueError("CLIENT_PRIVATE payload requires tenant_id and client_id")
 
     try:
         encoded = json.dumps(

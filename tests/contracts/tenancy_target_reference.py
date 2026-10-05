@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class Mode(str, Enum):
+class Mode(StrEnum):
     AUTO = "AUTO"
     EXPLICIT_TARGET = "EXPLICIT_TARGET"
 

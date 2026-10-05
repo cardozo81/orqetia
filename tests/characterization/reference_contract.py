@@ -9,14 +9,14 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 TERMINAL_ERRORS = frozenset(
     {"AUTH_ERROR", "CREDIT_ERROR", "QUOTA_ERROR", "MODEL_ERROR", "PERMISSION_ERROR"}
 )
 
 
-class Outcome(str, Enum):
+class Outcome(StrEnum):
     COMPLETE = "COMPLETE"
     PARTIAL_PROGRESS = "PARTIAL_PROGRESS"
     INPUT_BLOCKED = "INPUT_BLOCKED"
@@ -25,7 +25,7 @@ class Outcome(str, Enum):
     NO_PROGRESS = "NO_PROGRESS"
 
 
-class FinalState(str, Enum):
+class FinalState(StrEnum):
     COMPLETE = "COMPLETE"
     PARTIAL = "PARTIAL"
     UNAVAILABLE = "UNAVAILABLE"
@@ -270,11 +270,9 @@ def usage_is_priceable(
         return True
     if input_tokens is None or output_tokens is None:
         return False
-    if cached_input_tokens is None and not math.isclose(
+    return cached_input_tokens is not None or math.isclose(
         input_rate, cached_rate, rel_tol=0.0, abs_tol=1e-12
-    ):
-        return False
-    return True
+    )
 
 
 def billable_output_tokens(

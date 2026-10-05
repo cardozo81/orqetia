@@ -9,6 +9,7 @@ import signal
 import socket
 import time
 from collections.abc import Awaitable, Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -136,13 +137,11 @@ class WorkerProcess:
                 self._emit_heartbeat_if_due()
                 handled = await self.run_once()
                 if handled == 0:
-                    try:
+                    with suppress(TimeoutError):
                         await asyncio.wait_for(
                             self._stop.wait(),
                             timeout=self._poll_interval,
                         )
-                    except TimeoutError:
-                        pass
         finally:
             await self._drain_inflight()
             self._log("process.stopped")

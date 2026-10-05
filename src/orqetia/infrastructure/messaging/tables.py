@@ -48,11 +48,13 @@ work_items = sa.Table(
     ),
     sa.CheckConstraint("state IN ('READY','LEASED','DONE','DEAD','CANCELLED')", name="state_known"),
     sa.CheckConstraint(
-        "data_classification IN ('RESTRICTED','CONFIDENTIAL','CLIENT_PRIVATE','INTERNAL','PUBLIC')",
+        "data_classification IN "
+            "('RESTRICTED','CONFIDENTIAL','CLIENT_PRIVATE','INTERNAL','PUBLIC')",
         name="classification_non_secret",
     ),
     sa.CheckConstraint(
-        "data_classification <> 'CLIENT_PRIVATE' OR (tenant_id IS NOT NULL AND client_id IS NOT NULL)",
+        "data_classification <> 'CLIENT_PRIVATE' OR "
+        "(tenant_id IS NOT NULL AND client_id IS NOT NULL)",
         name="client_private_scoped",
     ),
     sa.CheckConstraint("octet_length(payload::text) <= 65536", name="payload_at_most_64kib"),
@@ -105,11 +107,13 @@ event_deliveries = sa.Table(
     sa.CheckConstraint("event_version >= 1", name="event_version_positive"),
     sa.CheckConstraint("state IN ('READY','LEASED','ACKED','DEAD')", name="state_known"),
     sa.CheckConstraint(
-        "data_classification IN ('RESTRICTED','CONFIDENTIAL','CLIENT_PRIVATE','INTERNAL','PUBLIC')",
+        "data_classification IN "
+            "('RESTRICTED','CONFIDENTIAL','CLIENT_PRIVATE','INTERNAL','PUBLIC')",
         name="classification_non_secret",
     ),
     sa.CheckConstraint(
-        "data_classification <> 'CLIENT_PRIVATE' OR (tenant_id IS NOT NULL AND client_id IS NOT NULL)",
+        "data_classification <> 'CLIENT_PRIVATE' OR "
+        "(tenant_id IS NOT NULL AND client_id IS NOT NULL)",
         name="client_private_scoped",
     ),
     sa.CheckConstraint("octet_length(payload::text) <= 65536", name="payload_at_most_64kib"),
