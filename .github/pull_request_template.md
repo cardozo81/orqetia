@@ -8,10 +8,10 @@
 ## Scope
 
 ### Completed
-- 
+-
 
 ### Explicitly out of scope
-- 
+-
 
 ## Validation
 
@@ -33,10 +33,15 @@
 
 ## Security & privacy
 
+- Applicable #53 controls (SEC-xxx):
 - AuthN/AuthZ impact:
 - Tenant isolation impact:
 - Secret/data-classification impact:
+- Outbound/provider/SSRF impact:
+- Resource-consumption/abuse impact:
 - LGPD/privacy impact:
+- Negative/security tests:
+- Security residual risk:
 
 ## Cost policy
 
@@ -45,7 +50,7 @@
 
 ## Residual risk
 
-- 
+-
 
 ## Human gate
 
