@@ -69,6 +69,9 @@ class RuntimeSettings(BaseSettings):
     queue_poll_interval_seconds: float = Field(default=1.0, gt=0, le=60)
     shutdown_grace_seconds: int = Field(default=30, ge=1, le=300)
 
+    telemetry_trace_sample_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    telemetry_log_payloads: bool = False
+
     @field_validator("secret_store_ref", "root_kek_ref", mode="before")
     @classmethod
     def normalize_secret_reference(cls, value: object) -> object:
@@ -137,6 +140,10 @@ class RuntimeSettings(BaseSettings):
             raise ValueError("managed secret store requires secret_store_ref")
         if self.secret_store_mode is SecretStoreMode.ENVELOPE and self.root_kek_ref is None:
             raise ValueError("envelope secret store requires root_kek_ref")
+        if self.telemetry_log_payloads:
+            raise ValueError(
+                "telemetry payload logging is disabled until an explicit data policy exists"
+            )
 
         if self.environment is not Environment.PRODUCTION:
             return self
@@ -183,4 +190,6 @@ class RuntimeSettings(BaseSettings):
             "work_lease_seconds": self.work_lease_seconds,
             "queue_poll_interval_seconds": self.queue_poll_interval_seconds,
             "shutdown_grace_seconds": self.shutdown_grace_seconds,
+            "telemetry_trace_sample_rate": self.telemetry_trace_sample_rate,
+            "telemetry_log_payloads": self.telemetry_log_payloads,
         }
