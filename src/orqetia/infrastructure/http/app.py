@@ -1,10 +1,10 @@
 """FastAPI application factory for the canonical client API shell."""
 
+import re
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from copy import deepcopy
 from datetime import datetime
-import re
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
@@ -127,9 +127,9 @@ def create_app(
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Cache-Control"] = "no-store"
-        response.headers[
-            "Content-Security-Policy"
-        ] = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+        )
         if enable_hsts:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
@@ -255,7 +255,10 @@ def create_app(
         principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("tasks:write"))],
     ) -> None:
         del session_id
-        if isinstance(payload.execution, ExplicitExecution) and "tasks:target" not in principal.scopes:
+        if (
+            isinstance(payload.execution, ExplicitExecution)
+            and "tasks:target" not in principal.scopes
+        ):
             raise ApiError(403, "FORBIDDEN", "Explicit target permission is missing.")
         not_implemented()
 
