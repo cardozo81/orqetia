@@ -1,8 +1,8 @@
 """Privacy-governed statistical estimation contracts."""
 
 from .benchmarks import (
-    BenchmarkBuildResult,
     BenchmarkBuilder,
+    BenchmarkBuildResult,
     BenchmarkConfidence,
     BenchmarkFeatureKey,
     BenchmarkMetrics,
