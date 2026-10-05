@@ -1,4 +1,4 @@
-"""Provider adapter contracts and deterministic test-provider support."""
+"""Provider adapter contracts, registry contracts and deterministic test-provider support."""
 
 from .protocol import (
     NativeUsage,
@@ -10,6 +10,23 @@ from .protocol import (
     ProviderOutcome,
     ProviderTarget,
     ProviderUsage,
+)
+from .registry import (
+    INITIAL_PROVIDER_TAXONOMY,
+    AdapterResolution,
+    ProviderCapability,
+    ProviderModelSpec,
+    ProviderRegistry,
+    ProviderRegistryError,
+    ProviderRegistryReader,
+    ProviderSpec,
+    PublicProviderTargetMetadata,
+    ReasoningProfileSpec,
+    RegistryEligibilityMode,
+    RegistryFailureCode,
+    RequestedTargetIdentity,
+    ResolvedProviderTarget,
+    TargetIdentity,
 )
 from .simulator import (
     ORQETIA_TEST_PROVIDER,
@@ -24,17 +41,31 @@ from .simulator import (
 )
 
 __all__ = [
+    "INITIAL_PROVIDER_TAXONOMY",
     "ORQETIA_TEST_PROVIDER",
+    "AdapterResolution",
     "DeterministicTestProvider",
     "NativeUsage",
     "OutputKind",
     "ProviderAdapter",
     "ProviderAttemptRequest",
     "ProviderAttemptResult",
+    "ProviderCapability",
     "ProviderCostMetadata",
+    "ProviderModelSpec",
     "ProviderOutcome",
+    "ProviderRegistry",
+    "ProviderRegistryError",
+    "ProviderRegistryReader",
+    "ProviderSpec",
     "ProviderTarget",
     "ProviderUsage",
+    "PublicProviderTargetMetadata",
+    "ReasoningProfileSpec",
+    "RegistryEligibilityMode",
+    "RegistryFailureCode",
+    "RequestedTargetIdentity",
+    "ResolvedProviderTarget",
     "SimulatorCandidate",
     "SimulatorFixture",
     "SimulatorFixtureExhausted",
@@ -42,4 +73,5 @@ __all__ = [
     "SimulatorInvocation",
     "SimulatorScenario",
     "SimulatorStep",
+    "TargetIdentity",
 ]
