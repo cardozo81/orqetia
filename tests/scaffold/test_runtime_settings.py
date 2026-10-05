@@ -13,7 +13,6 @@ from orqetia.settings import (
     SecretStoreMode,
 )
 
-
 TEST_DSN = "postgresql+psycopg://runtime-user:synthetic-password@db:5432/orqetia"
 
 

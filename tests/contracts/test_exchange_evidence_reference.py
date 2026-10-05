@@ -80,7 +80,9 @@ class ExchangeEvidenceCarryoverTests(unittest.TestCase):
         exchange = self._exchange()
         self.assertEqual(humanize_status(exchange.provider.provider_id), "Unknown status")
         self.assertEqual(provider_display(exchange.provider), "OpenAI")
-        self.assertNotEqual(provider_display(exchange.provider), humanize_status(exchange.provider.provider_id))
+        self.assertNotEqual(
+            provider_display(exchange.provider), humanize_status(exchange.provider.provider_id)
+        )
 
     def test_attempt_identity_is_preserved_in_exchange_and_api(self) -> None:
         exchange = self._exchange()

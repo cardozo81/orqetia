@@ -228,7 +228,7 @@ class ProcessShellTests(unittest.TestCase):
         rendered = output.getvalue()
         self.assertIn('"event": "process.heartbeat"', rendered)
         self.assertNotIn('"payload"', rendered)
-        self.assertNotIn("safe\": \"metadata", rendered)
+        self.assertNotIn('safe": "metadata', rendered)
 
     async def _test_scheduler_wakeup(self) -> None:
         queue = FakeQueue()

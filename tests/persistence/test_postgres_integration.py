@@ -33,8 +33,12 @@ class PostgreSQLPersistenceIntegrationTests(unittest.TestCase):
         engine = create_engine(settings)
         try:
             async with engine.connect() as connection:
-                version_num = int((await connection.execute(text("SHOW server_version_num"))).scalar_one())
-                isolation = (await connection.execute(text("SHOW transaction_isolation"))).scalar_one()
+                version_num = int(
+                    (await connection.execute(text("SHOW server_version_num"))).scalar_one()
+                )
+                isolation = (
+                    await connection.execute(text("SHOW transaction_isolation"))
+                ).scalar_one()
                 rows = await connection.execute(
                     text(
                         "SELECT schema_name FROM information_schema.schemata "
@@ -67,7 +71,9 @@ class PostgreSQLPersistenceIntegrationTests(unittest.TestCase):
                     raise RuntimeError("force rollback")
 
             async with engine.connect() as connection:
-                count = (await connection.execute(text(f"SELECT count(*) FROM {table}"))).scalar_one()
+                count = (
+                    await connection.execute(text(f"SELECT count(*) FROM {table}"))
+                ).scalar_one()
             self.assertEqual(count, 0)
         finally:
             async with engine.begin() as connection:
