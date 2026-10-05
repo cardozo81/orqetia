@@ -1,56 +1,62 @@
-## Issue
+## Traceability
 
-Closes #
-
-Parent: #
-Roadmap phase: #47 / Phase
+- Issue:
+- Parent:
+- Roadmap phase:
+- Blocked by: satisfied / n/a
 
 ## Scope
 
-What changed:
+### Completed
+-
 
-Out of scope:
+### Explicitly out of scope
+-
 
-## Dependencies
+## Validation
 
-Blocked-by issues completed:
+- Tests executed:
+- Tests intentionally not executed:
+- CI status:
 
-## Canonical preservation / reuse
+## Architecture / canonical preservation
 
-- [ ] Canonical behavior affected has been mapped to #31/#34, or N/A.
-- [ ] Existing RASAi logic was reused/extracted where technically appropriate, or N/A.
-- [ ] This change does not mutate the RASAi repository.
+- #31/#34 impact:
+- #43 reuse impact:
+- ADR impact:
 
-## Tests
+## Data / API
 
-Targeted tests executed:
+- Migrations:
+- OpenAPI/docs:
+- Backward compatibility:
 
-Why these tests are sufficient for this boundary:
+## Security & privacy
 
-Additional regression tests, if any:
+- Applicable #53 controls (SEC-xxx):
+- AuthN/AuthZ impact:
+- Tenant isolation impact:
+- Secret/data-classification impact:
+- Outbound/provider/SSRF impact:
+- Resource-consumption/abuse impact:
+- LGPD/privacy impact:
+- Negative/security tests:
+- Security residual risk:
 
-- [ ] No paid provider was called by ordinary CI/tests.
-- [ ] Automation used does not create additional financial cost for the repository owner.
+## Cost policy
 
-## Public contract / documentation
-
-- [ ] OpenAPI updated, or N/A.
-- [ ] Manual/docs updated, or N/A.
-- [ ] Product status remains DEVELOPMENT.
-
-## Data / security impact
-
-Persistence/migration impact:
-
-Security/tenancy impact:
-
-Secret-handling impact:
-
-## Human gate
-
-- [ ] No human smoke required for this isolated change.
-- [ ] Human gate required; reason:
+- Paid provider used: no
+- Additional paid GitHub resource used: no
 
 ## Residual risk
 
-Describe remaining risk and follow-up issues.
+-
+
+## Human gate
+
+- Required: no
+- If yes, reason:
+
+## Resume state
+
+- Final checkpoint or next exact action:
