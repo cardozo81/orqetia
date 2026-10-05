@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Iterable
 
 from tests.characterization.reference_contract import (
     FinalState,
     Invocation,
-    Outcome,
     Policy,
     run_need,
 )
@@ -84,9 +83,7 @@ def resolve_explicit(
         raise ValueError("provider required")
     model = str(raw.get("model") or default_model.get(provider) or "").strip()
     profile = str(
-        raw.get("reasoning_profile")
-        or default_profile.get((provider, model))
-        or ""
+        raw.get("reasoning_profile") or default_profile.get((provider, model)) or ""
     ).strip()
     target = Target(provider, model, profile)
     if target not in allowed_targets:
