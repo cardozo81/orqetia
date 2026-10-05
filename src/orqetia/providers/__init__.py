@@ -10,13 +10,6 @@ from .io import (
     StructuredOutputValidator,
 )
 from .openai import OPENAI_RESPONSES_ENDPOINT, OpenAIResponsesAdapter
-from .responses import (
-    HttpxProviderHttpTransport,
-    ProviderDispatchAmbiguousError,
-    ProviderHttpResponse,
-    ProviderHttpTransport,
-    ResponsesHttpAdapter,
-)
 from .parity import (
     CANONICAL_PROVIDER_PORT_PLAN,
     MANDATORY_ADAPTER_PARITY_GATES,
@@ -52,6 +45,13 @@ from .registry import (
     RequestedTargetIdentity,
     ResolvedProviderTarget,
     TargetIdentity,
+)
+from .responses import (
+    HttpxProviderHttpTransport,
+    ProviderDispatchAmbiguousError,
+    ProviderHttpResponse,
+    ProviderHttpTransport,
+    ResponsesHttpAdapter,
 )
 from .simulator import (
     ORQETIA_TEST_PROVIDER,
