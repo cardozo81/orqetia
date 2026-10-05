@@ -113,7 +113,7 @@ class FakeStructuredValidator:
 
 class OpenAIResponsesAdapterTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.secret = "sk-test-secret-must-never-persist"
+        self.secret = "fixture-credential-must-never-persist"
         self.target = ProviderTarget("openai", "gpt-test", "HIGH")
         self.request = ProviderAttemptRequest(
             attempt_id=uuid7(),
@@ -249,7 +249,9 @@ class OpenAIResponsesAdapterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(output_format["strict"], True)
         self.assertEqual(output_format["schema"], json.loads(schema_json))
 
-    async def test_structured_output_validation_failure_is_malformed_and_not_persisted(self) -> None:
+    async def test_structured_output_validation_failure_is_malformed_and_not_persisted(
+        self,
+    ) -> None:
         reader = FakePayloadReader(
             ProviderInvocationPayload(
                 input_text="Return JSON.",
