@@ -1,5 +1,10 @@
 """Provider adapter contracts, registry contracts and deterministic test-provider support."""
 
+from .anthropic import (
+    ANTHROPIC_MESSAGES_ENDPOINT,
+    ANTHROPIC_VERSION,
+    AnthropicMessagesAdapter,
+)
 from .chat_completions import ChatCompletionsHttpAdapter
 from .deepseek import DEEPSEEK_RESPONSES_ENDPOINT, DeepSeekResponsesAdapter
 from .gemini import GEMINI_INTERACTIONS_ENDPOINT, GeminiInteractionsAdapter
@@ -73,6 +78,8 @@ from .simulator import (
 from .xai import XAI_RESPONSES_ENDPOINT, XAIResponsesAdapter
 
 __all__ = [
+    "ANTHROPIC_MESSAGES_ENDPOINT",
+    "ANTHROPIC_VERSION",
     "CANONICAL_PROVIDER_PORT_PLAN",
     "ChatCompletionsHttpAdapter",
     "DEEPSEEK_RESPONSES_ENDPOINT",
@@ -85,6 +92,7 @@ __all__ = [
     "MISTRAL_CHAT_COMPLETIONS_ENDPOINT",
     "AdapterParityGate",
     "AdapterTransportFamily",
+    "AnthropicMessagesAdapter",
     "ORQETIA_TEST_PROVIDER",
     "AdapterResolution",
     "DeepSeekResponsesAdapter",
