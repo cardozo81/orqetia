@@ -6,6 +6,7 @@ from .anthropic import (
     AnthropicMessagesAdapter,
 )
 from .chat_completions import ChatCompletionsHttpAdapter
+from .cohere import COHERE_CHAT_ENDPOINT, CohereChatV2Adapter
 from .deepseek import DEEPSEEK_RESPONSES_ENDPOINT, DeepSeekResponsesAdapter
 from .gemini import GEMINI_INTERACTIONS_ENDPOINT, GeminiInteractionsAdapter
 from .io import (
@@ -81,7 +82,9 @@ __all__ = [
     "ANTHROPIC_MESSAGES_ENDPOINT",
     "ANTHROPIC_VERSION",
     "CANONICAL_PROVIDER_PORT_PLAN",
+    "COHERE_CHAT_ENDPOINT",
     "ChatCompletionsHttpAdapter",
+    "CohereChatV2Adapter",
     "DEEPSEEK_RESPONSES_ENDPOINT",
     "GEMINI_INTERACTIONS_ENDPOINT",
     "OPENAI_RESPONSES_ENDPOINT",
