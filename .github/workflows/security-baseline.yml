@@ -43,3 +43,6 @@ jobs:
 
       - name: AUTO and explicit execution selection tests
         run: python3 -m unittest tests.contracts.test_execution_target_reference -v
+
+      - name: Canonical cross-contract revalidation tests
+        run: python3 -m unittest tests.characterization.test_revalidation_contracts -v
