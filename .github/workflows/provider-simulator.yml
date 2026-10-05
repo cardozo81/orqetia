@@ -43,4 +43,5 @@ jobs:
             tests.providers.test_deepseek \
             tests.providers.test_mimo \
             tests.providers.test_xai \
+            tests.providers.test_qwen \
             -v
