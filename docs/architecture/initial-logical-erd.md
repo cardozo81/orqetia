@@ -40,9 +40,9 @@ Arrows across contexts describe logical references/contracts, **not cross-schema
 Any client-owned session/task/credential/usage projection must preserve tenant_id and client_id as required by its authorization boundary.
 
 Any provider attempt/accounting fact must preserve stable references needed to reconstruct:
-- session;
-- task;
 - attempt;
+- operation;
+- session/task when the operation is task/session-bound;
 - provider/model;
 - provider account/credential safe ID where applicable;
 - policy/pricing version;
@@ -73,25 +73,39 @@ tasks:
 - created_at / started_at / terminal_at / updated_at
 
 provider_attempts:
-- id UUIDv7 PK
-- task_id UUID FK within execution
-- session_id UUID FK within execution
-- tenant_id / client_id UUID
-- provider_id / model_id logical refs
+- attempt_id UUIDv7 PK — stable identity created before provider dispatch
+- operation typed code NOT NULL
+- task_id UUID FK within execution, nullable only when the operation contract permits taskless execution
+- session_id UUID FK within execution, nullable only when the operation contract permits sessionless execution
+- tenant_id / client_id UUID where client-scoped
+- provider_id / model_id typed logical refs
 - provider_account_id / provider_credential_id safe logical refs
 - cycle / attempt_index
+- retry_of_attempt_id / fallback_from_attempt_id optional self refs
+- request_fingerprint optional diagnostic/idempotency metadata; never attempt identity
 - status / normalized_error_class
 - started_at / finished_at / duration
 - policy_version_id logical ref
 - provenance metadata
 
-No provider secret belongs in provider_attempts.
+provider_exchanges:
+- exchange_id UUIDv7 PK
+- attempt_id UUID NOT NULL logical owner/reference
+- exchange_index integer when one logical attempt has multiple wire exchanges
+- sanitized request/response/prompt/schema evidence or protected payload refs
+- request/response integrity hashes and truncation metadata
+- endpoint safe metadata
+- started_at / finished_at / duration / transport status
+
+New ORQETIA exchange rows never infer the attempt by provider/model/timestamp/purpose/fingerprint.
+
+No generic round entity exists in the ORQETIA core. No provider secret belongs in provider_attempts or provider_exchanges.
 
 ## Accounting skeleton
 
 usage_facts:
 - id UUIDv7 PK
-- attempt_id logical ref
+- attempt_id logical ref NOT NULL for provider-attributed usage
 - tenant_id / client_id
 - provider/model
 - input/output/cached/reasoning/total tokens
@@ -100,7 +114,7 @@ usage_facts:
 
 provider_cost_facts:
 - id UUIDv7 PK
-- attempt_id logical ref
+- attempt_id logical ref NOT NULL
 - basis = ESTIMATED | PROVIDER_OBSERVED
 - amount numeric
 - currency
@@ -112,3 +126,11 @@ UNPRICED is represented explicitly by pricing/application status/fact semantics,
 ## Projection rule
 
 readmodel tables may duplicate selected dimensions for query performance, but they are disposable/rebuildable and cannot be used to authorize a mutation without authoritative ownership validation.
+
+## Attempt/operation contract
+
+ADR-0018 (#86/#87) amends this logical ERD:
+- `attempt_id` is the primary provider-dispatch identity;
+- `operation` is explicit even when no Task exists;
+- task/session absence is governed by the operation contract rather than represented by synthetic rows;
+- Exchange, Usage, Pricing and Diagnostic facts correlate through the same `attempt_id`.
