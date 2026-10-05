@@ -310,10 +310,10 @@ class PostgresProviderAttemptStore:
                 )
                 .returning(*provider_attempts.c)
             )
-            updated = (await database.execute(statement)).mappings().one()
+            updated_row = (await database.execute(statement)).mappings().one()
             return DispatchClaim(
                 DispatchAction.DISPATCH,
-                _attempt_from_row(updated),
+                _attempt_from_row(updated_row),
             )
 
     async def complete_dispatch(
