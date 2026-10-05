@@ -69,8 +69,8 @@ class GithubCopilotSdkTransport:
     ) -> str:
         try:
             module = importlib.import_module("copilot")
-            CopilotClient = getattr(module, "CopilotClient")
-        except (ImportError, AttributeError) as exc:
+            CopilotClient = vars(module)["CopilotClient"]
+        except (ImportError, KeyError) as exc:
             raise CopilotSdkUnavailableError(
                 "GitHub Copilot SDK is not installed or is incompatible"
             ) from exc
