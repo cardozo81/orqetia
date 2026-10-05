@@ -42,4 +42,5 @@ jobs:
             tests.providers.test_openai \
             tests.providers.test_deepseek \
             tests.providers.test_mimo \
+            tests.providers.test_xai \
             -v
