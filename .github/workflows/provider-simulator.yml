@@ -48,4 +48,5 @@ jobs:
             tests.providers.test_kimi \
             tests.providers.test_gemini \
             tests.providers.test_anthropic \
+            tests.providers.test_cohere \
             -v
