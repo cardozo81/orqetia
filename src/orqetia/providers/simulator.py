@@ -102,9 +102,11 @@ class SimulatorStep:
             raise ValueError("simulated_latency_ms cannot be negative")
         if self.retry_after_seconds is not None and self.retry_after_seconds < 0:
             raise ValueError("retry_after_seconds cannot be negative")
-        if self.scenario == SimulatorScenario.RETRY_AFTER:
-            if self.retry_after_seconds is None:
-                raise ValueError("retry_after scenario requires retry_after_seconds")
+        if (
+            self.scenario == SimulatorScenario.RETRY_AFTER
+            and self.retry_after_seconds is None
+        ):
+            raise ValueError("retry_after scenario requires retry_after_seconds")
         if len(set(self.accepted_requirements)) != len(self.accepted_requirements):
             raise ValueError("accepted_requirements must not contain duplicates")
 
