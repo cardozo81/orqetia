@@ -40,4 +40,5 @@ jobs:
             tests.providers.test_registry \
             tests.providers.test_parity \
             tests.providers.test_openai \
+            tests.providers.test_deepseek \
             -v
