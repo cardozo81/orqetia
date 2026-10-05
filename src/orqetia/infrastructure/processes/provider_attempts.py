@@ -207,7 +207,7 @@ class ProviderAttemptHandler:
             lease,
             journal,
             provider_outcome=result.outcome.value,
-            provider_latency_ms=result.simulated_latency_ms,
+            provider_latency_ms=result.latency_ms,
             retry_after_seconds=result.retry_after_seconds,
             input_tokens=result.usage.input_tokens,
             output_tokens=result.usage.output_tokens,
