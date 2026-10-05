@@ -9,6 +9,17 @@ from .attempts import (
     ProviderAttemptStatus,
     ProviderAttemptStore,
 )
+from .orchestration import (
+    AttemptObservation,
+    AttemptObservationStatus,
+    CanonicalOrchestrationPolicyEngine,
+    OrchestrationCandidate,
+    OrchestrationCyclePlan,
+    OrchestrationDecision,
+    OrchestrationDisposition,
+    OrchestrationPolicy,
+    RequirementProgress,
+)
 from .postgres import PostgresExecutionSessionStore
 from .sessions import (
     ExecutionSession,
@@ -44,6 +55,9 @@ from .tasks import (
 )
 
 __all__ = [
+    "AttemptObservation",
+    "AttemptObservationStatus",
+    "CanonicalOrchestrationPolicyEngine",
     "DispatchAction",
     "DispatchClaim",
     "ExecutionMode",
@@ -52,6 +66,11 @@ __all__ = [
     "ExecutionTargetSnapshot",
     "ExecutionTask",
     "ExecutionTaskStore",
+    "OrchestrationCandidate",
+    "OrchestrationCyclePlan",
+    "OrchestrationDecision",
+    "OrchestrationDisposition",
+    "OrchestrationPolicy",
     "OwnershipScope",
     "PostgresExecutionSessionStore",
     "PostgresExecutionTaskStore",
@@ -61,6 +80,7 @@ __all__ = [
     "ProviderAttemptStore",
     "QuarantineState",
     "RequestedTargetSnapshot",
+    "RequirementProgress",
     "SessionPolicySnapshot",
     "SessionStatus",
     "TargetHealth",
