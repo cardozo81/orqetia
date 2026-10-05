@@ -92,14 +92,24 @@ provider_exchanges:
 - exchange_id UUIDv7 PK
 - attempt_id UUID NOT NULL logical owner/reference
 - exchange_index integer when one logical attempt has multiple wire exchanges
-- sanitized request/response/prompt/schema evidence or protected payload refs
-- request/response integrity hashes and truncation metadata
 - endpoint safe metadata
 - started_at / finished_at / duration / transport status
 
+provider_exchange_evidence:
+- evidence_id UUIDv7 PK
+- exchange_id UUID NOT NULL within Execution
+- attempt_id UUID NOT NULL
+- kind = REQUEST | RESPONSE | PROMPT | SCHEMA | OTHER
+- media_type / encoding
+- sanitized_body or protected payload reference
+- sanitized_sha256 over the persisted sanitized representation
+- truncated / persisted_size / original_size when safely known
+- created_at
+- immutable/revisioned lifecycle under ADR-0019
+
 New ORQETIA exchange rows never infer the attempt by provider/model/timestamp/purpose/fingerprint.
 
-No generic round entity exists in the ORQETIA core. No provider secret belongs in provider_attempts or provider_exchanges.
+No generic round entity exists in the ORQETIA core. No provider secret belongs in provider_attempts, provider_exchanges or provider_exchange_evidence. Sanitization happens before evidence persistence; presentation does not semantically rewrite persisted evidence.
 
 ## Accounting skeleton
 
