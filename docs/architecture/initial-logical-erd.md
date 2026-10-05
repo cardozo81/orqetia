@@ -16,6 +16,7 @@ This document is the logical inventory from ADR-0005. It does not freeze every p
       |
       +-- control.client_policy_assignment
       +-- control.client_provider_permission
+      +-- control.client_target_permission
       +-- control.quota_assignment
 
     control.provider
@@ -65,6 +66,11 @@ tasks:
 - session_id UUID FK within execution
 - tenant_id UUID
 - client_id UUID
+- effective_policy_version_id UUID logical ref
+- requested_execution_mode = AUTO | EXPLICIT_TARGET
+- requested_provider_id / requested_model_id / requested_reasoning_profile nullable
+- effective_provider_id / effective_model_id / effective_reasoning_profile nullable; populated only for resolved EXPLICIT_TARGET
+- target_resolution_reason/status
 - status
 - requirements metadata/reference
 - accepted/missing metadata/reference
@@ -144,3 +150,9 @@ ADR-0018 (#86/#87) amends this logical ERD:
 - `operation` is explicit even when no Task exists;
 - task/session absence is governed by the operation contract rather than represented by synthetic rows;
 - Exchange, Usage, Pricing and Diagnostic facts correlate through the same `attempt_id`.
+
+## Client target entitlement contract
+
+#21 revalidation adds a Control Plane concept for the client-selectable execution envelope. The physical model may use normalized provider/model/profile entitlement tables or an equivalent typed representation, but authorization-critical target dimensions must not exist only inside opaque JSON.
+
+For AUTO, task-level effective provider/model/profile are not populated because candidate selection is dynamic per attempt. Each provider attempt remains the authoritative actual target provenance.

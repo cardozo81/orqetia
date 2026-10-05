@@ -34,3 +34,6 @@ jobs:
 
       - name: Exchange evidence and provider identity carry-over tests
         run: python3 -m unittest tests.contracts.test_exchange_evidence_reference -v
+
+      - name: Tenant target envelope revalidation tests
+        run: python3 -m unittest tests.contracts.test_tenancy_target_reference -v
