@@ -134,7 +134,9 @@ class PostgresExecutionSessionStore:
             "status": session.status.value,
             "requested_policy_version_id": session.policy.requested_policy_version_id,
             "effective_policy_version_id": session.policy.effective_policy_version_id,
-            "authorized_targets": [_target_json(item) for item in session.policy.authorized_targets],
+            "authorized_targets": [
+                _target_json(item) for item in session.policy.authorized_targets
+            ],
             "external_reference": session.external_reference,
             "usage_reference_ids": [str(item) for item in session.usage_reference_ids],
             "internal_cost_reference_ids": [
