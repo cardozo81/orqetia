@@ -47,12 +47,15 @@ Owner: Execution
 Classification: CLIENT_PRIVATE
 Minimum:
 - attempt_id;
-- task_id/session_id;
+- operation;
+- task_id/session_id when present under the operation contract;
 - provider/model safe IDs;
-- cycle/attempt index;
+- cycle/attempt index when orchestration-scoped;
 - status/normalized error;
 - usage-source availability/reference;
 - occurred_at.
+
+`attempt_id` is the stable correlation identity. Events do not reconstruct attempt identity from provider/model/time/purpose/fingerprint.
 
 No provider secret or provider monetary amount required in the execution event.
 
