@@ -6,10 +6,10 @@ No RASAi runtime/code dependency exists.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from hashlib import sha256
 from html import escape, unescape
-from typing import Mapping
 
 
 @dataclass(frozen=True)

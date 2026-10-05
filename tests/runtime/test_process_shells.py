@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import unittest
+from contextlib import redirect_stdout
 from datetime import UTC, datetime, timedelta
 from uuid import uuid7
 
@@ -127,6 +129,9 @@ class ProcessShellTests(unittest.TestCase):
     def test_scheduler_duplicate_wakeup_is_only_a_hint(self) -> None:
         asyncio.run(self._test_scheduler_wakeup())
 
+    def test_process_emits_safe_operational_heartbeat(self) -> None:
+        asyncio.run(self._test_operational_heartbeat())
+
     async def _test_start_stop(self) -> None:
         queue = FakeQueue()
         process = self.process(queue, HandlerRegistry())
@@ -199,6 +204,31 @@ class ProcessShellTests(unittest.TestCase):
 
         self.assertEqual(queue.completed, [])
         self.assertEqual(queue.requeued, [])
+
+    async def _test_operational_heartbeat(self) -> None:
+        queue = FakeQueue()
+        process = WorkerProcess(
+            queue=queue,
+            registry=HandlerRegistry(),
+            queue_name=QueueName.EXECUTION,
+            concurrency=1,
+            lease_seconds=30,
+            poll_interval_seconds=0.01,
+            shutdown_grace_seconds=1,
+            process_id="heartbeat-test",
+            heartbeat_interval_seconds=0.01,
+        )
+        output = io.StringIO()
+        with redirect_stdout(output):
+            task = asyncio.create_task(process.run())
+            await asyncio.sleep(0.04)
+            process.request_stop()
+            await asyncio.wait_for(task, timeout=1)
+
+        rendered = output.getvalue()
+        self.assertIn('"event": "process.heartbeat"', rendered)
+        self.assertNotIn('"payload"', rendered)
+        self.assertNotIn('safe": "metadata', rendered)
 
     async def _test_scheduler_wakeup(self) -> None:
         queue = FakeQueue()

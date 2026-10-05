@@ -11,7 +11,6 @@ from orqetia.infrastructure.persistence.schemas import (
     metadata_for_schema,
 )
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
 

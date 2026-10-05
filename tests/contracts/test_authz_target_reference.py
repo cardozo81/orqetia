@@ -27,7 +27,9 @@ class ExplicitTargetAuthorizationTests(unittest.TestCase):
             timeout_seconds=60,
         )
 
-    def principal(self, *scopes: str, tenant: str = "tenant-a", client: str = "client-a") -> Principal:
+    def principal(
+        self, *scopes: str, tenant: str = "tenant-a", client: str = "client-a"
+    ) -> Principal:
         return Principal("SERVICE_CLIENT", tenant, client, frozenset(scopes))
 
     def test_auto_requires_tasks_write_but_not_tasks_target(self) -> None:
@@ -43,7 +45,9 @@ class ExplicitTargetAuthorizationTests(unittest.TestCase):
             authorize_task_create(
                 principal=self.principal("tasks:write"),
                 envelope=self.envelope,
-                request={"execution": {"mode": "EXPLICIT_TARGET", "target": {"provider": "OPENAI"}}},
+                request={
+                    "execution": {"mode": "EXPLICIT_TARGET", "target": {"provider": "OPENAI"}}
+                },
             )
 
     def test_explicit_target_with_scope_and_entitlement_is_allowed(self) -> None:
@@ -60,7 +64,9 @@ class ExplicitTargetAuthorizationTests(unittest.TestCase):
             authorize_task_create(
                 principal=self.principal("tasks:target"),
                 envelope=self.envelope,
-                request={"execution": {"mode": "EXPLICIT_TARGET", "target": {"provider": "OPENAI"}}},
+                request={
+                    "execution": {"mode": "EXPLICIT_TARGET", "target": {"provider": "OPENAI"}}
+                },
             )
 
     def test_scope_does_not_bypass_provider_entitlement(self) -> None:
@@ -68,7 +74,9 @@ class ExplicitTargetAuthorizationTests(unittest.TestCase):
             authorize_task_create(
                 principal=self.principal("tasks:write", "tasks:target"),
                 envelope=self.envelope,
-                request={"execution": {"mode": "EXPLICIT_TARGET", "target": {"provider": "ANTHROPIC"}}},
+                request={
+                    "execution": {"mode": "EXPLICIT_TARGET", "target": {"provider": "ANTHROPIC"}}
+                },
             )
 
     def test_cross_tenant_bola_is_denied(self) -> None:
@@ -76,7 +84,9 @@ class ExplicitTargetAuthorizationTests(unittest.TestCase):
             authorize_task_create(
                 principal=self.principal("tasks:write", "tasks:target", tenant="tenant-b"),
                 envelope=self.envelope,
-                request={"execution": {"mode": "EXPLICIT_TARGET", "target": {"provider": "OPENAI"}}},
+                request={
+                    "execution": {"mode": "EXPLICIT_TARGET", "target": {"provider": "OPENAI"}}
+                },
             )
 
     def test_client_cannot_elevate_admin_limits(self) -> None:
@@ -95,7 +105,11 @@ class ExplicitTargetAuthorizationTests(unittest.TestCase):
             task_id="task-1",
             requested_execution_mode="EXPLICIT_TARGET",
             requested_target={"provider": "OPENAI"},
-            effective_target={"provider": "OPENAI", "model": "gpt-approved", "reasoning_profile": "MEDIUM"},
+            effective_target={
+                "provider": "OPENAI",
+                "model": "gpt-approved",
+                "reasoning_profile": "MEDIUM",
+            },
             attempt_id="attempt-1",
         )
         forbidden = {

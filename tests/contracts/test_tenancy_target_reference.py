@@ -59,7 +59,12 @@ class TenancyTargetEnvelopeTests(unittest.TestCase):
     def test_model_outside_envelope_is_denied(self) -> None:
         with self.assertRaises(PermissionError):
             resolve_selection(
-                {"execution": {"mode": "EXPLICIT_TARGET", "target": {"provider": "OPENAI", "model": "gpt-other"}}},
+                {
+                    "execution": {
+                        "mode": "EXPLICIT_TARGET",
+                        "target": {"provider": "OPENAI", "model": "gpt-other"},
+                    }
+                },
                 authenticated_tenant_id="tenant-a",
                 authenticated_client_id="client-a",
                 envelope=self.envelope,
@@ -68,11 +73,16 @@ class TenancyTargetEnvelopeTests(unittest.TestCase):
     def test_profile_outside_envelope_is_denied(self) -> None:
         with self.assertRaises(PermissionError):
             resolve_selection(
-                {"execution": {"mode": "EXPLICIT_TARGET", "target": {
-                    "provider": "OPENAI",
-                    "model": "gpt-approved",
-                    "reasoning_profile": "HIGH",
-                }}},
+                {
+                    "execution": {
+                        "mode": "EXPLICIT_TARGET",
+                        "target": {
+                            "provider": "OPENAI",
+                            "model": "gpt-approved",
+                            "reasoning_profile": "HIGH",
+                        },
+                    }
+                },
                 authenticated_tenant_id="tenant-a",
                 authenticated_client_id="client-a",
                 envelope=self.envelope,
@@ -89,14 +99,13 @@ class TenancyTargetEnvelopeTests(unittest.TestCase):
 
     def test_client_cannot_override_admin_cycles_or_timeout(self) -> None:
         for key, value in (("max_cycles", 99), ("timeout_seconds", 999)):
-            with self.subTest(key=key):
-                with self.assertRaises(PermissionError):
-                    resolve_selection(
-                        {key: value},
-                        authenticated_tenant_id="tenant-a",
-                        authenticated_client_id="client-a",
-                        envelope=self.envelope,
-                    )
+            with self.subTest(key=key), self.assertRaises(PermissionError):
+                resolve_selection(
+                    {key: value},
+                    authenticated_tenant_id="tenant-a",
+                    authenticated_client_id="client-a",
+                    envelope=self.envelope,
+                )
 
     def test_explicit_target_keeps_administrative_limits(self) -> None:
         result = resolve_selection(
@@ -110,9 +119,7 @@ class TenancyTargetEnvelopeTests(unittest.TestCase):
         self.assertEqual(result.timeout_seconds, 60)
 
     def test_explicit_target_can_be_disabled_by_policy(self) -> None:
-        disabled = ClientEnvelope(
-            **{**self.envelope.__dict__, "explicit_target_enabled": False}
-        )
+        disabled = ClientEnvelope(**{**self.envelope.__dict__, "explicit_target_enabled": False})
         with self.assertRaises(PermissionError):
             resolve_selection(
                 {"execution": {"mode": "EXPLICIT_TARGET", "target": {"provider": "OPENAI"}}},

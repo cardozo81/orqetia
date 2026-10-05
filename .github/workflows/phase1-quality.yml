@@ -1,0 +1,80 @@
+name: Phase 1 quality gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase1-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: orqetia_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d orqetia_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      ORQETIA_ENVIRONMENT: test
+      ORQETIA_PROCESS_ROLE: worker
+      ORQETIA_DATABASE_DSN: postgresql+psycopg://postgres@127.0.0.1:5432/orqetia_test
+      ORQETIA_SECRET_STORE_MODE: none
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned uv bootstrap tool
+        run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+
+      - name: Verify lockfile
+        run: uv lock --check
+
+      - name: Reproduce locked Python 3.14 development environment
+        run: uv sync --locked --python 3.14
+
+      - name: Apply PostgreSQL migrations
+        run: uv run --no-sync --python 3.14 alembic upgrade head
+
+      - name: Ruff
+        run: uv run --no-sync --python 3.14 ruff check src apps tests scripts migrations
+
+      - name: Mypy
+        run: uv run --no-sync --python 3.14 mypy
+
+      - name: Full pytest suite
+        run: uv run --no-sync --python 3.14 pytest -q
+
+      - name: Export locked dependencies for audit
+        run: |
+          uv export --locked --all-groups --no-emit-project \
+            --format requirements.txt \
+            --output-file /tmp/orqetia-audit-requirements.txt
+
+      - name: Dependency audit
+        run: |
+          uv run --no-sync --python 3.14 pip-audit \
+            --strict \
+            --requirement /tmp/orqetia-audit-requirements.txt \
+            --require-hashes

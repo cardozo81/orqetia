@@ -69,7 +69,13 @@ class CanonicalCharacterizationTests(unittest.TestCase):
         self.assertEqual(effective_cycle_delay(0, [-5, float("nan"), None]), 0)
 
     def test_char_005_terminal_error_taxonomy(self) -> None:
-        for item in ("AUTH_ERROR", "CREDIT_ERROR", "QUOTA_ERROR", "MODEL_ERROR", "PERMISSION_ERROR"):
+        for item in (
+            "AUTH_ERROR",
+            "CREDIT_ERROR",
+            "QUOTA_ERROR",
+            "MODEL_ERROR",
+            "PERMISSION_ERROR",
+        ):
             self.assertTrue(is_terminal(item))
         for item in ("NETWORK_ERROR", "TIMEOUT_ERROR", "HTTP_500", "RATE_LIMIT"):
             self.assertFalse(is_terminal(item))
@@ -137,7 +143,12 @@ class CanonicalCharacterizationTests(unittest.TestCase):
     def test_char_015_provider_total_wins_and_reasoning_is_not_double_counted(self) -> None:
         self.assertEqual(
             canonical_total_tokens(
-                {"input_tokens": 100, "output_tokens": 50, "reasoning_tokens": 40, "total_tokens": 151}
+                {
+                    "input_tokens": 100,
+                    "output_tokens": 50,
+                    "reasoning_tokens": 40,
+                    "total_tokens": 151,
+                }
             ),
             151,
         )

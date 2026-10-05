@@ -6,7 +6,6 @@ import tomllib
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 PACKAGE = SRC / "orqetia"
@@ -58,6 +57,7 @@ class ProjectScaffoldTests(unittest.TestCase):
         sys.path.insert(0, str(SRC))
         try:
             import orqetia
+
             self.assertEqual(orqetia.__version__, "0.1.0.dev0")
         finally:
             sys.path.pop(0)

@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class Mode(str, Enum):
+class Mode(StrEnum):
     AUTO = "AUTO"
     EXPLICIT_TARGET = "EXPLICIT_TARGET"
 
@@ -50,7 +50,10 @@ def resolve_selection(
     authenticated_client_id: str,
     envelope: ClientEnvelope,
 ) -> TaskSelectionSnapshot:
-    if authenticated_tenant_id != envelope.tenant_id or authenticated_client_id != envelope.client_id:
+    if (
+        authenticated_tenant_id != envelope.tenant_id
+        or authenticated_client_id != envelope.client_id
+    ):
         raise PermissionError("ownership mismatch")
 
     request = dict(request or {})
@@ -95,9 +98,7 @@ def resolve_selection(
 
     requested_profile = target.get("reasoning_profile")
     profile = str(
-        requested_profile
-        or envelope.default_profile_by_model.get((provider, model))
-        or ""
+        requested_profile or envelope.default_profile_by_model.get((provider, model)) or ""
     ).strip()
     if not profile or (provider, model, profile) not in envelope.allowed_profiles:
         raise PermissionError("profile not allowed")

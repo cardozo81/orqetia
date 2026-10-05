@@ -7,9 +7,9 @@ from uuid import uuid7
 from orqetia.infrastructure.messaging import build_inbox_table, build_outbox_table
 from orqetia.infrastructure.persistence.schemas import metadata_for_schema
 from orqetia.shared.messaging import (
+    MAX_INLINE_PAYLOAD_BYTES,
     DataClassification,
     EventEnvelope,
-    MAX_INLINE_PAYLOAD_BYTES,
     QueueName,
     WorkItem,
 )

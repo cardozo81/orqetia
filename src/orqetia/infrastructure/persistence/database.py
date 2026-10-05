@@ -47,6 +47,5 @@ async def transaction_scope(factory: SessionFactory) -> AsyncIterator[AsyncSessi
     Exceptions roll the transaction back before propagating.
     """
 
-    async with factory() as session:
-        async with session.begin():
-            yield session
+    async with factory() as session, session.begin():
+        yield session

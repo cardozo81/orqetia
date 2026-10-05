@@ -30,7 +30,9 @@ work_items = sa.Table(
     sa.Column("lease_owner", sa.Text(), nullable=True),
     sa.Column("lease_until", sa.DateTime(timezone=True), nullable=True),
     sa.Column("last_error_class", sa.Text(), nullable=True),
-    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+    sa.Column(
+        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    ),
     sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("dead_at", sa.DateTime(timezone=True), nullable=True),
@@ -46,11 +48,13 @@ work_items = sa.Table(
     ),
     sa.CheckConstraint("state IN ('READY','LEASED','DONE','DEAD','CANCELLED')", name="state_known"),
     sa.CheckConstraint(
-        "data_classification IN ('RESTRICTED','CONFIDENTIAL','CLIENT_PRIVATE','INTERNAL','PUBLIC')",
+        "data_classification IN "
+            "('RESTRICTED','CONFIDENTIAL','CLIENT_PRIVATE','INTERNAL','PUBLIC')",
         name="classification_non_secret",
     ),
     sa.CheckConstraint(
-        "data_classification <> 'CLIENT_PRIVATE' OR (tenant_id IS NOT NULL AND client_id IS NOT NULL)",
+        "data_classification <> 'CLIENT_PRIVATE' OR "
+        "(tenant_id IS NOT NULL AND client_id IS NOT NULL)",
         name="client_private_scoped",
     ),
     sa.CheckConstraint("octet_length(payload::text) <= 65536", name="payload_at_most_64kib"),
@@ -86,7 +90,9 @@ event_deliveries = sa.Table(
     sa.Column("data_classification", sa.Text(), nullable=False),
     sa.Column("payload", JSONB(), nullable=False),
     sa.Column("state", sa.Text(), nullable=False, server_default="READY"),
-    sa.Column("available_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+    sa.Column(
+        "available_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    ),
     sa.Column("attempt_count", sa.Integer(), nullable=False, server_default="0"),
     sa.Column("lease_owner", sa.Text(), nullable=True),
     sa.Column("lease_until", sa.DateTime(timezone=True), nullable=True),
@@ -94,16 +100,20 @@ event_deliveries = sa.Table(
     sa.Column("delivered_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("acked_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("dead_at", sa.DateTime(timezone=True), nullable=True),
-    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+    sa.Column(
+        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    ),
     sa.UniqueConstraint("event_id", "consumer_name", name="uq_event_deliveries_event_consumer"),
     sa.CheckConstraint("event_version >= 1", name="event_version_positive"),
     sa.CheckConstraint("state IN ('READY','LEASED','ACKED','DEAD')", name="state_known"),
     sa.CheckConstraint(
-        "data_classification IN ('RESTRICTED','CONFIDENTIAL','CLIENT_PRIVATE','INTERNAL','PUBLIC')",
+        "data_classification IN "
+            "('RESTRICTED','CONFIDENTIAL','CLIENT_PRIVATE','INTERNAL','PUBLIC')",
         name="classification_non_secret",
     ),
     sa.CheckConstraint(
-        "data_classification <> 'CLIENT_PRIVATE' OR (tenant_id IS NOT NULL AND client_id IS NOT NULL)",
+        "data_classification <> 'CLIENT_PRIVATE' OR "
+        "(tenant_id IS NOT NULL AND client_id IS NOT NULL)",
         name="client_private_scoped",
     ),
     sa.CheckConstraint("octet_length(payload::text) <= 65536", name="payload_at_most_64kib"),

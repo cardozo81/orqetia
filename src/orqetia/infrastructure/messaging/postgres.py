@@ -178,10 +178,11 @@ class PostgresWorkQueue(WorkQueuePort):
                 work_items.c.lease_until > sa.func.now(),
             )
             .values(lease_until=deadline)
+            .returning(work_items.c.work_id)
         )
         async with self._sessions.begin() as session:
-            result = await session.execute(statement)
-        return result.rowcount == 1
+            updated = (await session.execute(statement)).scalar_one_or_none()
+        return updated is not None
 
     async def complete(self, lease: WorkLease) -> bool:
         statement = (
@@ -198,10 +199,11 @@ class PostgresWorkQueue(WorkQueuePort):
                 lease_owner=None,
                 lease_until=None,
             )
+            .returning(work_items.c.work_id)
         )
         async with self._sessions.begin() as session:
-            result = await session.execute(statement)
-        return result.rowcount == 1
+            updated = (await session.execute(statement)).scalar_one_or_none()
+        return updated is not None
 
     async def requeue_infrastructure_failure(
         self,
@@ -236,10 +238,11 @@ class PostgresWorkQueue(WorkQueuePort):
                     else_=work_items.c.dead_at,
                 ),
             )
+            .returning(work_items.c.work_id)
         )
         async with self._sessions.begin() as session:
-            result = await session.execute(statement)
-        return result.rowcount == 1
+            updated = (await session.execute(statement)).scalar_one_or_none()
+        return updated is not None
 
 
 class PostgresEventTransport(EventTransportPort):
@@ -368,10 +371,11 @@ class PostgresEventTransport(EventTransportPort):
                 lease_owner=None,
                 lease_until=None,
             )
+            .returning(event_deliveries.c.delivery_id)
         )
         async with self._sessions.begin() as session:
-            result = await session.execute(statement)
-        return result.rowcount == 1
+            updated = (await session.execute(statement)).scalar_one_or_none()
+        return updated is not None
 
 
 class PostgresWakeup(WakeupPort):

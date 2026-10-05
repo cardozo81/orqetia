@@ -23,12 +23,21 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install pinned uv bootstrap tool
+        run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+
+      - name: Verify locked dependencies
+        run: uv lock --check
+
+      - name: Reproduce locked Python 3.14 runtime install
+        run: uv sync --locked --no-dev --python 3.14
+
       - name: Repository security policy checks
-        run: python3 scripts/security_baseline_check.py
+        run: uv run --no-sync --python 3.14 python scripts/security_baseline_check.py
 
       - name: Canonical revalidation gate
         run: |
-          python3 -m unittest \
+          uv run --no-sync --python 3.14 python -m unittest \
             tests.characterization.test_canonical_contract \
             tests.contracts.test_attempt_operation_reference \
             tests.contracts.test_exchange_evidence_reference \
@@ -36,10 +45,10 @@ jobs:
             -v
 
       - name: Tenant target envelope revalidation tests
-        run: python3 -m unittest tests.contracts.test_tenancy_target_reference -v
+        run: uv run --no-sync --python 3.14 python -m unittest tests.contracts.test_tenancy_target_reference -v
 
       - name: Explicit target authorization revalidation tests
-        run: python3 -m unittest tests.contracts.test_authz_target_reference -v
+        run: uv run --no-sync --python 3.14 python -m unittest tests.contracts.test_authz_target_reference -v
 
       - name: Client OpenAPI v1 contract tests
-        run: python3 -m unittest tests.contracts.test_openapi_v1_contract -v
+        run: uv run --no-sync --python 3.14 python -m unittest tests.contracts.test_openapi_v1_contract -v

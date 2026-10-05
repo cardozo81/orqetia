@@ -44,13 +44,15 @@ def check_secrets(paths: list[Path], errors: list[str]) -> None:
     for path in paths:
         try:
             data = path.read_bytes()
-        except (OSError, UnicodeError):
+        except OSError, UnicodeError:
             continue
         if len(data) > 2_000_000:
             continue
         for pattern in SECRET_PATTERNS:
             if pattern.search(data):
-                errors.append(f"SEC-013 likely secret/private key material: {path.relative_to(ROOT)}")
+                errors.append(
+                    f"SEC-013 likely secret/private key material: {path.relative_to(ROOT)}"
+                )
                 break
 
 

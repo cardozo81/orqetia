@@ -23,7 +23,9 @@ def valid_config() -> dict[str, object]:
             "migrate": dict(runtime),
             "postgres": {
                 "ports": [{"host_ip": "127.0.0.1", "published": "5432", "target": 5432}],
-                "volumes": [{"type": "volume", "source": "postgres_data", "target": "/var/lib/postgresql"}],
+                "volumes": [
+                    {"type": "volume", "source": "postgres_data", "target": "/var/lib/postgresql"}
+                ],
             },
         }
     }

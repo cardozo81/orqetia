@@ -9,8 +9,10 @@ from orqetia.identity.authentication import (
     AuthenticatedPrincipal,
     AuthenticationRejected,
 )
+from orqetia.infrastructure.health import DatabaseReadinessProbe
 from orqetia.infrastructure.http import create_app
-from orqetia.settings import RuntimeSettings
+from orqetia.infrastructure.persistence import create_engine
+from orqetia.settings import Environment, RuntimeSettings
 
 
 class UnconfiguredAuthenticator:
@@ -23,9 +25,14 @@ OPENAPI_PATH = ROOT / "contracts" / "openapi" / "orqetia-v1.openapi.json"
 
 settings = RuntimeSettings()
 canonical_openapi = json.loads(OPENAPI_PATH.read_text(encoding="utf-8"))
+engine = create_engine(settings)
 
 app = create_app(
     openapi_document=canonical_openapi,
     authenticator=UnconfiguredAuthenticator(),
+    readiness_probe=DatabaseReadinessProbe(engine),
+    cors_allowed_origins=settings.cors_allowed_origins,
+    enable_hsts=settings.environment is Environment.PRODUCTION,
+    shutdown_callback=engine.dispose,
 )
 app.state.runtime_settings = settings.safe_summary()

@@ -5,7 +5,6 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[2]
 OPENAPI_PATH = ROOT / "contracts" / "openapi" / "orqetia-v1.openapi.json"
 EXECUTION_SCHEMA_PATH = ROOT / "contracts" / "execution" / "task-execution-selection.schema.json"
@@ -77,10 +76,7 @@ class OpenApiV1ContractTests(unittest.TestCase):
             self.schemas["ExecutionSelection"]["$ref"],
             "../execution/task-execution-selection.schema.json",
         )
-        modes = {
-            branch["properties"]["mode"]["const"]
-            for branch in self.execution["oneOf"]
-        }
+        modes = {branch["properties"]["mode"]["const"] for branch in self.execution["oneOf"]}
         self.assertIn("AUTO", modes)
 
     def test_explicit_target_requires_conditional_scope(self) -> None:
@@ -125,7 +121,9 @@ class OpenApiV1ContractTests(unittest.TestCase):
     def test_provider_identity_is_separate_from_display_name(self) -> None:
         provider = self.schemas["ProviderIdentity"]
         self.assertEqual(provider["required"], ["provider_id", "provider_name"])
-        self.assertIn("Provider Registry identity", provider["properties"]["provider_id"]["description"])
+        self.assertIn(
+            "Provider Registry identity", provider["properties"]["provider_id"]["description"]
+        )
 
     def test_client_schema_has_no_provider_financial_or_secret_fields(self) -> None:
         forbidden = {

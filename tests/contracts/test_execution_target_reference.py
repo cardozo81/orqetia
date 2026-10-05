@@ -20,11 +20,19 @@ class ExecutionTargetTests(unittest.TestCase):
     def setUp(self) -> None:
         self.cheap = Candidate(
             Target("OPENAI", "cheap", "MEDIUM"),
-            "MONEY:USD", 10, 0.10, "USD", 10,
+            "MONEY:USD",
+            10,
+            0.10,
+            "USD",
+            10,
         )
         self.expensive = Candidate(
             Target("ANTHROPIC", "expensive", "DEFAULT"),
-            "MONEY:USD", 10, 0.30, "USD", 20,
+            "MONEY:USD",
+            10,
+            0.30,
+            "USD",
+            20,
         )
 
     def test_omitted_execution_defaults_to_auto(self) -> None:
@@ -32,12 +40,16 @@ class ExecutionTargetTests(unittest.TestCase):
 
     def test_auto_orders_lower_comparable_cost_first(self) -> None:
         ranked = rank_auto((self.expensive, self.cheap))
-        self.assertEqual(tuple(item.target for item in ranked), (self.cheap.target, self.expensive.target))
+        self.assertEqual(
+            tuple(item.target for item in ranked), (self.cheap.target, self.expensive.target)
+        )
 
     def test_cheaper_complete_prevents_expensive_call(self) -> None:
         state, calls = run_auto(
             candidates=lambda: (self.expensive, self.cheap),
-            outcome_for=lambda candidate, cycle: Invocation(Outcome.COMPLETE if candidate is self.cheap else Outcome.NO_PROGRESS),
+            outcome_for=lambda candidate, cycle: Invocation(
+                Outcome.COMPLETE if candidate is self.cheap else Outcome.NO_PROGRESS
+            ),
             policy=Policy(max_cycles=1, cycle_delay_seconds=0),
         )
         self.assertEqual(state, FinalState.COMPLETE)
@@ -98,7 +110,10 @@ class ExecutionTargetTests(unittest.TestCase):
     def test_unpriced_remains_eligible_and_not_zero(self) -> None:
         unpriced = Candidate(Target("MISTRAL", "u", "DEFAULT"), "UNPRICED", 30, None, None, 1)
         ranked = rank_auto((unpriced, self.expensive, self.cheap))
-        self.assertEqual(tuple(item.target for item in ranked), (self.cheap.target, self.expensive.target, unpriced.target))
+        self.assertEqual(
+            tuple(item.target for item in ranked),
+            (self.cheap.target, self.expensive.target, unpriced.target),
+        )
 
     def test_different_currency_uses_group_order_not_implicit_fx(self) -> None:
         usd = Candidate(Target("OPENAI", "usd", "DEFAULT"), "MONEY:USD", 10, 999.0, "USD", 1)
@@ -134,7 +149,9 @@ class ExecutionTargetTests(unittest.TestCase):
             request_fingerprint="sha256:same",
         )
         self.assertEqual(tuple(item[1] for item in attempts), (target, target, target))
-        self.assertEqual(tuple(item[0] for item in attempts), ("attempt-1", "attempt-2", "attempt-3"))
+        self.assertEqual(
+            tuple(item[0] for item in attempts), ("attempt-1", "attempt-2", "attempt-3")
+        )
 
     def test_cost_change_does_not_change_explicit_target(self) -> None:
         target = Target("OPENAI", "gpt-approved", "MEDIUM")
