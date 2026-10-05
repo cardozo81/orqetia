@@ -2,6 +2,7 @@
 
 from .chat_completions import ChatCompletionsHttpAdapter
 from .deepseek import DEEPSEEK_RESPONSES_ENDPOINT, DeepSeekResponsesAdapter
+from .gemini import GEMINI_INTERACTIONS_ENDPOINT, GeminiInteractionsAdapter
 from .io import (
     ProviderCredential,
     ProviderInvocationPayload,
@@ -75,6 +76,7 @@ __all__ = [
     "CANONICAL_PROVIDER_PORT_PLAN",
     "ChatCompletionsHttpAdapter",
     "DEEPSEEK_RESPONSES_ENDPOINT",
+    "GEMINI_INTERACTIONS_ENDPOINT",
     "OPENAI_RESPONSES_ENDPOINT",
     "INITIAL_PROVIDER_TAXONOMY",
     "MANDATORY_ADAPTER_PARITY_GATES",
@@ -87,6 +89,7 @@ __all__ = [
     "AdapterResolution",
     "DeepSeekResponsesAdapter",
     "DeterministicTestProvider",
+    "GeminiInteractionsAdapter",
     "HttpxProviderHttpTransport",
     "KimiChatCompletionsAdapter",
     "MiMoResponsesAdapter",
