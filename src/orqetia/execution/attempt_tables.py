@@ -57,6 +57,16 @@ provider_attempts = sa.Table(
     sa.Column("terminal_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
     sa.ForeignKeyConstraint(
+        ["session_id", "tenant_id", "client_id"],
+        [
+            "execution.execution_sessions.session_id",
+            "execution.execution_sessions.tenant_id",
+            "execution.execution_sessions.client_id",
+        ],
+        name="fk_provider_attempts_session_owner",
+        ondelete="CASCADE",
+    ),
+    sa.ForeignKeyConstraint(
         ["task_id", "tenant_id", "client_id"],
         [
             "execution.tasks.task_id",
@@ -65,6 +75,15 @@ provider_attempts = sa.Table(
         ],
         name="fk_provider_attempts_task_owner",
         ondelete="CASCADE",
+    ),
+    sa.CheckConstraint(
+        "(tenant_id IS NULL AND client_id IS NULL) OR "
+        "(tenant_id IS NOT NULL AND client_id IS NOT NULL)",
+        name="ownership_complete",
+    ),
+    sa.CheckConstraint(
+        "session_id IS NULL OR (tenant_id IS NOT NULL AND client_id IS NOT NULL)",
+        name="session_scope_complete",
     ),
     sa.CheckConstraint(
         "(task_id IS NULL) OR "
