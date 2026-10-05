@@ -78,8 +78,10 @@ class ProviderAttempt:
             self.session_id is None or self.ownership is None
         ):
             raise ValueError("task-scoped attempt requires session and ownership")
-        if (self.retry_of_attempt_id is not None and
-            self.retry_of_attempt_id == self.attempt_id):
+        if (
+            self.retry_of_attempt_id is not None
+            and self.retry_of_attempt_id == self.attempt_id
+        ):
             raise ValueError("attempt cannot retry itself")
         if (
             self.fallback_from_attempt_id is not None
