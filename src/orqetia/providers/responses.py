@@ -103,6 +103,9 @@ class ResponsesHttpAdapter(ProviderAdapter):
     include_store = False
     include_empty_tools = False
     strict_json_schema = False
+    credential_header = "Authorization"
+    credential_prefix = "Bearer "
+    structured_wire_mode = "json_schema"
 
     def __init__(
         self,
@@ -116,6 +119,8 @@ class ResponsesHttpAdapter(ProviderAdapter):
     ) -> None:
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be greater than zero")
+        if self.structured_wire_mode not in {"json_schema", "json_object"}:
+            raise ValueError("structured_wire_mode must be json_schema or json_object")
         self._credential = credential
         self._payload_reader = payload_reader
         self._response_writer = response_writer
@@ -155,8 +160,9 @@ class ResponsesHttpAdapter(ProviderAdapter):
             )
 
         wire_body = self._wire_body(request, materialized)
+        credential_value = f"{self.credential_prefix}{self._credential.secret_value}"
         headers = {
-            "Authorization": f"Bearer {self._credential.secret_value}",
+            self.credential_header: credential_value,
             "Content-Type": "application/json",
         }
 
@@ -269,8 +275,7 @@ class ResponsesHttpAdapter(ProviderAdapter):
             body["store"] = False
         if self.include_empty_tools:
             body["tools"] = []
-        if materialized.instructions is not None:
-            body["instructions"] = materialized.instructions
+        instructions = materialized.instructions
 
         profile = request.target.reasoning_profile.strip().casefold()
         if profile not in {"provider_default", "default"}:
@@ -279,16 +284,34 @@ class ResponsesHttpAdapter(ProviderAdapter):
         structured = materialized.structured_output
         if structured is not None:
             schema = json.loads(structured.schema_json)
-            output_format: dict[str, object] = {
-                "type": "json_schema",
-                "name": structured.name,
-                "schema": schema,
-            }
-            if self.strict_json_schema:
-                output_format["strict"] = True
-            body["text"] = {"format": output_format}
+            if self.structured_wire_mode == "json_object":
+                body["text"] = {"format": {"type": "json_object"}}
+                schema_text = json.dumps(
+                    schema,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                directive = (
+                    "Return JSON only. The following JSON Schema is normative and "
+                    f"will be validated locally: {schema_text}"
+                )
+                instructions = (
+                    f"{instructions}\n\n{directive}" if instructions is not None else directive
+                )
+            else:
+                output_format: dict[str, object] = {
+                    "type": "json_schema",
+                    "name": structured.name,
+                    "schema": schema,
+                }
+                if self.strict_json_schema:
+                    output_format["strict"] = True
+                body["text"] = {"format": output_format}
         else:
             body["text"] = {"format": {"type": "text"}}
+
+        if instructions is not None:
+            body["instructions"] = instructions
         return body
 
     def _http_failure(
