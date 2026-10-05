@@ -17,6 +17,24 @@ External Clients┘                                             │
                                                   Usage / Accounting
 ```
 
+## Execution selection
+
+### AUTO — default
+
+If no target is requested, ORQETIA:
+1. filters to integrated, configured, capability-compatible, client-authorized and healthy candidates;
+2. orders economically comparable candidates from lower estimated provider cost to higher;
+3. attempts the cheapest first;
+4. escalates only if the candidate does not satisfy the remaining requirement;
+5. preserves partial accepted progress;
+6. recomputes eligibility/order on each cycle.
+
+Pricing is not an eligibility gate. UNPRICED candidates remain eligible. Currencies/native units are not compared through invented FX.
+
+### EXPLICIT_TARGET — optional
+
+A service client may request an authorized provider, model and reasoning/depth profile. The effective target is then immutable for that task. Retry, Retry-After, timeout, cycles and validation remain ORQETIA responsibilities, but no cross-provider/model/depth fallback is allowed because of cost.
+
 ## Canonical execution invariants
 
 Unless an ADR explicitly changes them:
