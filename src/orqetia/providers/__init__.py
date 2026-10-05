@@ -1,5 +1,6 @@
 """Provider adapter contracts, registry contracts and deterministic test-provider support."""
 
+from .deepseek import DEEPSEEK_RESPONSES_ENDPOINT, DeepSeekResponsesAdapter
 from .io import (
     ProviderCredential,
     ProviderInvocationPayload,
@@ -8,13 +9,13 @@ from .io import (
     StructuredOutputSpec,
     StructuredOutputValidator,
 )
-from .openai import (
-    OPENAI_RESPONSES_ENDPOINT,
+from .openai import OPENAI_RESPONSES_ENDPOINT, OpenAIResponsesAdapter
+from .responses import (
     HttpxProviderHttpTransport,
-    OpenAIResponsesAdapter,
     ProviderDispatchAmbiguousError,
     ProviderHttpResponse,
     ProviderHttpTransport,
+    ResponsesHttpAdapter,
 )
 from .parity import (
     CANONICAL_PROVIDER_PORT_PLAN,
@@ -66,6 +67,7 @@ from .simulator import (
 
 __all__ = [
     "CANONICAL_PROVIDER_PORT_PLAN",
+    "DEEPSEEK_RESPONSES_ENDPOINT",
     "OPENAI_RESPONSES_ENDPOINT",
     "INITIAL_PROVIDER_TAXONOMY",
     "MANDATORY_ADAPTER_PARITY_GATES",
@@ -73,6 +75,7 @@ __all__ = [
     "AdapterTransportFamily",
     "ORQETIA_TEST_PROVIDER",
     "AdapterResolution",
+    "DeepSeekResponsesAdapter",
     "DeterministicTestProvider",
     "HttpxProviderHttpTransport",
     "NativeUsage",
@@ -96,6 +99,7 @@ __all__ = [
     "ProviderRegistryReader",
     "ProviderRequestPayloadReader",
     "ProviderResponsePayloadWriter",
+    "ResponsesHttpAdapter",
     "ProviderSpec",
     "ProviderTarget",
     "ProviderUsage",
