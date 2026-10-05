@@ -45,6 +45,9 @@ class PostgreSQLMessagingIntegrationTests(unittest.TestCase):
     def test_event_delivery_registration_is_deduplicated_per_consumer(self) -> None:
         asyncio.run(self._test_event_dedup())
 
+    def test_active_lease_can_be_renewed(self) -> None:
+        asyncio.run(self._test_active_lease_renewal())
+
     def test_client_private_scope_and_secret_are_defended_by_database(self) -> None:
         asyncio.run(self._test_database_classification_checks())
 
@@ -156,6 +159,26 @@ class PostgreSQLMessagingIntegrationTests(unittest.TestCase):
             self.assertEqual(second.attempt_count, 2)
             self.assertFalse(await queue.complete(first))
             self.assertTrue(await queue.complete(second))
+        finally:
+            await engine.dispose()
+
+    async def _test_active_lease_renewal(self) -> None:
+        engine, factory = await self._resources()
+        queue = PostgresWorkQueue(factory)
+        try:
+            item = self._item()
+            await queue.enqueue(item)
+            claimed = (
+                await queue.claim(
+                    queue_name=QueueName.EXECUTION,
+                    lease_owner="heartbeat-worker",
+                    lease_seconds=30,
+                    limit=1,
+                )
+            )[0]
+
+            self.assertTrue(await queue.renew_lease(claimed, lease_seconds=60))
+            self.assertTrue(await queue.complete(claimed))
         finally:
             await engine.dispose()
 
