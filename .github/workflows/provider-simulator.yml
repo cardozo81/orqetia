@@ -39,4 +39,5 @@ jobs:
             tests.providers.test_simulator \
             tests.providers.test_registry \
             tests.providers.test_parity \
+            tests.providers.test_openai \
             -v
