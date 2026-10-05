@@ -42,6 +42,7 @@ class ChatCompletionsHttpAdapter(ProviderAdapter):
     error_prefix: str
     endpoint: str
     strict_json_schema = False
+    service_tier: str | None = None
     credit_error_markers: tuple[str, ...] = ("credit", "balance", "arrearage")
     quota_error_markers: tuple[str, ...] = ("quota_exhausted", "freetieronly")
     auth_error_markers: tuple[str, ...] = (
@@ -231,6 +232,8 @@ class ChatCompletionsHttpAdapter(ProviderAdapter):
             "model": request.target.model_id,
             "messages": messages,
         }
+        if self.service_tier is not None:
+            body["service_tier"] = self.service_tier
         structured = materialized.structured_output
         if structured is not None:
             schema = json.loads(structured.schema_json)
