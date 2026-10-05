@@ -21,6 +21,7 @@ from orqetia.shared.messaging import QueueName, WakeupPort, WorkLease, WorkQueue
 class HandlerDisposition(StrEnum):
     COMPLETE = "COMPLETE"
     REQUEUE_INFRASTRUCTURE = "REQUEUE_INFRASTRUCTURE"
+    DEAD_LETTER = "DEAD_LETTER"
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,15 @@ class HandlerOutcome:
         return cls(
             HandlerDisposition.REQUEUE_INFRASTRUCTURE,
             available_at=available_at,
+            error_class=error_class,
+        )
+
+    @classmethod
+    def dead_letter(cls, *, error_class: str) -> HandlerOutcome:
+        if not error_class.strip():
+            raise ValueError("error_class is required for dead-letter")
+        return cls(
+            HandlerDisposition.DEAD_LETTER,
             error_class=error_class,
         )
 
@@ -179,7 +189,13 @@ class WorkerProcess:
     async def _handle(self, lease: WorkLease) -> None:
         handler = self._registry.resolve(lease)
         if handler is None:
-            self._log("work.unsupported", lease)
+            if not await self._queue.dead_letter(
+                lease,
+                error_class="UNSUPPORTED_OPERATION",
+            ):
+                self._log("work.stale_dead_letter_rejected", lease)
+            else:
+                self._log("work.unsupported_dead_lettered", lease)
             return
 
         handler_done = asyncio.Event()
@@ -212,6 +228,16 @@ class WorkerProcess:
                     error_class=outcome.error_class,
                 ):
                     self._log("work.stale_requeue_rejected", lease)
+                return
+
+            if outcome.disposition is HandlerDisposition.DEAD_LETTER:
+                if outcome.error_class is None:
+                    raise ValueError("dead-letter outcome is incomplete")
+                if not await self._queue.dead_letter(
+                    lease,
+                    error_class=outcome.error_class,
+                ):
+                    self._log("work.stale_dead_letter_rejected", lease)
                 return
 
             raise ValueError(f"unsupported handler disposition: {outcome.disposition}")
