@@ -7,6 +7,16 @@ from .anthropic import (
 )
 from .chat_completions import ChatCompletionsHttpAdapter
 from .cohere import COHERE_CHAT_ENDPOINT, CohereChatV2Adapter
+from .copilot import (
+    COPILOT_SDK_ENDPOINT,
+    CopilotSdkAuthenticationError,
+    CopilotSdkRateLimitError,
+    CopilotSdkTimeoutError,
+    CopilotSdkTransport,
+    CopilotSdkUnavailableError,
+    GitHubCopilotAdapter,
+    GithubCopilotSdkTransport,
+)
 from .deepseek import DEEPSEEK_RESPONSES_ENDPOINT, DeepSeekResponsesAdapter
 from .gemini import GEMINI_INTERACTIONS_ENDPOINT, GeminiInteractionsAdapter
 from .io import (
@@ -85,6 +95,14 @@ __all__ = [
     "COHERE_CHAT_ENDPOINT",
     "ChatCompletionsHttpAdapter",
     "CohereChatV2Adapter",
+    "COPILOT_SDK_ENDPOINT",
+    "CopilotSdkAuthenticationError",
+    "CopilotSdkRateLimitError",
+    "CopilotSdkTimeoutError",
+    "CopilotSdkTransport",
+    "CopilotSdkUnavailableError",
+    "GitHubCopilotAdapter",
+    "GithubCopilotSdkTransport",
     "DEEPSEEK_RESPONSES_ENDPOINT",
     "GEMINI_INTERACTIONS_ENDPOINT",
     "OPENAI_RESPONSES_ENDPOINT",
