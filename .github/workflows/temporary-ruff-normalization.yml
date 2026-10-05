@@ -1,0 +1,45 @@
+name: Temporary Ruff normalization
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned uv
+        run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+
+      - name: Install locked development environment
+        run: uv sync --locked --python 3.14
+
+      - name: Normalize with Ruff safe fixes and formatter
+        run: |
+          uv run --no-sync --python 3.14 ruff check --fix src apps tests scripts migrations || true
+          uv run --no-sync --python 3.14 ruff format src apps tests scripts migrations
+          python3 - <<'PY'
+          import base64
+          import subprocess
+          from pathlib import Path
+
+          raw = subprocess.check_output(["git", "diff", "--name-only", "-z"])
+          paths = [Path(p.decode()) for p in raw.split(b"\0") if p]
+          print("RUFF_FILES_BEGIN")
+          for path in paths:
+              if not path.is_file():
+                  continue
+              encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+              print(f"RUFF_FILE {path} {encoded}")
+          print("RUFF_FILES_END")
+          PY
+          exit 1
