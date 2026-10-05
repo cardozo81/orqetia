@@ -7,7 +7,6 @@ import json
 import sys
 from typing import Any
 
-
 EXPECTED_SERVICES = {"api", "worker", "scheduler", "migrate", "postgres"}
 RUNTIME_SERVICES = {"api", "worker", "scheduler", "migrate"}
 
