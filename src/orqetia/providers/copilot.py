@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 from typing import Protocol, runtime_checkable
 
@@ -66,10 +67,11 @@ class GithubCopilotSdkTransport:
         timeout_seconds: float,
     ) -> str:
         try:
-            from copilot import CopilotClient
-        except ImportError as exc:
+            module = importlib.import_module("copilot")
+            CopilotClient = getattr(module, "CopilotClient")
+        except (ImportError, AttributeError) as exc:
             raise CopilotSdkUnavailableError(
-                "GitHub Copilot SDK is not installed"
+                "GitHub Copilot SDK is not installed or is incompatible"
             ) from exc
 
         client = CopilotClient(
