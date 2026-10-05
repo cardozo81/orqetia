@@ -563,14 +563,12 @@ class CanonicalOrchestrationPolicyEngine:
             if missing_after != current_missing:
                 raise ValueError("non-progress outcome must preserve missing requirements")
 
-        accepted = tuple(
-            item
-            for item in (*progress.accepted, *observation.accepted_requirements)
-            if item not in set(progress.accepted)
-            or item in observation.accepted_requirements
-        )
+        accepted_items = list(progress.accepted)
+        for item in observation.accepted_requirements:
+            if item not in accepted_items:
+                accepted_items.append(item)
         missing = tuple(item for item in progress.missing if item in missing_after)
-        return RequirementProgress(accepted=accepted, missing=missing)
+        return RequirementProgress(accepted=tuple(accepted_items), missing=missing)
 
     @staticmethod
     def _effective_cycle_delay(
