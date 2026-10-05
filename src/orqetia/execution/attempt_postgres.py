@@ -68,6 +68,14 @@ def _usage_json(usage: ProviderUsage) -> dict[str, object]:
     }
 
 
+def _persisted_non_negative_int(value: object, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"persisted {field} must be an integer")
+    if value < 0:
+        raise ValueError(f"persisted {field} cannot be negative")
+    return value
+
+
 def _usage_from_json(value: object) -> ProviderUsage:
     if not isinstance(value, dict):
         raise ValueError("persisted usage must be an object")
@@ -88,8 +96,14 @@ def _usage_from_json(value: object) -> ProviderUsage:
             )
         )
     return ProviderUsage(
-        input_tokens=int(raw.get("input_tokens", 0)),
-        output_tokens=int(raw.get("output_tokens", 0)),
+        input_tokens=_persisted_non_negative_int(
+            raw.get("input_tokens", 0),
+            "input_tokens",
+        ),
+        output_tokens=_persisted_non_negative_int(
+            raw.get("output_tokens", 0),
+            "output_tokens",
+        ),
         native=tuple(native),
     )
 
