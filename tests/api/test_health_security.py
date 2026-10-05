@@ -7,9 +7,8 @@ from pathlib import Path
 
 import httpx
 
-from tests.api.test_fastapi_shell import FakeAuthenticator
 from orqetia.infrastructure.http import create_app
-
+from tests.api.test_fastapi_shell import FakeAuthenticator
 
 ROOT = Path(__file__).resolve().parents[2]
 CANONICAL = json.loads(
