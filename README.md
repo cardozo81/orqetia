@@ -62,6 +62,15 @@ Clients may:
 
 Clients do **not** administer orchestration parameters and do **not** receive monetary cost data in this phase.
 
+## Execution selection
+
+ORQETIA supports two execution modes:
+
+- **AUTO (default):** when the service client does not specify a target, ORQETIA orders eligible candidates by the lowest comparable estimated provider cost first and escalates to higher-cost candidates only when the cheaper candidate does not satisfy the remaining requirement.
+- **EXPLICIT_TARGET (optional):** the service client may request an authorized provider, model and reasoning/depth profile. Once resolved, that target remains fixed for retries/cycles; ORQETIA does not switch to another provider/model because of cost.
+
+Backoffice defines the allowed provider/model/profile envelope and runtime limits. The service client chooses only within that envelope.
+
 ## Economic model
 
 ORQETIA separates:
