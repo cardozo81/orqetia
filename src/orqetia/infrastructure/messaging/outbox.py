@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 def _require_owner_schema(metadata: sa.MetaData) -> str:
     schema = metadata.schema
-    if schema in {None, "messaging", "readmodel"}:
+    if schema is None or schema in {"messaging", "readmodel"}:
         raise ValueError("outbox/inbox metadata must belong to an authoritative owner schema")
     return schema
 
