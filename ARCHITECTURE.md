@@ -68,6 +68,16 @@ ORQETIA generic contracts:
 
 See ADR-0018 / #86 / #87.
 
+## Exchange evidence integrity
+
+Provider communication evidence is sanitized **before** persistence. The persisted sanitized body is the source of truth for any raw-evidence API/UI surface.
+
+Presentation may humanize labels, titles, statuses and provider display names, but must not semantically rewrite tokens inside request/response/prompt/schema evidence. Transport escaping is allowed when it round-trips to the persisted sanitized content.
+
+`provider_id` is a typed Provider Registry identity; `provider_name` is separate display metadata. Provider IDs never use a generic status/enum fallback.
+
+See ADR-0019 / #88.
+
 ## Administration boundary
 
 Only authorized Backoffice users administer tenants, clients, Backoffice users, execution policies, orchestration parameters, providers/models/endpoints, provider credentials, pricing, quotas, rate limits and scopes.
