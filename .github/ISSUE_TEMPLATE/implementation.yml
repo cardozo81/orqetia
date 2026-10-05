@@ -1,0 +1,96 @@
+name: Implementation
+description: Executable implementation work tied to the ORQETIA roadmap
+title: "[IMPLEMENTATION] "
+body:
+  - type: markdown
+    attributes:
+      value: "ORQETIA is in DEVELOPMENT. All writes must remain in cardozo81/orqetia."
+  - type: input
+    id: parent
+    attributes:
+      label: Parent epic
+      placeholder: "#35"
+    validations:
+      required: true
+  - type: input
+    id: roadmap
+    attributes:
+      label: Roadmap phase
+      placeholder: "#47 — Phase 1"
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+    validations:
+      required: true
+  - type: textarea
+    id: out
+    attributes:
+      label: Out of scope
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Blocked by / Blocks
+      placeholder: "Blocked by: #...\nBlocks: #..."
+    validations:
+      required: true
+  - type: textarea
+    id: canonical
+    attributes:
+      label: Canonical behavior / reuse
+      description: Reference #31, #34 and #43 when applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Targeted tests
+      description: Limit tests to the changed boundary unless broader regression is justified.
+    validations:
+      required: true
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk
+      options:
+        - low
+        - medium
+        - high
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+    validations:
+      required: true
+  - type: checkboxes
+    id: cost
+    attributes:
+      label: Automation cost constraints
+      options:
+        - label: Ordinary tests/CI require no paid AI provider.
+          required: true
+        - label: Agent/CI path is expected to create no additional financial cost for the repository owner.
+          required: true
+  - type: dropdown
+    id: human
+    attributes:
+      label: Human gate
+      options:
+        - "No — autonomous issue through validated PR"
+        - "Yes — architecture decision"
+        - "Yes — paid/external environment"
+        - "Yes — functional-package smoke"
+    validations:
+      required: true
