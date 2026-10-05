@@ -36,7 +36,7 @@ class ProjectScaffoldTests(unittest.TestCase):
         for required in (
             "fastapi>=0.141,<0.142",
             "pydantic>=2.13,<2.14",
-            "sqlalchemy>=2.1,<2.2",
+            "sqlalchemy[asyncio]>=2.1,<2.2",
             "alembic>=1.20,<1.21",
             "uvicorn[standard]>=0.46,<0.47",
         ):
