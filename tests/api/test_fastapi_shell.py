@@ -120,7 +120,7 @@ class FastApiShellTests(unittest.TestCase):
     def test_missing_authentication_is_safe_401(self) -> None:
         app = create_app(openapi_document=CANONICAL, authenticator=FakeAuthenticator())
         response = asyncio.run(request(app, "GET", "/v1/providers", token=None))
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 401, response.text)
         self.assertEqual(response.json()["code"], "AUTHENTICATION_REQUIRED")
         self.assertNotIn("traceback", response.text.lower())
 
