@@ -4,8 +4,8 @@ import unittest
 from dataclasses import asdict, dataclass
 
 from orqetia.providers import (
-    AdapterResolution,
     INITIAL_PROVIDER_TAXONOMY,
+    AdapterResolution,
     ProviderCapability,
     ProviderModelSpec,
     ProviderRegistry,
