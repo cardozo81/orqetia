@@ -25,8 +25,8 @@ tasks = sa.Table(
     sa.Column("status", sa.Text(), nullable=False, server_default="CREATED"),
     sa.Column("effective_policy_version_id", UUID(as_uuid=True), nullable=False),
     sa.Column("requested_execution_mode", sa.Text(), nullable=False),
-    sa.Column("requested_target", JSONB(), nullable=True),
-    sa.Column("effective_target", JSONB(), nullable=True),
+    sa.Column("requested_target", JSONB(none_as_null=True), nullable=True),
+    sa.Column("effective_target", JSONB(none_as_null=True), nullable=True),
     sa.Column("requirements", JSONB(), nullable=False),
     sa.Column(
         "accepted_requirements",
