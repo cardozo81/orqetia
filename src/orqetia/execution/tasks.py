@@ -207,12 +207,15 @@ class ExecutionTask:
             raise ValueError("terminal task status and terminal_at must agree")
         if self.status is TaskStatus.COMPLETE and self.missing_requirements:
             raise ValueError("COMPLETE task cannot have missing requirements")
-        if self.status is TaskStatus.PARTIAL:
-            if not self.accepted_requirements or not self.missing_requirements:
-                raise ValueError("PARTIAL task requires accepted and missing requirements")
-        if self.status in {TaskStatus.COMPLETE, TaskStatus.PARTIAL}:
-            if self.result_reference is None or not self.result_reference.strip():
-                raise ValueError("successful terminal task requires result_reference")
+        if self.status is TaskStatus.PARTIAL and (
+            not self.accepted_requirements or not self.missing_requirements
+        ):
+            raise ValueError("PARTIAL task requires accepted and missing requirements")
+        if (
+            self.status in {TaskStatus.COMPLETE, TaskStatus.PARTIAL}
+            and (self.result_reference is None or not self.result_reference.strip())
+        ):
+            raise ValueError("successful terminal task requires result_reference")
         if self.result_reference is not None and len(self.result_reference) > 500:
             raise ValueError("result_reference exceeds 500 characters")
 
