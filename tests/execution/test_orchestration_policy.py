@@ -33,6 +33,7 @@ from orqetia.execution import (
 from orqetia.providers import (
     DeterministicTestProvider,
     ProviderAttemptRequest,
+    ProviderOutcome,
     ProviderTarget,
     SimulatorFixture,
     SimulatorScenario,
@@ -44,6 +45,8 @@ class CanonicalOrchestrationPolicyTests(unittest.TestCase):
     def setUp(self) -> None:
         self.now = datetime.now(UTC)
         self.scope = OwnershipScope(uuid7(), uuid7())
+        self.session_id = uuid7()
+        self.policy_id = uuid7()
         self.cheap = ExecutionTargetSnapshot("CHEAP", "small", "standard")
         self.expensive = ExecutionTargetSnapshot("EXPENSIVE", "large", "deep")
         self.unpriced = ExecutionTargetSnapshot("UNPRICED", "special", "standard")
@@ -492,7 +495,7 @@ class CanonicalOrchestrationPolicyTests(unittest.TestCase):
             attempt_id=uuid7(),
             target=self.cheap,
             status=AttemptObservationStatus.COMPLETED,
-            outcome=self._auth_failure_outcome(),
+            outcome=ProviderOutcome.AUTH_FAILURE,
             accepted_requirements=(),
             missing_requirements=("VALID_JSON",),
             error_class="AUTH_FAILURE",
@@ -564,7 +567,7 @@ class CanonicalOrchestrationPolicyTests(unittest.TestCase):
             attempt_id=uuid7(),
             target=self.cheap,
             status=AttemptObservationStatus.COMPLETED,
-            outcome=self._rate_limited_outcome(),
+            outcome=ProviderOutcome.RATE_LIMITED,
             accepted_requirements=(),
             missing_requirements=("VALID_JSON",),
             retry_after_seconds=999,
@@ -594,7 +597,7 @@ class CanonicalOrchestrationPolicyTests(unittest.TestCase):
             attempt_id=uuid7(),
             target=self.cheap,
             status=AttemptObservationStatus.COMPLETED,
-            outcome=self._partial_outcome(),
+            outcome=ProviderOutcome.PARTIAL,
             accepted_requirements=("VALID_JSON",),
             missing_requirements=("CITED",),
             response_reference="simulator://partial",
@@ -719,11 +722,11 @@ class CanonicalOrchestrationPolicyTests(unittest.TestCase):
         runtime: tuple[TargetRuntimeState, ...] = (),
     ) -> ExecutionSession:
         return ExecutionSession(
-            session_id=self._session_id(),
+            session_id=self.session_id,
             ownership=self.scope,
             status=SessionStatus.ACTIVE,
             policy=SessionPolicySnapshot(
-                effective_policy_version_id=self._policy_id(),
+                effective_policy_version_id=self.policy_id,
                 authorized_targets=(self.cheap, self.expensive, self.unpriced),
             ),
             target_runtime=runtime,
@@ -765,16 +768,6 @@ class CanonicalOrchestrationPolicyTests(unittest.TestCase):
             started_at=self.now,
             version=3,
         )
-
-    def _session_id(self):
-        if not hasattr(self, "_stable_session_id"):
-            self._stable_session_id = uuid7()
-        return self._stable_session_id
-
-    def _policy_id(self):
-        if not hasattr(self, "_stable_policy_id"):
-            self._stable_policy_id = uuid7()
-        return self._stable_policy_id
 
     @staticmethod
     def _candidate(
@@ -821,25 +814,6 @@ class CanonicalOrchestrationPolicyTests(unittest.TestCase):
             task_id=uuid7(),
             session_id=uuid7(),
         )
-
-    @staticmethod
-    def _auth_failure_outcome():
-        from orqetia.providers import ProviderOutcome
-
-        return ProviderOutcome.AUTH_FAILURE
-
-    @staticmethod
-    def _rate_limited_outcome():
-        from orqetia.providers import ProviderOutcome
-
-        return ProviderOutcome.RATE_LIMITED
-
-    @staticmethod
-    def _partial_outcome():
-        from orqetia.providers import ProviderOutcome
-
-        return ProviderOutcome.PARTIAL
-
 
 if __name__ == "__main__":
     unittest.main()
