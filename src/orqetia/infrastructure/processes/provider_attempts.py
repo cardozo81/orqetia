@@ -12,6 +12,12 @@ from orqetia.execution import (
     ProviderAttempt,
     ProviderAttemptStore,
 )
+from orqetia.observability import (
+    EventEmitter,
+    JsonEventEmitter,
+    provider_attempt_telemetry_fields,
+    work_telemetry_fields,
+)
 from orqetia.providers import (
     ProviderAdapter,
     ProviderAttemptRequest,
@@ -81,6 +87,7 @@ class ProviderAttemptHandler:
         resolve_adapter: AdapterResolver,
         infrastructure_retry_delay_seconds: int = 1,
         clock: Clock = _utc_now,
+        telemetry: EventEmitter | None = None,
     ) -> None:
         if infrastructure_retry_delay_seconds < 1:
             raise ValueError("infrastructure_retry_delay_seconds must be >= 1")
@@ -88,16 +95,23 @@ class ProviderAttemptHandler:
         self._resolve_adapter = resolve_adapter
         self._infrastructure_retry_delay = infrastructure_retry_delay_seconds
         self._clock = clock
+        self._telemetry = telemetry or JsonEventEmitter()
 
     async def __call__(self, lease: WorkLease) -> HandlerOutcome:
         if lease.tenant_id is None or lease.client_id is None:
-            return self._infrastructure_failure("MISSING_OWNERSHIP")
+            return self._infrastructure_failure(
+                "MISSING_OWNERSHIP",
+                lease=lease,
+            )
 
         raw_attempt_id = lease.payload.get("attempt_id")
         try:
             attempt_id = UUID(str(raw_attempt_id))
         except (TypeError, ValueError, AttributeError):
-            return self._infrastructure_failure("INVALID_ATTEMPT_ID")
+            return self._infrastructure_failure(
+                "INVALID_ATTEMPT_ID",
+                lease=lease,
+            )
 
         scope = OwnershipScope(
             tenant_id=lease.tenant_id,
@@ -108,7 +122,10 @@ class ProviderAttemptHandler:
             attempt_id=attempt_id,
         )
         if attempt is None:
-            return self._infrastructure_failure("ATTEMPT_NOT_FOUND")
+            return self._infrastructure_failure(
+                "ATTEMPT_NOT_FOUND",
+                lease=lease,
+            )
 
         target = ProviderTarget(
             provider_id=attempt.target.provider_id,
@@ -118,9 +135,14 @@ class ProviderAttemptHandler:
         try:
             adapter = self._resolve_adapter(target)
         except Exception as exc:
-            return self._infrastructure_failure(
-                f"ADAPTER_RESOLUTION_{type(exc).__name__.upper()}"
+            error_class = f"ADAPTER_RESOLUTION_{type(exc).__name__.upper()}"
+            self._emit_attempt(
+                "provider.adapter_resolution_failed",
+                lease,
+                attempt,
+                error_class=error_class,
             )
+            return self._infrastructure_failure(error_class)
 
         claim = await self._store.claim_dispatch(
             scope=scope,
@@ -129,9 +151,16 @@ class ProviderAttemptHandler:
             occurred_at=self._clock(),
         )
         if claim.action is not DispatchAction.DISPATCH:
+            self._emit_attempt(
+                "provider.dispatch_skipped",
+                lease,
+                claim.attempt,
+                dispatch_action=claim.action.value,
+            )
             return HandlerOutcome.complete()
 
         journal = claim.attempt
+        self._emit_attempt("provider.dispatch_started", lease, journal)
         request = ProviderAttemptRequest(
             attempt_id=journal.attempt_id,
             operation=journal.operation,
@@ -143,11 +172,20 @@ class ProviderAttemptHandler:
             missing_requirements=journal.missing_requirements,
             task_id=journal.task_id,
             session_id=journal.session_id,
+            correlation_id=lease.correlation_id,
+            trace_id=lease.trace_id,
         )
 
         try:
             result = await adapter.invoke(request)
         except Exception as exc:
+            self._emit_attempt(
+                "provider.dispatch_ambiguous",
+                lease,
+                journal,
+                error_class=type(exc).__name__,
+                attempt_status="AMBIGUOUS",
+            )
             await self._store.mark_ambiguous(
                 scope=scope,
                 attempt_id=attempt_id,
@@ -164,9 +202,41 @@ class ProviderAttemptHandler:
             result=result,
             occurred_at=self._clock(),
         )
+        self._emit_attempt(
+            "provider.dispatch_completed",
+            lease,
+            journal,
+            provider_outcome=result.outcome.value,
+            provider_latency_ms=result.simulated_latency_ms,
+            retry_after_seconds=result.retry_after_seconds,
+            input_tokens=result.usage.input_tokens,
+            output_tokens=result.usage.output_tokens,
+            total_tokens=result.usage.total_tokens,
+            attempt_status="COMPLETED",
+        )
         return HandlerOutcome.complete()
 
-    def _infrastructure_failure(self, error_class: str) -> HandlerOutcome:
+    def _emit_attempt(
+        self,
+        event: str,
+        lease: WorkLease,
+        attempt: ProviderAttempt,
+        **extra: object,
+    ) -> None:
+        fields = provider_attempt_telemetry_fields(lease, attempt)
+        fields.update(extra)
+        self._telemetry.emit(event, fields)
+
+    def _infrastructure_failure(
+        self,
+        error_class: str,
+        *,
+        lease: WorkLease | None = None,
+    ) -> HandlerOutcome:
+        if lease is not None:
+            fields = work_telemetry_fields(lease)
+            fields["error_class"] = error_class
+            self._telemetry.emit("provider.infrastructure_failure", fields)
         return HandlerOutcome.requeue_infrastructure(
             available_at=self._clock()
             + timedelta(seconds=self._infrastructure_retry_delay),

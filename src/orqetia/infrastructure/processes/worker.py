@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import signal
 import socket
@@ -11,10 +10,11 @@ import time
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 from uuid import uuid7
 
+from orqetia.observability import EventEmitter, JsonEventEmitter, work_telemetry_fields
 from orqetia.shared.messaging import QueueName, WakeupPort, WorkLease, WorkQueuePort
 
 
@@ -98,6 +98,7 @@ class WorkerProcess:
         shutdown_grace_seconds: int,
         process_id: str | None = None,
         heartbeat_interval_seconds: float = 30.0,
+        telemetry: EventEmitter | None = None,
     ) -> None:
         if concurrency < 1:
             raise ValueError("concurrency must be >= 1")
@@ -119,6 +120,7 @@ class WorkerProcess:
         self._shutdown_grace = shutdown_grace_seconds
         self._process_id = process_id or default_process_id(queue_name.value)
         self._heartbeat_interval = heartbeat_interval_seconds
+        self._telemetry = telemetry or JsonEventEmitter()
         self._last_heartbeat = 0.0
         self._stop = asyncio.Event()
         self._inflight: set[asyncio.Task[None]] = set()
@@ -276,26 +278,15 @@ class WorkerProcess:
         *,
         error_class: str | None = None,
     ) -> None:
-        record: dict[str, object] = {
-            "event": event,
+        fields: dict[str, object] = {
             "process_id": self._process_id,
             "queue_name": self._queue_name.value,
-            "occurred_at": datetime.now(UTC).isoformat(),
         }
         if lease is not None:
-            record.update(
-                {
-                    "work_id": str(lease.work_id),
-                    "operation_type": lease.operation_type,
-                    "operation_version": lease.operation_version,
-                    "correlation_id": (
-                        None if lease.correlation_id is None else str(lease.correlation_id)
-                    ),
-                }
-            )
+            fields.update(work_telemetry_fields(lease))
         if error_class is not None:
-            record["error_class"] = error_class
-        print(json.dumps(record, sort_keys=True), flush=True)
+            fields["error_class"] = error_class
+        self._telemetry.emit(event, fields)
 
 
 class SchedulerProcess:
