@@ -6,8 +6,6 @@ from collections.abc import Mapping
 from uuid import uuid7
 
 from orqetia.providers import (
-    XAI_RESPONSES_ENDPOINT,
-    XAIResponsesAdapter,
     OutputKind,
     ProviderAttemptRequest,
     ProviderCredential,
@@ -17,6 +15,8 @@ from orqetia.providers import (
     ProviderOutcome,
     ProviderTarget,
     StructuredOutputSpec,
+    XAI_RESPONSES_ENDPOINT,
+    XAIResponsesAdapter,
 )
 
 
