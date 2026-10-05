@@ -33,8 +33,10 @@ jobs:
       - name: Reproduce locked Python 3.14 development environment
         run: uv sync --locked --python 3.14
 
-      - name: Provider simulator unit tests
+      - name: Provider contract unit tests
         run: |
           uv run --no-sync --python 3.14 python -m unittest \
             tests.providers.test_simulator \
+            tests.providers.test_registry \
+            tests.providers.test_parity \
             -v
