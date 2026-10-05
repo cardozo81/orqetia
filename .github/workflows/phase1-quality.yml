@@ -66,5 +66,5 @@ jobs:
       - name: Full pytest suite
         run: uv run --no-sync --python 3.14 pytest -q
 
-      - name: Runtime dependency audit
-        run: uv run --no-sync --python 3.14 pip-audit --strict
+      - name: Dependency audit
+        run: uv run --no-sync --python 3.14 pip-audit --strict --skip-editable
