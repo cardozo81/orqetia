@@ -7,6 +7,7 @@ import json
 import os
 import signal
 import socket
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -95,6 +96,7 @@ class WorkerProcess:
         poll_interval_seconds: float,
         shutdown_grace_seconds: int,
         process_id: str | None = None,
+        heartbeat_interval_seconds: float = 30.0,
     ) -> None:
         if concurrency < 1:
             raise ValueError("concurrency must be >= 1")
@@ -104,6 +106,8 @@ class WorkerProcess:
             raise ValueError("poll_interval_seconds must be > 0")
         if shutdown_grace_seconds < 1:
             raise ValueError("shutdown_grace_seconds must be >= 1")
+        if heartbeat_interval_seconds <= 0:
+            raise ValueError("heartbeat_interval_seconds must be > 0")
 
         self._queue = queue
         self._registry = registry
@@ -113,6 +117,8 @@ class WorkerProcess:
         self._poll_interval = poll_interval_seconds
         self._shutdown_grace = shutdown_grace_seconds
         self._process_id = process_id or default_process_id(queue_name.value)
+        self._heartbeat_interval = heartbeat_interval_seconds
+        self._last_heartbeat = 0.0
         self._stop = asyncio.Event()
         self._inflight: set[asyncio.Task[None]] = set()
 
@@ -127,6 +133,7 @@ class WorkerProcess:
         self._log("process.started")
         try:
             while not self._stop.is_set():
+                self._emit_heartbeat_if_due()
                 handled = await self.run_once()
                 if handled == 0:
                     try:
@@ -162,6 +169,13 @@ class WorkerProcess:
         finally:
             self._inflight.difference_update(tasks)
         return len(leases)
+
+    def _emit_heartbeat_if_due(self) -> None:
+        now = time.monotonic()
+        if now - self._last_heartbeat < self._heartbeat_interval:
+            return
+        self._last_heartbeat = now
+        self._log("process.heartbeat")
 
     async def _handle(self, lease: WorkLease) -> None:
         handler = self._registry.resolve(lease)
