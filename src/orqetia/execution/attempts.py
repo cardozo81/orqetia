@@ -95,12 +95,14 @@ class ProviderAttempt:
             if value is not None:
                 _require_aware(value, field)
 
-        if self.status is ProviderAttemptStatus.PREPARED:
-            if self.dispatch_work_id is not None or self.dispatch_started_at is not None:
-                raise ValueError("PREPARED attempt cannot have dispatch ownership")
-        if self.status is ProviderAttemptStatus.DISPATCHING:
-            if self.dispatch_work_id is None or self.dispatch_started_at is None:
-                raise ValueError("DISPATCHING attempt requires work and start timestamp")
+        if self.status is ProviderAttemptStatus.PREPARED and (
+            self.dispatch_work_id is not None or self.dispatch_started_at is not None
+        ):
+            raise ValueError("PREPARED attempt cannot have dispatch ownership")
+        if self.status is ProviderAttemptStatus.DISPATCHING and (
+            self.dispatch_work_id is None or self.dispatch_started_at is None
+        ):
+            raise ValueError("DISPATCHING attempt requires work and start timestamp")
         if self.status.terminal != (self.terminal_at is not None):
             raise ValueError("terminal attempt status and terminal_at must agree")
         if self.status is ProviderAttemptStatus.COMPLETED and self.provider_outcome is None:
