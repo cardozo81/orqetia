@@ -28,3 +28,6 @@ jobs:
 
       - name: Canonical characterization tests
         run: python3 -m unittest tests.characterization.test_canonical_contract -v
+
+      - name: Attempt and taskless operation carry-over tests
+        run: python3 -m unittest tests.contracts.test_attempt_operation_reference -v
