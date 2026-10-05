@@ -28,8 +28,10 @@ RUN groupadd --gid 10001 orqetia \
 COPY --from=builder --chown=10001:10001 /app/.venv /app/.venv
 COPY --chown=10001:10001 alembic.ini ./
 COPY --chown=10001:10001 migrations ./migrations
+COPY --chown=10001:10001 apps ./apps
+COPY --chown=10001:10001 contracts ./contracts
 COPY --chown=10001:10001 scripts/dev_container_process.py ./scripts/dev_container_process.py
 
 USER 10001:10001
 
-CMD ["python", "/app/scripts/dev_container_process.py", "api"]
+CMD ["uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]
