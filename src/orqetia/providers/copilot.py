@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import time
 from typing import Protocol, runtime_checkable
 
 from .io import (
@@ -156,11 +157,13 @@ class GitHubCopilotAdapter(ProviderAdapter):
         self._timeout_seconds = float(timeout_seconds)
 
     async def invoke(self, request: ProviderAttemptRequest) -> ProviderAttemptResult:
+        started = time.perf_counter()
         if request.target.provider_id != "copilot":
             return _failure(
                 request,
                 ProviderOutcome.TERMINAL_ERROR,
                 error_class="COPILOT_TARGET_PROVIDER_MISMATCH",
+                started=started,
             )
 
         try:
@@ -173,6 +176,7 @@ class GitHubCopilotAdapter(ProviderAdapter):
                 request,
                 ProviderOutcome.TERMINAL_ERROR,
                 error_class=f"REQUEST_PAYLOAD_{type(exc).__name__.upper()}",
+                started=started,
             )
 
         if materialized.structured_output is not None and self._structured_validator is None:
@@ -180,6 +184,7 @@ class GitHubCopilotAdapter(ProviderAdapter):
                 request,
                 ProviderOutcome.TERMINAL_ERROR,
                 error_class="STRUCTURED_VALIDATOR_UNAVAILABLE",
+                started=started,
             )
 
         prompt = _prompt(materialized)
@@ -197,24 +202,28 @@ class GitHubCopilotAdapter(ProviderAdapter):
                 request,
                 ProviderOutcome.AUTH_FAILURE,
                 error_class="COPILOT_AUTHENTICATION_ERROR",
+                started=started,
             )
         except CopilotSdkRateLimitError:
             return _failure(
                 request,
                 ProviderOutcome.RATE_LIMITED,
                 error_class="COPILOT_RATE_LIMIT_ERROR",
+                started=started,
             )
         except CopilotSdkTimeoutError:
             return _failure(
                 request,
                 ProviderOutcome.TIMEOUT,
                 error_class="COPILOT_TIMEOUT_ERROR",
+                started=started,
             )
         except CopilotSdkUnavailableError as exc:
             return _failure(
                 request,
                 ProviderOutcome.TERMINAL_ERROR,
                 error_class=f"COPILOT_{type(exc).__name__.upper()}",
+                started=started,
             )
         except Exception as exc:
             raise ProviderDispatchAmbiguousError(
@@ -261,6 +270,7 @@ class GitHubCopilotAdapter(ProviderAdapter):
             output_kind=output_kind,
             accepted_requirements=request.missing_requirements,
             missing_requirements=(),
+            simulated_latency_ms=_elapsed_ms(started),
             response_reference=response_reference,
             usage=ProviderUsage(),
         )
@@ -318,11 +328,16 @@ def _pre_dispatch_sdk_error(exc: Exception) -> RuntimeError:
     return CopilotSdkUnavailableError(type(exc).__name__)
 
 
+def _elapsed_ms(started: float) -> int:
+    return max(0, int((time.perf_counter() - started) * 1000))
+
+
 def _failure(
     request: ProviderAttemptRequest,
     outcome: ProviderOutcome,
     *,
     error_class: str,
+    started: float,
 ) -> ProviderAttemptResult:
     return ProviderAttemptResult(
         attempt_id=request.attempt_id,
@@ -334,6 +349,7 @@ def _failure(
         ),
         accepted_requirements=(),
         missing_requirements=request.missing_requirements,
+        simulated_latency_ms=_elapsed_ms(started),
         error_class=error_class[:96],
         usage=ProviderUsage(),
     )
