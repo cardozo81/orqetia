@@ -10,6 +10,7 @@ from .io import (
     StructuredOutputSpec,
     StructuredOutputValidator,
 )
+from .kimi import KIMI_CHAT_COMPLETIONS_ENDPOINT, KimiChatCompletionsAdapter
 from .mimo import MIMO_RESPONSES_ENDPOINT, MiMoResponsesAdapter
 from .mistral import MISTRAL_CHAT_COMPLETIONS_ENDPOINT, MistralChatCompletionsAdapter
 from .openai import OPENAI_RESPONSES_ENDPOINT, OpenAIResponsesAdapter
@@ -77,6 +78,7 @@ __all__ = [
     "OPENAI_RESPONSES_ENDPOINT",
     "INITIAL_PROVIDER_TAXONOMY",
     "MANDATORY_ADAPTER_PARITY_GATES",
+    "KIMI_CHAT_COMPLETIONS_ENDPOINT",
     "MIMO_RESPONSES_ENDPOINT",
     "MISTRAL_CHAT_COMPLETIONS_ENDPOINT",
     "AdapterParityGate",
@@ -86,6 +88,7 @@ __all__ = [
     "DeepSeekResponsesAdapter",
     "DeterministicTestProvider",
     "HttpxProviderHttpTransport",
+    "KimiChatCompletionsAdapter",
     "MiMoResponsesAdapter",
     "MistralChatCompletionsAdapter",
     "NativeUsage",
