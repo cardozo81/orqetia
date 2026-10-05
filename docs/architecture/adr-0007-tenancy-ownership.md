@@ -102,7 +102,11 @@ They cannot:
 
 May execute only the API actions granted by scopes and ownership.
 
-It cannot widen its tenant/client scope through request fields.
+Within an administratively enabled target-selection envelope, a service client may:
+- omit execution target and use AUTO;
+- request an explicitly allowed provider/model/reasoning profile.
+
+It cannot widen its tenant/client scope, provider/model/profile entitlement or administrative limits through request fields.
 
 ## Authenticated scope derivation
 
@@ -139,18 +143,44 @@ For every read/mutation:
 
 Execution policy is administrative data.
 
-A client request does not submit free routing controls such as:
+A client request does not submit free orchestration controls such as:
 - max_cycles;
 - retry/delay;
 - timeout;
-- provider selection override;
 - arbitrary allowed/excluded provider set;
-- reasoning policy;
-- pricing/quota configuration.
+- pricing/quota configuration;
+- terminal/quarantine policy.
 
-Execution resolves the effective version assigned server-side and stores that version/reference with the session/task.
+### Client target-selection envelope
 
-Any future client-selectable execution option requires an explicit allowlisted contract and cannot override administrative ceilings.
+Issue #80 is the explicit allowlisted target-selection contract.
+
+Backoffice/Control Plane defines, per client and effective policy:
+- whether explicit targeting is enabled;
+- allowed providers;
+- allowed provider/model combinations;
+- allowed provider/model/reasoning-profile combinations;
+- server-side defaults used when an allowed target is partially specified;
+- administrative cycles/retry/delay/timeout/quota ceilings.
+
+The client's explicit request can only **narrow** execution to an allowed target. It cannot widen any permission or administrative limit.
+
+AUTO remains the default when execution target is omitted.
+
+### Task snapshot
+
+A task persists:
+- effective_policy_version_id;
+- requested_execution_mode = AUTO | EXPLICIT_TARGET;
+- requested provider/model/reasoning profile fields as supplied;
+- effective provider/model/reasoning profile only when a hard explicit target is resolved;
+- target resolution reason/status.
+
+For AUTO there is no single frozen task-level provider/model target: actual provider/model/profile provenance belongs to each `attempt_id`. The task-level effective target fields remain null/not-applicable in AUTO.
+
+For EXPLICIT_TARGET, the fully resolved target is frozen before the first provider dispatch. Later default/catalog changes do not rewrite it.
+
+Exact scope authorization is revalidated by #12; routing/cost behavior is defined by #80.
 
 ## Tenant lifecycle
 
@@ -209,6 +239,9 @@ Mandatory tests include:
 - credential for client A1 cannot authenticate as A2 by changing client_id in request;
 - suspended/revoked tenant/client/credential cannot create new execution;
 - client cannot set/override policy/quota/provider permissions;
+- client without an enabled target envelope cannot select provider/model/profile;
+- provider/model/profile outside the client envelope is rejected before provider dispatch;
+- explicit target does not change max cycles/retry/delay/timeout/quota;
 - client response never exposes provider credential/cost/internal finance fields;
 - Backoffice role lacking a specific privilege cannot gain it by knowing endpoint/resource ID;
 - filters/export endpoints cannot bypass object/property authorization;
@@ -225,6 +258,16 @@ The identity/ownership model reserves future relationships for:
 These are separate from immutable historical provider-cost/accounting facts.
 
 Adding commercial billing must not rewrite provider cost history.
+
+## Revalidation result — 2026-10-05
+
+Revalidated for #21 against #80:
+- AUTO is default on omitted target;
+- explicit target is an optional narrowing capability;
+- provider/model/profile entitlements are server-side;
+- task persistence distinguishes requested selection from resolved explicit target;
+- AUTO provider provenance remains per attempt rather than being falsely frozen at task level;
+- administrative orchestration limits remain owned by Backoffice/Control Plane.
 
 ## Consequences
 
