@@ -1,5 +1,36 @@
-"""read models bounded-context package.
+"""Secure, rebuildable Web Read Model contracts."""
 
-This package is intentionally a scaffold only in Phase 1. Business behavior is
-introduced through its owning implementation issues.
-"""
+from .cache import CacheLookup, InMemoryReadModelCache
+from .domain import (
+    ProjectionFreshness,
+    ProjectionIdentity,
+    ReadAudience,
+    ReadClassification,
+    ReadModelDocument,
+    ReadSurface,
+    SURFACE_POLICIES,
+    SurfacePolicy,
+)
+from .pagination import CursorPage, decode_cursor, encode_cursor, paginate
+from .store import PostgresReadModelStore, ReadModelStore
+from .tables import projection_documents
+
+__all__ = [
+    "CacheLookup",
+    "CursorPage",
+    "InMemoryReadModelCache",
+    "PostgresReadModelStore",
+    "ProjectionFreshness",
+    "ProjectionIdentity",
+    "ReadAudience",
+    "ReadClassification",
+    "ReadModelDocument",
+    "ReadModelStore",
+    "ReadSurface",
+    "SURFACE_POLICIES",
+    "SurfacePolicy",
+    "decode_cursor",
+    "encode_cursor",
+    "paginate",
+    "projection_documents",
+]
