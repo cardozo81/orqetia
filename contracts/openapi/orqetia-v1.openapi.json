@@ -1,0 +1,1629 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ORQETIA Client API",
+    "version": "1.0.0-development",
+    "description": "Canonical client/service-facing API contract. Product state: DEVELOPMENT. Backoffice/admin APIs are intentionally separate."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Deployment base URL"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Sessions"
+    },
+    {
+      "name": "Tasks"
+    },
+    {
+      "name": "Attempts"
+    },
+    {
+      "name": "Estimates"
+    },
+    {
+      "name": "Catalog"
+    },
+    {
+      "name": "Usage"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/v1/sessions": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "operationId": "createSession",
+        "summary": "Create an execution session.",
+        "x-orqetia-required-scopes": [
+          "sessions:write"
+        ],
+        "x-orqetia-object-ownership": "authenticated tenant/client",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Session created.",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "operationId": "getSession",
+        "summary": "Get an owned execution session.",
+        "x-orqetia-required-scopes": [
+          "sessions:read"
+        ],
+        "x-orqetia-object-ownership": "session must belong to authenticated tenant/client",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UUID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}/tasks": {
+      "post": {
+        "tags": [
+          "Tasks"
+        ],
+        "operationId": "createTask",
+        "summary": "Create asynchronous work in a session.",
+        "description": "execution is optional; omission means AUTO. EXPLICIT_TARGET requires additional target authorization. The client cannot set retry/cycle/delay/timeout/quarantine/quota policy.",
+        "x-orqetia-required-scopes": [
+          "tasks:write"
+        ],
+        "x-orqetia-conditional-scopes": [
+          {
+            "when": "execution.mode == EXPLICIT_TARGET",
+            "required": [
+              "tasks:target"
+            ]
+          }
+        ],
+        "x-orqetia-object-ownership": "session must belong to authenticated tenant/client",
+        "x-orqetia-content-limit-policy": "server-configured; 413 when exceeded",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UUID"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Task accepted for durable asynchronous execution.",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/tasks/{task_id}": {
+      "get": {
+        "tags": [
+          "Tasks"
+        ],
+        "operationId": "getTask",
+        "summary": "Get an owned task.",
+        "x-orqetia-required-scopes": [
+          "tasks:read"
+        ],
+        "x-orqetia-object-ownership": "task must belong to authenticated tenant/client",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UUID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/tasks/{task_id}/result": {
+      "get": {
+        "tags": [
+          "Tasks"
+        ],
+        "operationId": "getTaskResult",
+        "summary": "Get the current/terminal task result.",
+        "x-orqetia-required-scopes": [
+          "tasks:read"
+        ],
+        "x-orqetia-object-ownership": "task must belong to authenticated tenant/client",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UUID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResultView"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/tasks/{task_id}/cancel": {
+      "post": {
+        "tags": [
+          "Tasks"
+        ],
+        "operationId": "cancelTask",
+        "summary": "Request idempotent task cancellation.",
+        "x-orqetia-required-scopes": [
+          "tasks:cancel"
+        ],
+        "x-orqetia-object-ownership": "task must belong to authenticated tenant/client",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UUID"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cancellation accepted or already in equivalent cancelling/terminal state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/tasks/{task_id}/attempts": {
+      "get": {
+        "tags": [
+          "Attempts"
+        ],
+        "operationId": "listTaskAttempts",
+        "summary": "List safe attempt provenance for an owned task.",
+        "x-orqetia-required-scopes": [
+          "tasks:read"
+        ],
+        "x-orqetia-object-ownership": "task and attempts must belong to authenticated tenant/client",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UUID"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attempt provenance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AttemptView"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/tasks/{task_id}/attempts/{attempt_id}/exchanges": {
+      "get": {
+        "tags": [
+          "Attempts"
+        ],
+        "operationId": "listAttemptExchanges",
+        "summary": "Get retained sanitized raw exchange evidence for an owned task attempt.",
+        "description": "Evidence is returned only when retained and authorized. Sanitized raw content is separate from humanizable metadata.",
+        "x-orqetia-required-scopes": [
+          "tasks:read"
+        ],
+        "x-orqetia-object-ownership": "task/attempt must belong to authenticated tenant/client",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UUID"
+            }
+          },
+          {
+            "name": "attempt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UUID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sanitized exchange evidence.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ExchangeEvidenceView"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/estimates": {
+      "post": {
+        "tags": [
+          "Estimates"
+        ],
+        "operationId": "estimateTokens",
+        "summary": "Estimate technical token usage without provider monetary output.",
+        "x-orqetia-required-scopes": [
+          "estimates:write"
+        ],
+        "x-orqetia-object-ownership": "authenticated tenant/client",
+        "x-orqetia-content-limit-policy": "server-configured; 413 when exceeded",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstimateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstimateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/providers": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "operationId": "listProviders",
+        "summary": "List client-visible providers within the authenticated client's authorized envelope.",
+        "x-orqetia-required-scopes": [
+          "catalog:read"
+        ],
+        "x-orqetia-object-ownership": "result filtered to authenticated client's visible envelope",
+        "responses": {
+          "200": {
+            "description": "Client-visible providers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderPublicView"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "operationId": "listModels",
+        "summary": "List client-visible models within the authenticated client's authorized envelope.",
+        "x-orqetia-required-scopes": [
+          "catalog:read"
+        ],
+        "x-orqetia-object-ownership": "result filtered to authenticated client's visible envelope",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Client-visible models.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModelPublicView"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/usage": {
+      "get": {
+        "tags": [
+          "Usage"
+        ],
+        "operationId": "getUsage",
+        "summary": "Get technical usage for the authenticated tenant/client; no monetary provider data.",
+        "x-orqetia-required-scopes": [
+          "usage:read"
+        ],
+        "x-orqetia-object-ownership": "usage filtered to authenticated tenant/client",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsagePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Validated according to ADR-0009. Required scopes are declared with x-orqetia-required-scopes and x-orqetia-conditional-scopes."
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "Opaque client-generated key. Scoped by tenant/client/operation. Raw value is not a resource identity.",
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 50
+        }
+      }
+    },
+    "headers": {
+      "Location": {
+        "description": "Canonical resource location.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "RetryAfter": {
+        "description": "Retry delay in seconds when applicable.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "schemas": {
+      "ExecutionSelection": {
+        "$ref": "../execution/task-execution-selection.schema.json"
+      },
+      "UUID": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "OperationCode": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^[A-Z][A-Z0-9_]*$",
+        "description": "Typed ORQETIA operation identifier; not a localized display label."
+      },
+      "Target": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider_id",
+          "model_id",
+          "reasoning_profile"
+        ],
+        "properties": {
+          "provider_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "model_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "reasoning_profile": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "ProviderIdentity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider_id",
+          "provider_name"
+        ],
+        "properties": {
+          "provider_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Typed Provider Registry identity. Never a generic status/enum label."
+          },
+          "provider_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Human-readable provider display metadata."
+          }
+        }
+      },
+      "TechnicalUsage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "input_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cached_input_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "output_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reasoning_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "native_usage": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "unit",
+                "quantity"
+              ],
+              "properties": {
+                "unit": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "quantity": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "correlation_id"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "correlation_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "details": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            }
+          }
+        }
+      },
+      "SessionCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "external_reference": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
+      "SessionView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "session_id",
+          "status",
+          "policy_version_id",
+          "created_at"
+        ],
+        "properties": {
+          "session_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "EXPIRED",
+              "CANCELLED",
+              "CLOSED"
+            ]
+          },
+          "policy_version_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "TaskCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation",
+          "input"
+        ],
+        "properties": {
+          "operation": {
+            "$ref": "#/components/schemas/OperationCode"
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "execution": {
+            "$ref": "#/components/schemas/ExecutionSelection",
+            "description": "Optional. Omission is equivalent to AUTO."
+          },
+          "external_reference": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
+      "AttemptSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attempt_id",
+          "operation",
+          "provider_id",
+          "model_id",
+          "status"
+        ],
+        "properties": {
+          "attempt_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/OperationCode"
+          },
+          "provider_id": {
+            "type": "string"
+          },
+          "model_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "TaskView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "session_id",
+          "operation",
+          "status",
+          "requested_execution_mode",
+          "created_at",
+          "attempts"
+        ],
+        "properties": {
+          "task_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "session_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/OperationCode"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "QUEUED",
+              "RUNNING",
+              "PARTIAL",
+              "COMPLETE",
+              "UNAVAILABLE",
+              "FAILED",
+              "CANCELLING",
+              "CANCELLED"
+            ]
+          },
+          "requested_execution_mode": {
+            "type": "string",
+            "enum": [
+              "AUTO",
+              "EXPLICIT_TARGET"
+            ]
+          },
+          "requested_target": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Target"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_target": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Target"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Frozen for EXPLICIT_TARGET. AUTO actual target remains per attempt."
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttemptSummary"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "terminal_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "AttemptView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attempt_id",
+          "operation",
+          "provider",
+          "model_id",
+          "status",
+          "started_at"
+        ],
+        "properties": {
+          "attempt_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/OperationCode"
+          },
+          "task_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nullable only when an operation contract permits taskless execution. Never replaced with a synthetic task."
+          },
+          "session_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provider": {
+            "$ref": "#/components/schemas/ProviderIdentity"
+          },
+          "model_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "reasoning_profile": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "status": {
+            "type": "string"
+          },
+          "cycle": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "attempt_index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "retry_of_attempt_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fallback_from_attempt_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "usage": {
+            "$ref": "#/components/schemas/TechnicalUsage"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "SanitizedEvidence": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "media_type",
+          "sanitized_raw_body",
+          "sanitized_sha256",
+          "truncated"
+        ],
+        "properties": {
+          "media_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "sanitized_raw_body": {
+            "type": "string",
+            "description": "Persisted sanitized technical evidence. Presentation layers must not semantically humanize this content."
+          },
+          "sanitized_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ExchangeEvidenceView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "exchange_id",
+          "attempt_id",
+          "provider",
+          "operation",
+          "request_evidence"
+        ],
+        "properties": {
+          "exchange_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "attempt_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/ProviderIdentity"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/OperationCode"
+          },
+          "status": {
+            "type": "string"
+          },
+          "status_label": {
+            "type": "string",
+            "description": "Humanizable metadata; never applied to raw evidence."
+          },
+          "request_evidence": {
+            "$ref": "#/components/schemas/SanitizedEvidence"
+          },
+          "response_evidence": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SanitizedEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "TaskResultView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "status",
+          "result",
+          "attempt_ids"
+        ],
+        "properties": {
+          "task_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "status": {
+            "type": "string"
+          },
+          "result": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "accepted": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "attempt_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UUID"
+            }
+          }
+        }
+      },
+      "EstimateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation",
+          "input"
+        ],
+        "properties": {
+          "operation": {
+            "$ref": "#/components/schemas/OperationCode"
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "target": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Target"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "EstimateResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "estimated_input_tokens",
+          "estimation_method",
+          "as_of"
+        ],
+        "properties": {
+          "estimated_input_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "estimated_output_tokens": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "estimated_total_tokens": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "estimation_method": {
+            "type": "string"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProviderPublicView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider_id",
+          "provider_name",
+          "capabilities"
+        ],
+        "properties": {
+          "provider_id": {
+            "type": "string"
+          },
+          "provider_name": {
+            "type": "string"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ModelPublicView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider_id",
+          "model_id",
+          "model_name",
+          "capabilities",
+          "reasoning_profiles"
+        ],
+        "properties": {
+          "provider_id": {
+            "type": "string"
+          },
+          "model_id": {
+            "type": "string"
+          },
+          "model_name": {
+            "type": "string"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reasoning_profiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UsageItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "period_start",
+          "period_end",
+          "usage"
+        ],
+        "properties": {
+          "period_start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/TechnicalUsage"
+          }
+        }
+      },
+      "UsagePage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageItem"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Authentication required/invalid.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Authenticated but not authorized for scope/object/target.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found or intentionally hidden by ownership policy.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "State or idempotency conflict.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "PayloadTooLarge": {
+        "description": "Request exceeds server content policy.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Unprocessable": {
+        "description": "Validated shape is semantically invalid, including target resolution failure.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Rate/concurrency/quota policy rejected the request.",
+        "headers": {
+          "Retry-After": {
+            "$ref": "#/components/headers/RetryAfter"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      }
+    }
+  }
+}
