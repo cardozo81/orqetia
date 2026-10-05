@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid7
 
 from orqetia.execution import (
     DispatchAction,
@@ -41,6 +41,7 @@ def build_provider_attempt_work_item(
     attempt: ProviderAttempt,
     *,
     available_at: datetime,
+    work_id: UUID | None = None,
     priority: int = 0,
     max_infrastructure_attempts: int = 5,
     correlation_id: UUID | None = None,
@@ -50,7 +51,7 @@ def build_provider_attempt_work_item(
     if available_at.tzinfo is None or available_at.utcoffset() is None:
         raise ValueError("available_at must be timezone-aware")
     return WorkItem(
-        work_id=UUID(int=attempt.attempt_id.int ^ (1 << 127)),
+        work_id=work_id or uuid7(),
         queue_name=QueueName.EXECUTION,
         operation_type=PROVIDER_ATTEMPT_OPERATION,
         operation_version=PROVIDER_ATTEMPT_OPERATION_VERSION,
