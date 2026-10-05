@@ -48,6 +48,9 @@ class PostgreSQLMessagingIntegrationTests(unittest.TestCase):
     def test_active_lease_can_be_renewed(self) -> None:
         asyncio.run(self._test_active_lease_renewal())
 
+    def test_expired_exhausted_lease_becomes_dead_instead_of_reclaiming(self) -> None:
+        asyncio.run(self._test_expired_exhausted_lease())
+
     def test_client_private_scope_and_secret_are_defended_by_database(self) -> None:
         asyncio.run(self._test_database_classification_checks())
 
@@ -179,6 +182,56 @@ class PostgreSQLMessagingIntegrationTests(unittest.TestCase):
 
             self.assertTrue(await queue.renew_lease(claimed, lease_seconds=60))
             self.assertTrue(await queue.complete(claimed))
+        finally:
+            await engine.dispose()
+
+    async def _test_expired_exhausted_lease(self) -> None:
+        engine, factory = await self._resources()
+        queue = PostgresWorkQueue(factory)
+        try:
+            item = self._item(max_infrastructure_attempts=1)
+            await queue.enqueue(item)
+            first = (
+                await queue.claim(
+                    queue_name=QueueName.EXECUTION,
+                    lease_owner="worker-a",
+                    lease_seconds=30,
+                    limit=1,
+                )
+            )[0]
+            self.assertEqual(first.attempt_count, 1)
+
+            async with engine.begin() as connection:
+                await connection.execute(
+                    sa.update(work_items)
+                    .where(work_items.c.work_id == item.work_id)
+                    .values(lease_until=datetime.now(UTC) - timedelta(seconds=1))
+                )
+
+            reclaimed = await queue.claim(
+                queue_name=QueueName.EXECUTION,
+                lease_owner="worker-b",
+                lease_seconds=30,
+                limit=1,
+            )
+            self.assertEqual(tuple(reclaimed), ())
+
+            async with engine.connect() as connection:
+                row = (
+                    await connection.execute(
+                        sa.select(
+                            work_items.c.state,
+                            work_items.c.last_error_class,
+                            work_items.c.dead_at,
+                        ).where(work_items.c.work_id == item.work_id)
+                    )
+                ).one()
+            self.assertEqual(row.state, "DEAD")
+            self.assertEqual(
+                row.last_error_class,
+                "INFRASTRUCTURE_ATTEMPTS_EXHAUSTED",
+            )
+            self.assertIsNotNone(row.dead_at)
         finally:
             await engine.dispose()
 
