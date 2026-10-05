@@ -11,6 +11,7 @@ from tests.characterization.reference_contract import (
     Policy,
     SingleAttemptAdapterOracle,
     aggregate_attempt_costs,
+    billable_output_tokens,
     canonical_total_tokens,
     effective_cycle_delay,
     is_terminal,
@@ -210,6 +211,24 @@ class CanonicalCharacterizationTests(unittest.TestCase):
                 input_rate=1.0,
                 cached_rate=1.0,
             )
+        )
+
+    def test_char_021_reasoning_billing_is_catalog_controlled(self) -> None:
+        self.assertEqual(
+            billable_output_tokens(
+                50,
+                40,
+                reasoning_billing_mode="INCLUDED_IN_OUTPUT",
+            ),
+            50,
+        )
+        self.assertEqual(
+            billable_output_tokens(
+                50,
+                40,
+                reasoning_billing_mode="ADD_REASONING_TO_OUTPUT",
+            ),
+            90,
         )
 
 

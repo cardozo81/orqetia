@@ -26,20 +26,17 @@ jobs:
       - name: Repository security policy checks
         run: python3 scripts/security_baseline_check.py
 
-      - name: Canonical characterization tests
-        run: python3 -m unittest tests.characterization.test_canonical_contract -v
-
-      - name: Attempt and taskless operation carry-over tests
-        run: python3 -m unittest tests.contracts.test_attempt_operation_reference -v
-
-      - name: Exchange evidence and provider identity carry-over tests
-        run: python3 -m unittest tests.contracts.test_exchange_evidence_reference -v
+      - name: Canonical revalidation gate
+        run: |
+          python3 -m unittest \
+            tests.characterization.test_canonical_contract \
+            tests.contracts.test_attempt_operation_reference \
+            tests.contracts.test_exchange_evidence_reference \
+            tests.contracts.test_execution_target_reference \
+            -v
 
       - name: Tenant target envelope revalidation tests
         run: python3 -m unittest tests.contracts.test_tenancy_target_reference -v
 
       - name: Explicit target authorization revalidation tests
         run: python3 -m unittest tests.contracts.test_authz_target_reference -v
-
-      - name: AUTO and explicit execution selection tests
-        run: python3 -m unittest tests.contracts.test_execution_target_reference -v
