@@ -194,6 +194,35 @@ class QwenChatCompletionsAdapterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(writer.calls[0]["target"], self.target)
         self.assertEqual(writer.calls[0]["content"], "provider answer")
 
+    async def test_usage_accepts_input_output_token_aliases(self) -> None:
+        transport = FakeTransport(
+            _response(
+                {
+                    "choices": [
+                        {
+                            "message": {"role": "assistant", "content": "provider answer"},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {
+                        "input_tokens": 7,
+                        "output_tokens": 5,
+                        "total_tokens": 12,
+                    },
+                }
+            )
+        )
+
+        result = await self._adapter(transport=transport).invoke(self.request)
+
+        self.assertEqual(result.outcome, ProviderOutcome.SUCCESS)
+        self.assertEqual(result.usage.input_tokens, 7)
+        self.assertEqual(result.usage.output_tokens, 5)
+        self.assertEqual(
+            tuple(item.name for item in result.usage.native),
+            ("provider_total_tokens",),
+        )
+
     async def test_structured_success_uses_strict_schema_and_local_validation(self) -> None:
         schema_json = json.dumps(
             {
