@@ -132,6 +132,7 @@ class PostgresWorkQueue(WorkQueuePort):
             .where(
                 work_items.c.queue_name == queue_name.value,
                 work_items.c.available_at <= sa.func.now(),
+                work_items.c.attempt_count < work_items.c.max_infrastructure_attempts,
                 sa.or_(
                     work_items.c.state == WorkState.READY.value,
                     sa.and_(
@@ -163,7 +164,28 @@ class PostgresWorkQueue(WorkQueuePort):
             .returning(*work_items.c)
         )
 
+        expired_exhausted = (
+            sa.update(work_items)
+            .where(
+                work_items.c.queue_name == queue_name.value,
+                work_items.c.state == WorkState.LEASED.value,
+                work_items.c.lease_until <= sa.func.now(),
+                work_items.c.attempt_count >= work_items.c.max_infrastructure_attempts,
+            )
+            .values(
+                state=WorkState.DEAD.value,
+                dead_at=sa.func.now(),
+                lease_owner=None,
+                lease_until=None,
+                last_error_class=sa.func.coalesce(
+                    work_items.c.last_error_class,
+                    "INFRASTRUCTURE_ATTEMPTS_EXHAUSTED",
+                ),
+            )
+        )
+
         async with self._sessions.begin() as session:
+            await session.execute(expired_exhausted)
             rows = (await session.execute(statement)).mappings().all()
         return tuple(_work_lease(row) for row in rows)
 
@@ -198,6 +220,35 @@ class PostgresWorkQueue(WorkQueuePort):
                 completed_at=sa.func.now(),
                 lease_owner=None,
                 lease_until=None,
+            )
+            .returning(work_items.c.work_id)
+        )
+        async with self._sessions.begin() as session:
+            updated = (await session.execute(statement)).scalar_one_or_none()
+        return updated is not None
+
+    async def dead_letter(
+        self,
+        lease: WorkLease,
+        *,
+        error_class: str,
+    ) -> bool:
+        if not error_class.strip():
+            raise ValueError("error_class is required")
+        statement = (
+            sa.update(work_items)
+            .where(
+                work_items.c.work_id == lease.work_id,
+                work_items.c.state == WorkState.LEASED.value,
+                work_items.c.lease_owner == lease.lease_owner,
+                work_items.c.lease_until > sa.func.now(),
+            )
+            .values(
+                state=WorkState.DEAD.value,
+                dead_at=sa.func.now(),
+                lease_owner=None,
+                lease_until=None,
+                last_error_class=error_class,
             )
             .returning(work_items.c.work_id)
         )
