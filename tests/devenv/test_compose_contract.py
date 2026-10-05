@@ -30,6 +30,14 @@ def valid_config() -> dict[str, object]:
 
 
 class ComposeContractTests(unittest.TestCase):
+    def test_compose_uses_real_worker_scheduler_entry_points(self) -> None:
+        from pathlib import Path
+
+        compose = Path("compose.yaml").read_text(encoding="utf-8")
+        self.assertIn('["python", "-m", "apps.worker.main"]', compose)
+        self.assertIn('["python", "-m", "apps.scheduler.main"]', compose)
+        self.assertNotIn("dev_container_process.py", compose)
+
     def test_valid_baseline_config_is_accepted(self) -> None:
         self.assertEqual(validate_compose(valid_config()), [])
 
