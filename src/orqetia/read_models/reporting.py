@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Protocol
 from uuid import UUID, uuid7
@@ -14,6 +14,14 @@ from orqetia.usage_accounting import NativeUsageQuantity
 
 from .domain import SURFACE_POLICIES, ReadSurface
 from .pagination import paginate
+
+CLIENT_USAGE_MAX_SOURCE_ROWS = 5_000
+REPORT_STORE_MAX_ROWS = 50_001
+REPORT_MAX_QUERY_SPAN = timedelta(days=366)
+
+
+class BoundedReadExceeded(ValueError):
+    """A read/export would exceed the versioned bounded-read contract."""
 
 
 def _aware(value: datetime, field: str) -> None:
@@ -220,6 +228,14 @@ class ReportQuery:
             and self.period_to <= self.period_from
         ):
             raise ValueError("period_to must be after period_from")
+        if (
+            self.period_from is not None
+            and self.period_to is not None
+            and self.period_to - self.period_from > REPORT_MAX_QUERY_SPAN
+        ):
+            raise BoundedReadExceeded(
+                "report query time range exceeds bounded maximum"
+            )
         if self.client_id is not None and self.tenant_id is None:
             raise ValueError("client_id filter requires tenant_id")
 
@@ -248,8 +264,8 @@ class InMemoryReportRollupStore:
         filters: ReportQuery,
         limit: int,
     ) -> tuple[ReportRollup, ...]:
-        if limit < 1:
-            raise ValueError("limit must be positive")
+        if limit < 1 or limit > REPORT_STORE_MAX_ROWS:
+            raise ValueError("report query limit outside allowed range")
         matches = [
             item
             for item in self._items.values()
@@ -330,8 +346,12 @@ class ClientUsageReportService:
         )
         rows = await self._store.query(
             filters=query,
-            limit=50_000,
+            limit=CLIENT_USAGE_MAX_SOURCE_ROWS + 1,
         )
+        if len(rows) > CLIENT_USAGE_MAX_SOURCE_ROWS:
+            raise BoundedReadExceeded(
+                "usage query exceeds bounded source-row scan"
+            )
         buckets = _client_buckets(rows)
         fingerprint = _query_fingerprint(
             {
@@ -414,6 +434,13 @@ class BackofficeReportingService:
         _authorize_filters(access, filters)
         if not access.can_view_financial:
             raise PermissionError("financial reporting permission is required")
+        maximum = SURFACE_POLICIES[
+            ReadSurface.PROVIDER_COST_SUMMARY
+        ].maximum_page_size
+        if limit < 1 or limit > maximum:
+            raise BoundedReadExceeded(
+                "report page limit exceeds bounded maximum"
+            )
         rows = await self._store.query(filters=filters, limit=limit)
         as_of = max((row.as_of for row in rows), default=None)
         return BackofficeReportPage(rows=rows, as_of=as_of)
@@ -428,6 +455,10 @@ class BackofficeReportingService:
         _authorize_filters(access, filters)
         if not access.can_view_financial or not access.can_export:
             raise PermissionError("financial export permission is required")
+        if filters.period_from is None or filters.period_to is None:
+            raise BoundedReadExceeded(
+                "report export requires period_from and period_to"
+            )
         maximum = SURFACE_POLICIES[
             ReadSurface.PROVIDER_COST_SUMMARY
         ].maximum_export_rows

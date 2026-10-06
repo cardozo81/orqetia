@@ -194,6 +194,8 @@ async def test_backoffice_report_preserves_currency_and_provenance() -> None:
         allowed_tenant_ids=frozenset({tenant_id}),
     )
     filters = ReportQuery(
+        period_from=START,
+        period_to=END + timedelta(minutes=1),
         tenant_id=tenant_id,
         client_id=client_id,
         provider_account_id=account_id,

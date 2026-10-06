@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from orqetia.usage_accounting import NativeUsageQuantity
 
-from .reporting import ReportQuery, ReportRollup
+from .reporting import REPORT_STORE_MAX_ROWS, ReportQuery, ReportRollup
 from .reporting_tables import report_rollups
 
 SessionFactory = async_sessionmaker[AsyncSession]
@@ -158,7 +158,7 @@ class PostgresReportRollupStore:
         filters: ReportQuery,
         limit: int,
     ) -> tuple[ReportRollup, ...]:
-        if limit < 1 or limit > 50_001:
+        if limit < 1 or limit > REPORT_STORE_MAX_ROWS:
             raise ValueError("report query limit outside allowed range")
         conditions: list[object] = []
         if filters.period_from is not None:
