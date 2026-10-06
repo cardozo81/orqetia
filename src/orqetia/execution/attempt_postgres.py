@@ -72,6 +72,8 @@ def _attempt_from_row(row: RowMapping) -> ProviderAttempt:
             client_id=cast(UUID, row["client_id"]),
         ),
         operation=cast(str, row["operation"]),
+        provider_account_id=cast(UUID | None, row["provider_account_id"]),
+        provider_credential_id=cast(UUID | None, row["provider_credential_id"]),
         target=ExecutionTargetSnapshot(
             provider_id=cast(str, row["provider_id"]),
             model_id=cast(str, row["model_id"]),
@@ -127,6 +129,8 @@ class PostgresProviderAttemptStore:
             "client_id": attempt.ownership.client_id,
             "operation": attempt.operation,
             "provider_id": attempt.target.provider_id,
+            "provider_account_id": attempt.provider_account_id,
+            "provider_credential_id": attempt.provider_credential_id,
             "model_id": attempt.target.model_id,
             "reasoning_profile": attempt.target.reasoning_profile,
             "cycle": attempt.cycle,
