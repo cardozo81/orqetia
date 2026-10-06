@@ -436,6 +436,40 @@ class PostgresQuotaEnforcer:
                 row=released,
             )
 
+    async def list_by_idempotency_key(
+        self,
+        *,
+        tenant_id: UUID,
+        client_id: UUID,
+        idempotency_key: str,
+    ) -> tuple[QuotaReservation, ...]:
+        if not idempotency_key.strip() or len(idempotency_key) > 200:
+            raise ValueError("idempotency_key must contain 1..200 characters")
+        statement = (
+            sa.select(quota_reservations)
+            .where(
+                quota_reservations.c.tenant_id == tenant_id,
+                quota_reservations.c.client_id == client_id,
+                quota_reservations.c.idempotency_key == idempotency_key,
+            )
+            .order_by(
+                quota_reservations.c.policy_id,
+                quota_reservations.c.policy_version,
+                quota_reservations.c.reservation_id,
+            )
+        )
+        async with self._sessions() as database:
+            rows = (await database.execute(statement)).mappings().all()
+            return tuple(
+                [
+                    await self._hydrate_reservation(
+                        database=database,
+                        row=row,
+                    )
+                    for row in rows
+                ]
+            )
+
     async def utilization(
         self,
         *,
@@ -567,7 +601,7 @@ class PostgresQuotaEnforcer:
         window: QuotaWindow,
         consumed: Decimal,
     ) -> QuotaUtilization:
-        reserved = (
+        reserved_raw: object = (
             await database.execute(
                 sa.select(
                     sa.func.coalesce(
@@ -583,6 +617,7 @@ class PostgresQuotaEnforcer:
                 )
             )
         ).scalar_one()
+        reserved = Decimal(str(reserved_raw))
         return QuotaUtilization(
             policy_id=policy_id,
             policy_version=policy_version,
@@ -592,7 +627,7 @@ class PostgresQuotaEnforcer:
                 if metric is QuotaMetric.CONCURRENT_TASKS
                 else Decimal(consumed)
             ),
-            reserved=Decimal(reserved),
+            reserved=reserved,
             limit=limit,
             burst=burst,
             window=window,

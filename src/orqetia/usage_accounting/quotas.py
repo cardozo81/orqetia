@@ -357,6 +357,33 @@ class InMemoryQuotaEnforcer:
             self._reservations[reservation_id] = released
             return released
 
+    async def list_by_idempotency_key(
+        self,
+        *,
+        tenant_id: UUID,
+        client_id: UUID,
+        idempotency_key: str,
+    ) -> tuple[QuotaReservation, ...]:
+        if not idempotency_key.strip() or len(idempotency_key) > 200:
+            raise ValueError("idempotency_key must contain 1..200 characters")
+        async with self._lock:
+            return tuple(
+                sorted(
+                    (
+                        item
+                        for item in self._reservations.values()
+                        if item.tenant_id == tenant_id
+                        and item.client_id == client_id
+                        and item.idempotency_key == idempotency_key
+                    ),
+                    key=lambda item: (
+                        str(item.policy_id),
+                        item.policy_version,
+                        str(item.reservation_id),
+                    ),
+                )
+            )
+
     async def utilization(
         self,
         *,
