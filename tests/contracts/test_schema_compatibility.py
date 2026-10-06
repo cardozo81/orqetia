@@ -18,6 +18,7 @@ def _run(
     kind: str = "json-schema",
     approvals: dict[str, object] | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    tmp_path.mkdir(parents=True, exist_ok=True)
     old_path = tmp_path / "old.json"
     new_path = tmp_path / "new.json"
     approvals_path = tmp_path / "approvals.json"
