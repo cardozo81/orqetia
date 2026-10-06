@@ -12,14 +12,40 @@ from .domain import (
     SurfacePolicy,
 )
 from .pagination import CursorPage, decode_cursor, encode_cursor, paginate
+from .reporting import (
+    BackofficeReportAccess,
+    BackofficeReportPage,
+    BackofficeReportingService,
+    ClientUsageBucket,
+    ClientUsagePage,
+    ClientUsageReportService,
+    InMemoryReportExportAuditSink,
+    InMemoryReportRollupStore,
+    ReportExportAuditEvent,
+    ReportExportAuditSink,
+    ReportQuery,
+    ReportRollup,
+    ReportRollupStore,
+)
+from .reporting_postgres import PostgresReportRollupStore
+from .reporting_tables import report_rollups
 from .store import PostgresReadModelStore, ReadModelStore
 from .tables import projection_documents
 
 __all__ = [
+    "BackofficeReportAccess",
+    "BackofficeReportPage",
+    "BackofficeReportingService",
     "CacheLookup",
+    "ClientUsageBucket",
+    "ClientUsagePage",
+    "ClientUsageReportService",
     "CursorPage",
     "InMemoryReadModelCache",
+    "InMemoryReportExportAuditSink",
+    "InMemoryReportRollupStore",
     "PostgresReadModelStore",
+    "PostgresReportRollupStore",
     "ProjectionFreshness",
     "ProjectionIdentity",
     "ReadAudience",
@@ -27,10 +53,16 @@ __all__ = [
     "ReadModelDocument",
     "ReadModelStore",
     "ReadSurface",
+    "ReportExportAuditEvent",
+    "ReportExportAuditSink",
+    "ReportQuery",
+    "ReportRollup",
+    "ReportRollupStore",
     "SURFACE_POLICIES",
     "SurfacePolicy",
     "decode_cursor",
     "encode_cursor",
     "paginate",
     "projection_documents",
+    "report_rollups",
 ]
