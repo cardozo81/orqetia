@@ -500,9 +500,9 @@ curl -sS "$ORQETIA_BASE_URL/v1/models?provider_id=provider-visible-id"   -H "Aut
 | Ownership | usage filtrado ao tenant/client autenticado |
 | Query | cursor; limit 1..100 default 50; from/to date-time opcionais |
 | Success | 200 UsagePage |
-| Erros declarados | 401, 403, 404, 429 |
+| Erros declarados | 400, 401, 403, 404, 413, 429 |
 | Idempotência | Não aplicável |
-| Limites/quota | Read model paginado; não faz full scan do ledger |
+| Limites/quota | Read model paginado; scan de source rows é bounded e excesso retorna 413 |
 | Version/deprecation | v1; não deprecated |
 
 Usage inclui tokens técnicos e native usage não monetária. Não inclui amount,

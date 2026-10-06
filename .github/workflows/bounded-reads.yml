@@ -1,0 +1,61 @@
+name: Bounded reads
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - src/orqetia/read_models/**
+      - src/orqetia/infrastructure/http/app.py
+      - src/orqetia/infrastructure/http/execution_runtime.py
+      - contracts/openapi/orqetia-v1.openapi.json
+      - docs/architecture/adr-0042-bounded-read-contracts.md
+      - docs/api/client-api-v1-manual.md
+      - tests/read_models/test_bounded_reads.py
+      - tests/read_models/test_reporting.py
+      - tests/api/test_usage_reporting.py
+      - tests/api/test_client_execution_runtime.py
+      - .github/workflows/bounded-reads.yml
+  push:
+    branches: [main]
+    paths:
+      - src/orqetia/read_models/**
+      - src/orqetia/infrastructure/http/app.py
+      - src/orqetia/infrastructure/http/execution_runtime.py
+      - contracts/openapi/orqetia-v1.openapi.json
+      - docs/architecture/adr-0042-bounded-read-contracts.md
+      - docs/api/client-api-v1-manual.md
+      - tests/read_models/test_bounded_reads.py
+      - tests/read_models/test_reporting.py
+      - tests/api/test_usage_reporting.py
+      - tests/api/test_client_execution_runtime.py
+      - .github/workflows/bounded-reads.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bounded-reads-main
+  cancel-in-progress: true
+
+jobs:
+  bounded:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ORQETIA_ENVIRONMENT: test
+      ORQETIA_PROCESS_ROLE: api
+      ORQETIA_DATABASE_DSN: postgresql+psycopg://localhost/orqetia_test
+      ORQETIA_SECRET_STORE_MODE: none
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+      - run: uv sync --locked --python 3.14
+      - name: Bounded read tests
+        run: >-
+          uv run --no-sync --python 3.14 pytest -q
+          tests/read_models/test_bounded_reads.py
+          tests/read_models/test_reporting.py
+          tests/api/test_usage_reporting.py::test_usage_endpoint_returns_413_when_source_scan_is_too_large
+          tests/api/test_client_execution_runtime.py::test_attempt_cursor_is_bound_to_task_query

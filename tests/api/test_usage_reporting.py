@@ -12,6 +12,7 @@ import httpx
 from orqetia.identity import AuthenticatedPrincipal
 from orqetia.infrastructure.http import create_app
 from orqetia.read_models import (
+    BoundedReadExceeded,
     ClientUsageReportService,
     InMemoryReportRollupStore,
     ReportRollup,
@@ -134,3 +135,19 @@ def test_usage_endpoint_fails_closed_without_reporting_service() -> None:
     response = asyncio.run(_get(app, "/v1/usage"))
     assert response.status_code == 503
     assert response.json()["code"] == "USAGE_REPORTING_UNAVAILABLE"
+
+
+class _ExceededUsageService:
+    async def read(self, **_kwargs):
+        raise BoundedReadExceeded("synthetic bounded read overflow")
+
+
+def test_usage_endpoint_returns_413_when_source_scan_is_too_large() -> None:
+    app = create_app(
+        openapi_document=CANONICAL,
+        authenticator=UsageAuthenticator(),
+        client_usage_service=_ExceededUsageService(),
+    )
+    response = asyncio.run(_get(app, "/v1/usage?limit=50"))
+    assert response.status_code == 413
+    assert response.json()["code"] == "READ_LIMIT_EXCEEDED"
