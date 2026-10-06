@@ -91,6 +91,10 @@ provider_attempts = sa.Table(
         "task_id IS NULL OR session_id IS NOT NULL",
         name="task_requires_session",
     ),
+    sa.CheckConstraint(
+        "provider_credential_id IS NULL OR provider_account_id IS NOT NULL",
+        name="credential_requires_provider_account",
+    ),
     sa.CheckConstraint("cycle >= 1", name="cycle_positive"),
     sa.CheckConstraint("attempt_index >= 1", name="attempt_index_positive"),
     sa.CheckConstraint("version >= 1", name="version_positive"),

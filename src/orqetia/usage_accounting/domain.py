@@ -208,6 +208,8 @@ class AccountingDimensions:
     task_id: UUID | None = None
 
     def __post_init__(self) -> None:
+        if self.provider_credential_id is not None and self.provider_account_id is None:
+            raise ValueError("provider credential provenance requires provider account")
         for field, value, maximum in (
             ("provider_id", self.provider_id, 100),
             ("model_id", self.model_id, 200),

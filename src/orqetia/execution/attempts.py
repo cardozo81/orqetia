@@ -85,6 +85,8 @@ class ProviderAttempt:
             raise ValueError("request_fingerprint must be lowercase SHA-256 hex")
         if self.task_id is not None and self.session_id is None:
             raise ValueError("task-scoped attempt requires session_id")
+        if self.provider_credential_id is not None and self.provider_account_id is None:
+            raise ValueError("provider credential provenance requires provider account")
         if self.version < 1:
             raise ValueError("version must be positive")
 

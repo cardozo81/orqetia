@@ -1,5 +1,22 @@
 """Control Plane contracts for provider, policy and administrative configuration."""
 
+from .provider_account_postgres import (
+    PostgresExternalCapacityRepository,
+    PostgresProviderAccountRepository,
+)
+from .provider_account_tables import provider_accounts, provider_capacity_snapshots
+from .provider_accounts import (
+    ExternalCapacityRepository,
+    ExternalCapacitySnapshot,
+    ExternalCapacitySource,
+    InMemoryExternalCapacityRepository,
+    InMemoryProviderAccountRepository,
+    ProviderAccount,
+    ProviderAccountRepository,
+    ProviderAccountService,
+    ProviderAccountStatus,
+    ProviderCredentialSelection,
+)
 from .provider_credential_postgres import PostgresProviderCredentialRepository
 from .provider_credential_tables import provider_credentials
 from .provider_credentials import (
@@ -30,14 +47,26 @@ __all__ = [
     "CredentialAuditEvent",
     "CredentialAuditSink",
     "CredentialPreflightResult",
+    "ExternalCapacityRepository",
+    "ExternalCapacitySnapshot",
+    "ExternalCapacitySource",
     "InMemoryCredentialAuditSink",
+    "InMemoryExternalCapacityRepository",
+    "InMemoryProviderAccountRepository",
     "InMemoryProviderCredentialRepository",
     "InMemoryProviderSecretStore",
+    "PostgresExternalCapacityRepository",
+    "PostgresProviderAccountRepository",
     "PostgresProviderCredentialRepository",
+    "ProviderAccount",
+    "ProviderAccountRepository",
+    "ProviderAccountService",
+    "ProviderAccountStatus",
     "ProviderCredentialMetadata",
     "ProviderCredentialPreflight",
     "ProviderCredentialRepository",
     "ProviderCredentialService",
+    "ProviderCredentialSelection",
     "ProviderCredentialStatus",
     "ProviderSecretStore",
     "QuotaEnforcementMode",
@@ -46,6 +75,8 @@ __all__ = [
     "QuotaScope",
     "SecretReference",
     "SecretValue",
+    "provider_accounts",
+    "provider_capacity_snapshots",
     "provider_credentials",
     "quota_policies",
 ]

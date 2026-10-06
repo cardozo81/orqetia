@@ -52,6 +52,10 @@ accounting_ledger = sa.Table(
         server_default=sa.func.now(),
     ),
     sa.UniqueConstraint("attempt_id", "fragment_id", name="attempt_fragment"),
+    sa.CheckConstraint(
+        "provider_credential_id IS NULL OR provider_account_id IS NOT NULL",
+        name="credential_requires_provider_account",
+    ),
     sa.CheckConstraint("char_length(fragment_id) BETWEEN 1 AND 100", name="fragment_bounded"),
     sa.CheckConstraint("char_length(provider_id) BETWEEN 1 AND 100", name="provider_bounded"),
     sa.CheckConstraint("char_length(model_id) BETWEEN 1 AND 200", name="model_bounded"),
