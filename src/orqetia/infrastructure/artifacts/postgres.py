@@ -564,7 +564,7 @@ class PostgresClientArtifactStore:
             "attempt_id": attempt_id,
             "kind": "PROVIDER_RESPONSE",
             "media_type": media_type,
-            "content_json": None,
+            "content_json": sa.null(),
             "content_text": content,
             "output_kind": output_kind,
             "sha256": fingerprint,
