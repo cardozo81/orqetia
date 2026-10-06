@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
-from typing import Mapping
 from uuid import UUID, uuid7
 
 
@@ -199,7 +199,10 @@ def _reject_client_financial_fields(value: object, path: str = "payload") -> Non
         for key, nested in value.items():
             lowered = str(key).lower()
             if any(part in lowered for part in _CLIENT_FORBIDDEN_KEY_PARTS):
-                raise ValueError(f"client projection contains forbidden financial field: {path}.{key}")
+                raise ValueError(
+                    "client projection contains forbidden financial field: "
+                    f"{path}.{key}"
+                )
             _reject_client_financial_fields(nested, f"{path}.{key}")
     elif isinstance(value, (list, tuple)):
         for index, nested in enumerate(value):

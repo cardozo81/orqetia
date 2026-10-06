@@ -2,13 +2,13 @@
 
 from .cache import CacheLookup, InMemoryReadModelCache
 from .domain import (
+    SURFACE_POLICIES,
     ProjectionFreshness,
     ProjectionIdentity,
     ReadAudience,
     ReadClassification,
     ReadModelDocument,
     ReadSurface,
-    SURFACE_POLICIES,
     SurfacePolicy,
 )
 from .pagination import CursorPage, decode_cursor, encode_cursor, paginate

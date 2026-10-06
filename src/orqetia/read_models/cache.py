@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from .domain import ProjectionIdentity, ReadModelDocument, SURFACE_POLICIES
+from .domain import SURFACE_POLICIES, ProjectionIdentity, ReadModelDocument
 
 
 @dataclass(frozen=True)

@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import base64
 import json
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Callable, Generic, Sequence, TypeVar
-
-T = TypeVar("T")
 
 
 @dataclass(frozen=True)
-class CursorPage(Generic[T]):
+class CursorPage[T]:
     items: tuple[T, ...]
     next_cursor: str | None
 
@@ -42,7 +40,7 @@ def decode_cursor(*, cursor: str, query_fingerprint: str) -> str:
     return last
 
 
-def paginate(
+def paginate[T](
     items: Sequence[T],
     *,
     key: Callable[[T], str],
