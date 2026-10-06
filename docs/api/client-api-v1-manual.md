@@ -169,8 +169,8 @@ visível/autorizada.
   "execution": {
     "mode": "EXPLICIT_TARGET",
     "target": {
-      "provider_id": "provider-visible-id",
-      "model_id": "model-visible-id",
+      "provider": "provider-visible-id",
+      "model": "model-visible-id",
       "reasoning_profile": "standard"
     }
   },
@@ -186,8 +186,8 @@ curl -sS -X POST   "$ORQETIA_BASE_URL/v1/sessions/$SESSION_ID/tasks"   -H "Autho
     "execution":{
       "mode":"EXPLICIT_TARGET",
       "target":{
-        "provider_id":"provider-visible-id",
-        "model_id":"model-visible-id",
+        "provider":"provider-visible-id",
+        "model":"model-visible-id",
         "reasoning_profile":"standard"
       }
     },
@@ -296,7 +296,7 @@ curl -sS "$ORQETIA_BASE_URL/v1/sessions/$SESSION_ID"   -H "Authorization: Bearer
 | Limites/quota | Content limit e quotas server-side |
 | Version/deprecation | v1; não deprecated |
 
-cURL AUTO:
+cURL: AUTO
 
 ~~~bash
 curl -sS -X POST   "$ORQETIA_BASE_URL/v1/sessions/$SESSION_ID/tasks"   -H "Authorization: Bearer $ORQETIA_TOKEN"   -H "Content-Type: application/json"   -H "Idempotency-Key: task-001"   -d '{"operation":"TASK_EXECUTION","input":{"input_text":"hello"}}'
