@@ -10,6 +10,7 @@ from orqetia.execution import (
     DispatchAction,
     OwnershipScope,
     ProviderAttempt,
+    ProviderAttemptStatus,
     ProviderAttemptStore,
 )
 from orqetia.observability import (
@@ -135,6 +136,22 @@ class ProviderAttemptHandler:
             model_id=attempt.target.model_id,
             reasoning_profile=attempt.target.reasoning_profile,
         )
+        adapter: ProviderAdapter | None = None
+        if attempt.status is ProviderAttemptStatus.PREPARED:
+            try:
+                adapter = await self._resolve(attempt)
+            except Exception as exc:
+                error_class = (
+                    f"ADAPTER_RESOLUTION_{type(exc).__name__.upper()}"
+                )
+                self._emit_attempt(
+                    "provider.adapter_resolution_failed",
+                    lease,
+                    attempt,
+                    error_class=error_class,
+                )
+                return self._infrastructure_failure(error_class)
+
         claim = await self._store.claim_dispatch(
             scope=scope,
             attempt_id=attempt_id,
@@ -162,22 +179,35 @@ class ProviderAttemptHandler:
                     return continuation
             return HandlerOutcome.complete()
 
-        try:
-            resolved_adapter = self._resolve_adapter(claim.attempt)
-            adapter = (
-                await resolved_adapter
-                if isinstance(resolved_adapter, Awaitable)
-                else resolved_adapter
-            )
-        except Exception as exc:
-            error_class = f"ADAPTER_RESOLUTION_{type(exc).__name__.upper()}"
-            self._emit_attempt(
-                "provider.adapter_resolution_failed",
-                lease,
-                claim.attempt,
-                error_class=error_class,
-            )
-            return self._infrastructure_failure(error_class)
+        if adapter is None:
+            try:
+                adapter = await self._resolve(claim.attempt)
+            except Exception as exc:
+                error_class = (
+                    f"ADAPTER_RESOLUTION_{type(exc).__name__.upper()}"
+                )
+                self._emit_attempt(
+                    "provider.adapter_resolution_failed",
+                    lease,
+                    claim.attempt,
+                    error_class=error_class,
+                )
+                await self._store.mark_ambiguous(
+                    scope=scope,
+                    attempt_id=attempt_id,
+                    work_id=lease.work_id,
+                    occurred_at=self._clock(),
+                    error_class=error_class,
+                )
+                continuation = await self._continue_task(
+                    lease,
+                    claim.attempt,
+                )
+                return (
+                    HandlerOutcome.complete()
+                    if continuation is None
+                    else continuation
+                )
 
         journal = claim.attempt
         self._emit_attempt("provider.dispatch_started", lease, journal)
@@ -245,6 +275,15 @@ class ProviderAttemptHandler:
             if continuation is None
             else continuation
         )
+
+    async def _resolve(
+        self,
+        attempt: ProviderAttempt,
+    ) -> ProviderAdapter:
+        resolved = self._resolve_adapter(attempt)
+        if isinstance(resolved, Awaitable):
+            return await resolved
+        return resolved
 
     async def _continue_task(
         self,
