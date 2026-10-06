@@ -307,6 +307,25 @@ async def test_admin_web_executes_control_plane_without_exposing_provider_secret
         )
         client_id = clients[0].client_id
 
+        catalog = await _post(
+            client,
+            "/backoffice/providers/catalog/publish",
+            csrf,
+            {
+                "catalog_json": _catalog_json(),
+                "endpoints_json": json.dumps(
+                    [
+                        {
+                            "provider_id": "alpha",
+                            "base_url": "https://api.alpha.example/v1",
+                            "region": "us",
+                        }
+                    ]
+                ),
+            },
+        )
+        assert catalog.status_code == 303
+
         policy = await _post(
             client,
             "/backoffice/policies/publish",
@@ -346,25 +365,6 @@ async def test_admin_web_executes_control_plane_without_exposing_provider_secret
             },
         )
         assert quota.status_code == 303
-
-        catalog = await _post(
-            client,
-            "/backoffice/providers/catalog/publish",
-            csrf,
-            {
-                "catalog_json": _catalog_json(),
-                "endpoints_json": json.dumps(
-                    [
-                        {
-                            "provider_id": "alpha",
-                            "base_url": "https://api.alpha.example/v1",
-                            "region": "us",
-                        }
-                    ]
-                ),
-            },
-        )
-        assert catalog.status_code == 303
 
         pricing = await _post(
             client,
