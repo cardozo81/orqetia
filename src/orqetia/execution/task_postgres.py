@@ -173,6 +173,7 @@ def _cycle_decision_from_row(row: RowMapping) -> TaskCycleDecision:
         missing_snapshot=_str_tuple(row["missing_snapshot"], "missing_snapshot"),
         escalation_reason_code=cast(str | None, row["escalation_reason_code"]),
         delay_seconds=cast(int, row["delay_seconds"]),
+        result_reference_snapshot=cast(str | None, row["result_reference_snapshot"]),
         recorded_at=cast(datetime, row["recorded_at"]),
     )
 
@@ -467,11 +468,23 @@ class PostgresExecutionTaskStore:
                         "EXPLICIT_TARGET cycle cannot contain a cross-target candidate"
                     )
 
+            if (
+                current.result_reference is not None
+                and decision.result_reference_snapshot is not None
+                and current.result_reference != decision.result_reference_snapshot
+            ):
+                raise ValueError("running result reference snapshot is immutable")
+
             candidate = replace(
                 current,
                 accepted_requirements=decision.accepted_snapshot,
                 missing_requirements=decision.missing_snapshot,
                 current_cycle=decision.cycle_index,
+                result_reference=(
+                    current.result_reference
+                    if decision.result_reference_snapshot is None
+                    else decision.result_reference_snapshot
+                ),
                 updated_at=decision.recorded_at,
                 version=current.version + 1,
             )
@@ -490,6 +503,7 @@ class PostgresExecutionTaskStore:
                     accepted_requirements=list(candidate.accepted_requirements),
                     missing_requirements=list(candidate.missing_requirements),
                     current_cycle=candidate.current_cycle,
+                    result_reference=candidate.result_reference,
                     updated_at=candidate.updated_at,
                     version=candidate.version,
                 )
@@ -511,6 +525,7 @@ class PostgresExecutionTaskStore:
                     ],
                     escalation_reason_code=decision.escalation_reason_code,
                     delay_seconds=decision.delay_seconds,
+                    result_reference_snapshot=decision.result_reference_snapshot,
                     accepted_snapshot=list(decision.accepted_snapshot),
                     missing_snapshot=list(decision.missing_snapshot),
                     recorded_at=decision.recorded_at,

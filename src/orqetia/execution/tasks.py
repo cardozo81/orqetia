@@ -244,6 +244,7 @@ class TaskCycleDecision:
     recorded_at: datetime
     escalation_reason_code: str | None = None
     delay_seconds: int = 0
+    result_reference_snapshot: str | None = None
 
     def __post_init__(self) -> None:
         if self.cycle_index < 1:
@@ -253,6 +254,11 @@ class TaskCycleDecision:
         if self.delay_seconds < 0:
             raise ValueError("delay_seconds cannot be negative")
         _bounded_optional(self.escalation_reason_code, "escalation_reason_code", 200)
+        _bounded_optional(
+            self.result_reference_snapshot,
+            "result_reference_snapshot",
+            500,
+        )
         _require_aware(self.recorded_at, "recorded_at")
 
 

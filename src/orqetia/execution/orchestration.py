@@ -211,6 +211,7 @@ class OrchestrationCyclePlan:
     accepted_snapshot: tuple[str, ...]
     missing_snapshot: tuple[str, ...]
     delay_seconds: int
+    result_reference_snapshot: str | None = None
 
     @property
     def candidate_order(self) -> tuple[ExecutionTargetSnapshot, ...]:
@@ -224,6 +225,7 @@ class OrchestrationCyclePlan:
             missing_snapshot=self.missing_snapshot,
             recorded_at=recorded_at,
             delay_seconds=self.delay_seconds,
+            result_reference_snapshot=self.result_reference_snapshot,
         )
 
 
@@ -319,6 +321,7 @@ class CanonicalOrchestrationPolicyEngine:
             accepted_snapshot=task.accepted_requirements,
             missing_snapshot=task.missing_requirements,
             delay_seconds=delay,
+            result_reference_snapshot=task.result_reference,
         )
 
     def evaluate_cycle(
@@ -342,7 +345,7 @@ class CanonicalOrchestrationPolicyEngine:
         )
         retry_after_values: list[int | None] = []
         quarantines: list[ExecutionTargetSnapshot] = []
-        last_progress_reference: str | None = None
+        last_progress_reference: str | None = plan.result_reference_snapshot
 
         for index, observation in enumerate(observations):
             expected_target = plan.candidates[index].target

@@ -284,6 +284,7 @@ task_cycle_decisions = sa.Table(
     sa.Column("candidate_order", JSONB(), nullable=False),
     sa.Column("escalation_reason_code", sa.Text(), nullable=True),
     sa.Column("delay_seconds", sa.Integer(), nullable=False, server_default="0"),
+    sa.Column("result_reference_snapshot", sa.Text(), nullable=True),
     sa.Column("accepted_snapshot", JSONB(), nullable=False),
     sa.Column("missing_snapshot", JSONB(), nullable=False),
     sa.Column("recorded_at", sa.DateTime(timezone=True), nullable=False),
@@ -321,6 +322,11 @@ task_cycle_decisions = sa.Table(
         "escalation_reason_code IS NULL "
         "OR char_length(escalation_reason_code) <= 200",
         name="escalation_reason_bounded",
+    ),
+    sa.CheckConstraint(
+        "result_reference_snapshot IS NULL "
+        "OR char_length(result_reference_snapshot) <= 500",
+        name="result_reference_snapshot_bounded",
     ),
 )
 
