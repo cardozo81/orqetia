@@ -74,7 +74,7 @@ async def test_publish_creates_immutable_versions_and_moves_assignment() -> None
     )
     assert [item.version_number for item in versions] == [1, 2]
     assert versions[0] == first.version
-    assert versions[0].authorized_targets == _targets()
+    assert versions[0].authorized_targets == tuple(sorted(_targets()))
     assert second.assignment.assignment_version == 2
     assert (
         await service.resolve_effective(
