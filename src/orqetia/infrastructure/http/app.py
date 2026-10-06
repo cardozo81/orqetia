@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
-from fastapi import Depends, FastAPI, Header, Query, Request
+from fastapi import Depends, FastAPI, Header, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -24,6 +24,10 @@ from orqetia.estimation import (
     EstimateUnavailable,
     ReferenceScope,
 )
+from orqetia.execution import (
+    ClientApiIdempotencyConflict,
+    OwnershipScope,
+)
 from orqetia.identity import (
     ClientAccessCredentialService,
     IdempotencyConflict,
@@ -37,7 +41,18 @@ from orqetia.identity.authentication import (
 from orqetia.infrastructure.health import ReadinessProbe
 from orqetia.read_models import ClientUsageReportService
 
+from .execution_runtime import (
+    ClientExecutionArtifactUnavailable,
+    ClientExecutionConflict,
+    ClientExecutionForbidden,
+    ClientExecutionNotFound,
+    ClientExecutionRuntime,
+    ClientRequestedTarget,
+)
 from .models import (
+    AttemptListResponse,
+    AttemptSummaryView,
+    AttemptView,
     CredentialCreateRequest,
     CredentialIssueResponse,
     CredentialListResponse,
@@ -47,9 +62,19 @@ from .models import (
     EstimateExplicitExecution,
     EstimateRequest,
     EstimateResponse,
+    ExchangeEvidenceView,
+    ExchangeListResponse,
     ExplicitExecution,
+    ModelPublicView,
+    ProviderIdentityView,
+    ProviderPublicView,
+    SanitizedEvidenceView,
     SessionCreateRequest,
+    SessionView,
+    TargetView,
     TaskCreateRequest,
+    TaskResultView,
+    TaskView,
     UsagePageResponse,
 )
 
@@ -83,6 +108,7 @@ def create_app(
     estimation_service: EstimateService | None = None,
     client_credential_service: ClientAccessCredentialService | None = None,
     client_usage_service: ClientUsageReportService | None = None,
+    execution_runtime: ClientExecutionRuntime | None = None,
 ) -> FastAPI:
     """Build the client API shell around the versioned canonical OpenAPI document."""
 
@@ -276,84 +302,347 @@ def create_app(
     def credential_metadata_view(credential: Any) -> CredentialMetadataView:
         return CredentialMetadataView.model_validate(credential.safe_view())
 
-    def not_implemented() -> None:
-        raise ApiError(
-            501,
-            "NOT_IMPLEMENTED",
-            "Endpoint contract is defined but runtime implementation is not available yet.",
+    def required_execution_runtime() -> ClientExecutionRuntime:
+        if execution_runtime is None:
+            raise ApiError(
+                503,
+                "EXECUTION_RUNTIME_UNAVAILABLE",
+                "Execution runtime is not configured.",
+            )
+        return execution_runtime
+
+    def principal_scope(principal: AuthenticatedPrincipal) -> OwnershipScope:
+        tenant_id, client_id = principal_owner(principal)
+        return OwnershipScope(tenant_id=tenant_id, client_id=client_id)
+
+    def target_view(target: Any | None, effective: Any | None = None) -> TargetView | None:
+        if target is None:
+            return None
+        provider_id = target.provider_id
+        model_id = target.model_id
+        reasoning_profile = target.reasoning_profile
+        if (model_id is None or reasoning_profile is None) and effective is not None:
+            model_id = effective.model_id
+            reasoning_profile = effective.reasoning_profile
+        if model_id is None or reasoning_profile is None:
+            raise ApiError(
+                500,
+                "INTERNAL_CONTRACT_ERROR",
+                "Persisted explicit target is incomplete.",
+            )
+        return TargetView(
+            provider_id=provider_id,
+            model_id=model_id,
+            reasoning_profile=reasoning_profile,
         )
 
-    @app.post("/v1/sessions", response_model=None)
-    async def create_session(
-        _payload: SessionCreateRequest,
-        _principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("sessions:write"))],
-    ) -> None:
-        not_implemented()
+    def session_view(session: Any) -> SessionView:
+        return SessionView(
+            session_id=session.session_id,
+            status=session.status.value,
+            policy_version_id=session.policy.effective_policy_version_id,
+            created_at=session.created_at,
+            updated_at=session.updated_at,
+            expires_at=session.expires_at,
+        )
 
-    @app.get("/v1/sessions/{session_id}", response_model=None)
+    async def task_view(
+        runtime: ClientExecutionRuntime,
+        *,
+        scope: OwnershipScope,
+        task: Any,
+    ) -> TaskView:
+        attempts = await runtime.list_task_attempts(
+            scope=scope,
+            task_id=task.task_id,
+            cursor=None,
+            limit=100,
+        )
+        return TaskView(
+            task_id=task.task_id,
+            session_id=task.session_id,
+            operation=task.operation,
+            status=task.status.value,
+            requested_execution_mode=task.requested_execution_mode.value,
+            requested_target=target_view(task.requested_target, task.effective_target),
+            effective_target=target_view(task.effective_target),
+            attempts=[
+                AttemptSummaryView(
+                    attempt_id=item.attempt_id,
+                    operation=item.operation,
+                    provider_id=item.target.provider_id,
+                    model_id=item.target.model_id,
+                    status=item.status.value,
+                )
+                for item in attempts.items
+            ],
+            created_at=task.created_at,
+            updated_at=task.updated_at,
+            terminal_at=task.terminal_at,
+        )
+
+    async def attempt_view(
+        runtime: ClientExecutionRuntime,
+        *,
+        scope: OwnershipScope,
+        attempt: Any,
+    ) -> AttemptView:
+        provider_name = await runtime.provider_name(
+            scope=scope,
+            provider_id=attempt.target.provider_id,
+        )
+        return AttemptView(
+            attempt_id=attempt.attempt_id,
+            operation=attempt.operation,
+            task_id=attempt.task_id,
+            session_id=attempt.session_id,
+            provider=ProviderIdentityView(
+                provider_id=attempt.target.provider_id,
+                provider_name=provider_name,
+            ),
+            model_id=attempt.target.model_id,
+            reasoning_profile=attempt.target.reasoning_profile,
+            status=attempt.status.value,
+            cycle=attempt.cycle,
+            attempt_index=attempt.attempt_index,
+            usage={},
+            started_at=attempt.dispatch_started_at or attempt.created_at,
+            finished_at=attempt.terminal_at,
+        )
+
+    def translate_execution_error(exc: Exception) -> ApiError:
+        if isinstance(exc, ClientApiIdempotencyConflict):
+            return ApiError(
+                409,
+                "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST",
+                "Idempotency key was reused with a different request.",
+            )
+        if isinstance(exc, ClientExecutionNotFound):
+            return ApiError(404, "NOT_FOUND", "Requested execution resource was not found.")
+        if isinstance(exc, (ClientExecutionForbidden, PermissionError)):
+            return ApiError(403, "FORBIDDEN", "Requested execution operation is not authorized.")
+        if isinstance(exc, ClientExecutionArtifactUnavailable):
+            return ApiError(404, "ARTIFACT_NOT_RETAINED", "Requested retained artifact is unavailable.")
+        if isinstance(exc, ClientExecutionConflict):
+            return ApiError(409, "EXECUTION_STATE_CONFLICT", "Execution state does not permit this operation.")
+        if isinstance(exc, LookupError):
+            return ApiError(404, "NOT_FOUND", "Required execution configuration was not found.")
+        if isinstance(exc, ValueError):
+            return ApiError(400, "INVALID_REQUEST", "Execution request is invalid.")
+        return ApiError(500, "INTERNAL_ERROR", "An internal error occurred.")
+
+    @app.post("/v1/sessions", response_model=SessionView, status_code=201)
+    async def create_session(
+        payload: SessionCreateRequest,
+        principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("sessions:write"))],
+        response: Response,
+        idempotency_key: Annotated[
+            str,
+            Header(alias="Idempotency-Key", min_length=1, max_length=200),
+        ],
+    ) -> SessionView:
+        runtime = required_execution_runtime()
+        scope = principal_scope(principal)
+        try:
+            session = await runtime.create_session(
+                scope=scope,
+                external_reference=payload.external_reference,
+                idempotency_key=idempotency_key,
+                occurred_at=datetime.now(UTC),
+            )
+        except Exception as exc:
+            raise translate_execution_error(exc) from exc
+        response.headers["Location"] = f"/v1/sessions/{session.session_id}"
+        return session_view(session)
+
+    @app.get("/v1/sessions/{session_id}", response_model=SessionView)
     async def get_session(
         session_id: UUID,
-        _principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("sessions:read"))],
-    ) -> None:
-        del session_id
-        not_implemented()
+        principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("sessions:read"))],
+    ) -> SessionView:
+        runtime = required_execution_runtime()
+        try:
+            return session_view(
+                await runtime.get_session(
+                    scope=principal_scope(principal),
+                    session_id=session_id,
+                )
+            )
+        except Exception as exc:
+            raise translate_execution_error(exc) from exc
 
-    @app.post("/v1/sessions/{session_id}/tasks", response_model=None)
+    @app.post("/v1/sessions/{session_id}/tasks", response_model=TaskView, status_code=202)
     async def create_task(
         session_id: UUID,
         payload: TaskCreateRequest,
         principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("tasks:write"))],
-    ) -> None:
-        del session_id
-        if (
-            isinstance(payload.execution, ExplicitExecution)
-            and "tasks:target" not in principal.scopes
-        ):
+        response: Response,
+        idempotency_key: Annotated[
+            str,
+            Header(alias="Idempotency-Key", min_length=1, max_length=200),
+        ],
+    ) -> TaskView:
+        explicit = isinstance(payload.execution, ExplicitExecution)
+        if explicit and "tasks:target" not in principal.scopes:
             raise ApiError(403, "FORBIDDEN", "Explicit target permission is missing.")
-        not_implemented()
+        requested = None
+        if explicit:
+            assert isinstance(payload.execution, ExplicitExecution)
+            requested = ClientRequestedTarget(
+                provider_id=payload.execution.target.provider,
+                model_id=payload.execution.target.model,
+                reasoning_profile=payload.execution.target.reasoning_profile,
+            )
+        runtime = required_execution_runtime()
+        scope = principal_scope(principal)
+        try:
+            task = await runtime.create_task(
+                scope=scope,
+                session_id=session_id,
+                operation=payload.operation,
+                input_payload=payload.input,
+                target=requested,
+                external_reference=payload.external_reference,
+                idempotency_key=idempotency_key,
+                occurred_at=datetime.now(UTC),
+            )
+            view = await task_view(runtime, scope=scope, task=task)
+        except Exception as exc:
+            raise translate_execution_error(exc) from exc
+        response.headers["Location"] = f"/v1/tasks/{task.task_id}"
+        return view
 
-    @app.get("/v1/tasks/{task_id}", response_model=None)
+    @app.get("/v1/tasks/{task_id}", response_model=TaskView)
     async def get_task(
         task_id: UUID,
-        _principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("tasks:read"))],
-    ) -> None:
-        del task_id
-        not_implemented()
+        principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("tasks:read"))],
+    ) -> TaskView:
+        runtime = required_execution_runtime()
+        scope = principal_scope(principal)
+        try:
+            task = await runtime.get_task(scope=scope, task_id=task_id)
+            return await task_view(runtime, scope=scope, task=task)
+        except Exception as exc:
+            raise translate_execution_error(exc) from exc
 
-    @app.get("/v1/tasks/{task_id}/result", response_model=None)
+    @app.get("/v1/tasks/{task_id}/result", response_model=TaskResultView)
     async def get_task_result(
         task_id: UUID,
-        _principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("tasks:read"))],
-    ) -> None:
-        del task_id
-        not_implemented()
+        principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("tasks:read"))],
+    ) -> TaskResultView:
+        runtime = required_execution_runtime()
+        try:
+            result = await runtime.get_task_result(
+                scope=principal_scope(principal),
+                task_id=task_id,
+            )
+        except Exception as exc:
+            raise translate_execution_error(exc) from exc
+        return TaskResultView(
+            task_id=result.task_id,
+            status=result.status,
+            result=result.result,
+            accepted=list(result.accepted),
+            missing=list(result.missing),
+            attempt_ids=list(result.attempt_ids),
+        )
 
-    @app.post("/v1/tasks/{task_id}/cancel", response_model=None)
+    @app.post("/v1/tasks/{task_id}/cancel", response_model=TaskView, status_code=202)
     async def cancel_task(
         task_id: UUID,
-        _principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("tasks:cancel"))],
-    ) -> None:
-        del task_id
-        not_implemented()
+        principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("tasks:cancel"))],
+        idempotency_key: Annotated[
+            str,
+            Header(alias="Idempotency-Key", min_length=1, max_length=200),
+        ],
+    ) -> TaskView:
+        runtime = required_execution_runtime()
+        scope = principal_scope(principal)
+        try:
+            task = await runtime.cancel_task(
+                scope=scope,
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                occurred_at=datetime.now(UTC),
+            )
+            return await task_view(runtime, scope=scope, task=task)
+        except Exception as exc:
+            raise translate_execution_error(exc) from exc
 
-    @app.get("/v1/tasks/{task_id}/attempts", response_model=None)
+    @app.get("/v1/tasks/{task_id}/attempts", response_model=AttemptListResponse)
     async def list_task_attempts(
         task_id: UUID,
-        _principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("tasks:read"))],
-        _cursor: Annotated[str | None, Query(alias="cursor", max_length=500)] = None,
-        _limit: Annotated[int, Query(alias="limit", ge=1, le=100)] = 50,
-    ) -> None:
-        del task_id, _cursor, _limit
-        not_implemented()
+        principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("tasks:read"))],
+        cursor: Annotated[str | None, Query(alias="cursor", max_length=500)] = None,
+        limit: Annotated[int, Query(alias="limit", ge=1, le=100)] = 50,
+    ) -> AttemptListResponse:
+        runtime = required_execution_runtime()
+        scope = principal_scope(principal)
+        try:
+            page = await runtime.list_task_attempts(
+                scope=scope,
+                task_id=task_id,
+                cursor=cursor,
+                limit=limit,
+            )
+            items = [
+                await attempt_view(runtime, scope=scope, attempt=item)
+                for item in page.items
+            ]
+        except Exception as exc:
+            raise translate_execution_error(exc) from exc
+        return AttemptListResponse(items=items, next_cursor=page.next_cursor)
 
-    @app.get("/v1/tasks/{task_id}/attempts/{attempt_id}/exchanges", response_model=None)
+    @app.get(
+        "/v1/tasks/{task_id}/attempts/{attempt_id}/exchanges",
+        response_model=ExchangeListResponse,
+    )
     async def list_attempt_exchanges(
         task_id: UUID,
         attempt_id: UUID,
-        _principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("tasks:read"))],
-    ) -> None:
-        del task_id, attempt_id
-        not_implemented()
+        principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("tasks:read"))],
+    ) -> ExchangeListResponse:
+        runtime = required_execution_runtime()
+        try:
+            evidence = await runtime.list_attempt_exchanges(
+                scope=principal_scope(principal),
+                task_id=task_id,
+                attempt_id=attempt_id,
+            )
+        except Exception as exc:
+            raise translate_execution_error(exc) from exc
+        return ExchangeListResponse(
+            items=[
+                ExchangeEvidenceView(
+                    exchange_id=item.exchange_id,
+                    attempt_id=item.attempt_id,
+                    provider=ProviderIdentityView(
+                        provider_id=item.provider_id,
+                        provider_name=item.provider_name,
+                    ),
+                    operation=item.operation,
+                    status=item.status,
+                    status_label=item.status_label,
+                    request_evidence=SanitizedEvidenceView(
+                        media_type=item.request_evidence.media_type,
+                        sanitized_raw_body=item.request_evidence.sanitized_raw_body,
+                        sanitized_sha256=item.request_evidence.sanitized_sha256,
+                        truncated=item.request_evidence.truncated,
+                    ),
+                    response_evidence=(
+                        None
+                        if item.response_evidence is None
+                        else SanitizedEvidenceView(
+                            media_type=item.response_evidence.media_type,
+                            sanitized_raw_body=item.response_evidence.sanitized_raw_body,
+                            sanitized_sha256=item.response_evidence.sanitized_sha256,
+                            truncated=item.response_evidence.truncated,
+                        )
+                    ),
+                )
+                for item in evidence
+            ]
+        )
 
     @app.post("/v1/estimates", response_model=EstimateResponse)
     async def create_estimate(
@@ -568,19 +857,47 @@ def create_app(
             raise ApiError(404, "NOT_FOUND", "Credential was not found.") from exc
         return credential_metadata_view(result.credential)
 
-    @app.get("/v1/providers", response_model=None)
+    @app.get("/v1/providers", response_model=list[ProviderPublicView])
     async def list_providers(
-        _principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("catalog:read"))],
-    ) -> None:
-        not_implemented()
+        principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("catalog:read"))],
+    ) -> list[ProviderPublicView]:
+        runtime = required_execution_runtime()
+        try:
+            items = await runtime.list_providers(scope=principal_scope(principal))
+        except Exception as exc:
+            raise translate_execution_error(exc) from exc
+        return [
+            ProviderPublicView(
+                provider_id=item.provider_id,
+                provider_name=item.provider_name,
+                capabilities=list(item.capabilities),
+            )
+            for item in items
+        ]
 
-    @app.get("/v1/models", response_model=None)
+    @app.get("/v1/models", response_model=list[ModelPublicView])
     async def list_models(
-        _principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("catalog:read"))],
-        _provider_id: Annotated[str | None, Query(alias="provider_id", max_length=100)] = None,
-    ) -> None:
-        del _provider_id
-        not_implemented()
+        principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("catalog:read"))],
+        provider_id: Annotated[str | None, Query(alias="provider_id", max_length=100)] = None,
+    ) -> list[ModelPublicView]:
+        runtime = required_execution_runtime()
+        try:
+            items = await runtime.list_models(
+                scope=principal_scope(principal),
+                provider_id=provider_id,
+            )
+        except Exception as exc:
+            raise translate_execution_error(exc) from exc
+        return [
+            ModelPublicView(
+                provider_id=item.provider_id,
+                model_id=item.model_id,
+                model_name=item.model_name,
+                capabilities=list(item.capabilities),
+                reasoning_profiles=list(item.reasoning_profiles),
+            )
+            for item in items
+        ]
 
     @app.get("/health/live", include_in_schema=False)
     async def health_live() -> dict[str, str]:

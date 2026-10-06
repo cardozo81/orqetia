@@ -169,3 +169,124 @@ class UsagePageResponse(StrictModel):
     items: list[UsageItemView]
     next_cursor: str | None = None
     as_of: datetime | None = None
+
+
+
+class TargetView(StrictModel):
+    provider_id: str = Field(min_length=1, max_length=100)
+    model_id: str = Field(min_length=1, max_length=200)
+    reasoning_profile: str = Field(min_length=1, max_length=100)
+
+
+class AttemptSummaryView(StrictModel):
+    attempt_id: UUID
+    operation: str
+    provider_id: str
+    model_id: str
+    status: str
+
+
+class SessionView(StrictModel):
+    session_id: UUID
+    status: Literal["ACTIVE", "EXPIRED", "CANCELLED", "CLOSED"]
+    policy_version_id: UUID
+    created_at: datetime
+    updated_at: datetime
+    expires_at: datetime | None = None
+
+
+class TaskView(StrictModel):
+    task_id: UUID
+    session_id: UUID
+    operation: str
+    status: Literal[
+        "CREATED",
+        "QUEUED",
+        "RUNNING",
+        "PARTIAL",
+        "COMPLETE",
+        "UNAVAILABLE",
+        "FAILED",
+        "CANCELLING",
+        "CANCELLED",
+    ]
+    requested_execution_mode: Literal["AUTO", "EXPLICIT_TARGET"]
+    requested_target: TargetView | None = None
+    effective_target: TargetView | None = None
+    attempts: list[AttemptSummaryView] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+    terminal_at: datetime | None = None
+
+
+class TaskResultView(StrictModel):
+    task_id: UUID
+    status: str
+    result: dict[str, Any]
+    accepted: list[str] = Field(default_factory=list)
+    missing: list[str] = Field(default_factory=list)
+    attempt_ids: list[UUID] = Field(default_factory=list)
+
+
+class ProviderIdentityView(StrictModel):
+    provider_id: str = Field(min_length=1, max_length=100)
+    provider_name: str = Field(min_length=1, max_length=200)
+
+
+class AttemptView(StrictModel):
+    attempt_id: UUID
+    operation: str
+    task_id: UUID | None = None
+    session_id: UUID | None = None
+    provider: ProviderIdentityView
+    model_id: str = Field(min_length=1, max_length=200)
+    reasoning_profile: str | None = Field(default=None, max_length=100)
+    status: str
+    cycle: int | None = Field(default=None, ge=1)
+    attempt_index: int | None = Field(default=None, ge=1)
+    retry_of_attempt_id: UUID | None = None
+    fallback_from_attempt_id: UUID | None = None
+    usage: TechnicalUsageView = Field(default_factory=TechnicalUsageView)
+    started_at: datetime
+    finished_at: datetime | None = None
+
+
+class AttemptListResponse(StrictModel):
+    items: list[AttemptView]
+    next_cursor: str | None = None
+
+
+class SanitizedEvidenceView(StrictModel):
+    media_type: str = Field(min_length=1, max_length=200)
+    sanitized_raw_body: str
+    sanitized_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    truncated: bool
+
+
+class ExchangeEvidenceView(StrictModel):
+    exchange_id: UUID
+    attempt_id: UUID
+    provider: ProviderIdentityView
+    operation: str
+    status: str | None = None
+    status_label: str | None = None
+    request_evidence: SanitizedEvidenceView
+    response_evidence: SanitizedEvidenceView | None = None
+
+
+class ExchangeListResponse(StrictModel):
+    items: list[ExchangeEvidenceView]
+
+
+class ProviderPublicView(StrictModel):
+    provider_id: str
+    provider_name: str
+    capabilities: list[str]
+
+
+class ModelPublicView(StrictModel):
+    provider_id: str
+    model_id: str
+    model_name: str
+    capabilities: list[str]
+    reasoning_profiles: list[str]

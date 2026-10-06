@@ -137,6 +137,14 @@ class ProviderAttemptStore(Protocol):
     ) -> ProviderAttempt | None:
         """Read an attempt only through tenant/client ownership."""
 
+    async def list_for_task(
+        self,
+        *,
+        scope: OwnershipScope,
+        task_id: UUID,
+    ) -> tuple[ProviderAttempt, ...]:
+        """List attempts for one owned task in deterministic execution order."""
+
     async def claim_dispatch(
         self,
         *,

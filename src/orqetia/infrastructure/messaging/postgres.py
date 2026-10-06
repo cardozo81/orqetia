@@ -89,29 +89,32 @@ class PostgresWorkQueue(WorkQueuePort):
         self._sessions = session_factory
 
     async def enqueue(self, item: WorkItem) -> None:
-        async with self._sessions.begin() as session:
-            await session.execute(
-                sa.insert(work_items).values(
-                    work_id=item.work_id,
-                    queue_name=item.queue_name.value,
-                    operation_type=item.operation_type,
-                    operation_version=item.operation_version,
-                    tenant_id=item.tenant_id,
-                    client_id=item.client_id,
-                    resource_type=item.resource_type,
-                    resource_id=item.resource_id,
-                    data_classification=item.data_classification.value,
-                    payload=dict(item.payload),
-                    priority=item.priority,
-                    state=WorkState.READY.value,
-                    available_at=item.available_at,
-                    max_infrastructure_attempts=item.max_infrastructure_attempts,
-                    correlation_id=item.correlation_id,
-                    causation_id=item.causation_id,
-                    trace_id=item.trace_id,
-                    logical_operation_id=item.logical_operation_id,
-                )
+        statement = (
+            pg_insert(work_items)
+            .values(
+                work_id=item.work_id,
+                queue_name=item.queue_name.value,
+                operation_type=item.operation_type,
+                operation_version=item.operation_version,
+                tenant_id=item.tenant_id,
+                client_id=item.client_id,
+                resource_type=item.resource_type,
+                resource_id=item.resource_id,
+                data_classification=item.data_classification.value,
+                payload=dict(item.payload),
+                priority=item.priority,
+                state=WorkState.READY.value,
+                available_at=item.available_at,
+                max_infrastructure_attempts=item.max_infrastructure_attempts,
+                correlation_id=item.correlation_id,
+                causation_id=item.causation_id,
+                trace_id=item.trace_id,
+                logical_operation_id=item.logical_operation_id,
             )
+            .on_conflict_do_nothing(index_elements=["work_id"])
+        )
+        async with self._sessions.begin() as session:
+            await session.execute(statement)
 
     async def claim(
         self,

@@ -1,6 +1,14 @@
 """Execution bounded-context contracts and PostgreSQL adapters."""
 
 from .attempt_postgres import PostgresProviderAttemptStore
+from .client_api_idempotency import (
+    ClientApiIdempotencyConflict,
+    ClientApiIdempotencyJournal,
+    ClientApiIdempotencyReservation,
+    InMemoryClientApiIdempotencyJournal,
+)
+from .client_api_postgres import PostgresClientApiIdempotencyJournal
+from .client_api_tables import client_api_idempotency
 from .attempt_tables import attempt_metadata, provider_attempts
 from .attempts import (
     DispatchAction,
@@ -59,9 +67,13 @@ __all__ = [
     "AttemptObservation",
     "AttemptObservationStatus",
     "CanonicalOrchestrationPolicyEngine",
+    "ClientApiIdempotencyConflict",
+    "ClientApiIdempotencyJournal",
+    "ClientApiIdempotencyReservation",
     "DispatchAction",
     "DispatchClaim",
     "ExecutionMode",
+    "InMemoryClientApiIdempotencyJournal",
     "ExecutionSession",
     "ExecutionSessionStore",
     "ExecutionTargetSnapshot",
@@ -73,6 +85,7 @@ __all__ = [
     "OrchestrationDisposition",
     "OrchestrationPolicy",
     "OwnershipScope",
+    "PostgresClientApiIdempotencyJournal",
     "PostgresExecutionSessionStore",
     "PostgresExecutionTaskStore",
     "PostgresProviderAttemptStore",
@@ -92,6 +105,7 @@ __all__ = [
     "TaskStatus",
     "VALID_TRANSITIONS",
     "attempt_metadata",
+    "client_api_idempotency",
     "execution_metadata",
     "execution_sessions",
     "provider_attempts",

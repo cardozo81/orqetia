@@ -215,6 +215,30 @@ class PostgresProviderAttemptStore:
             row = (await database.execute(statement)).mappings().one_or_none()
         return None if row is None else _attempt_from_row(row)
 
+    async def list_for_task(
+        self,
+        *,
+        scope: OwnershipScope,
+        task_id: UUID,
+    ) -> tuple[ProviderAttempt, ...]:
+        statement = (
+            sa.select(provider_attempts)
+            .where(
+                provider_attempts.c.task_id == task_id,
+                provider_attempts.c.tenant_id == scope.tenant_id,
+                provider_attempts.c.client_id == scope.client_id,
+            )
+            .order_by(
+                provider_attempts.c.cycle,
+                provider_attempts.c.attempt_index,
+                provider_attempts.c.created_at,
+                provider_attempts.c.attempt_id,
+            )
+        )
+        async with self._sessions() as database:
+            rows = (await database.execute(statement)).mappings().all()
+        return tuple(_attempt_from_row(row) for row in rows)
+
     async def claim_dispatch(
         self,
         *,

@@ -77,12 +77,15 @@ async def request(
     token: str | None = "synthetic-token",
     json_body: object | None = None,
     correlation_id: str | None = None,
+    idempotency_key: str | None = None,
 ) -> httpx.Response:
     headers: dict[str, str] = {}
     if token is not None:
         headers["Authorization"] = f"Bearer {token}"
     if correlation_id is not None:
         headers["X-Correlation-ID"] = correlation_id
+    if idempotency_key is not None:
+        headers["Idempotency-Key"] = idempotency_key
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
@@ -100,7 +103,7 @@ class FastApiShellTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), CANONICAL)
 
-    def test_authenticated_route_returns_not_implemented_not_fake_success(self) -> None:
+    def test_execution_route_requires_configured_runtime_not_stub(self) -> None:
         app = create_app(openapi_document=CANONICAL, authenticator=FakeAuthenticator())
         response = asyncio.run(
             request(
@@ -109,10 +112,12 @@ class FastApiShellTests(unittest.TestCase):
                 "/v1/sessions",
                 json_body={},
                 correlation_id="client-correlation-1",
+                idempotency_key="session-key",
             )
         )
-        self.assertEqual(response.status_code, 501)
-        self.assertEqual(response.json()["code"], "NOT_IMPLEMENTED")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["code"], "EXECUTION_RUNTIME_UNAVAILABLE")
+        self.assertNotEqual(response.json()["code"], "NOT_IMPLEMENTED")
         self.assertEqual(response.json()["correlation_id"], "client-correlation-1")
         self.assertEqual(response.headers["x-correlation-id"], "client-correlation-1")
 
@@ -160,7 +165,7 @@ class FastApiShellTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["code"], "FORBIDDEN")
 
-    def test_auto_task_creation_with_base_scope_reaches_stub(self) -> None:
+    def test_auto_task_creation_with_base_scope_requires_runtime(self) -> None:
         app = create_app(
             openapi_document=CANONICAL,
             authenticator=FakeAuthenticator(frozenset({"tasks:write"})),
@@ -172,9 +177,11 @@ class FastApiShellTests(unittest.TestCase):
                 "POST",
                 f"/v1/sessions/{session_id}/tasks",
                 json_body={"operation": "TASK_EXECUTION", "input": {}},
+                idempotency_key="task-key",
             )
         )
-        self.assertEqual(response.status_code, 501)
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["code"], "EXECUTION_RUNTIME_UNAVAILABLE")
 
     def test_validation_error_does_not_echo_sensitive_value(self) -> None:
         app = create_app(openapi_document=CANONICAL, authenticator=FakeAuthenticator())
@@ -200,7 +207,8 @@ class FastApiShellTests(unittest.TestCase):
                 correlation_id="contains spaces and is invalid",
             )
         )
-        self.assertEqual(response.status_code, 501)
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["code"], "EXECUTION_RUNTIME_UNAVAILABLE")
         returned = response.headers["x-correlation-id"]
         self.assertNotEqual(returned, "contains spaces and is invalid")
         UUID(returned)
