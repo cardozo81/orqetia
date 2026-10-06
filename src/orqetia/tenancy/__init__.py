@@ -1,5 +1,32 @@
-"""tenancy bounded-context package.
+"""Identity & Tenancy administrative lifecycle contracts."""
 
-This package is intentionally a scaffold only in Phase 1. Business behavior is
-introduced through its owning implementation issues.
-"""
+from .admin import (
+    ActiveOwner,
+    AdministrativeStatus,
+    InMemoryTenantClientRepository,
+    InMemoryTenancyAuditSink,
+    ServiceClientRecord,
+    TenantClientRepository,
+    TenantRecord,
+    TenancyAdminService,
+    TenancyAuditEvent,
+    TenancyAuditSink,
+)
+from .postgres import PostgresTenantClientRepository
+from .tables import service_clients, tenants
+
+__all__ = [
+    "ActiveOwner",
+    "AdministrativeStatus",
+    "InMemoryTenantClientRepository",
+    "InMemoryTenancyAuditSink",
+    "PostgresTenantClientRepository",
+    "ServiceClientRecord",
+    "TenantClientRepository",
+    "TenantRecord",
+    "TenancyAdminService",
+    "TenancyAuditEvent",
+    "TenancyAuditSink",
+    "service_clients",
+    "tenants",
+]
