@@ -45,3 +45,4 @@ jobs:
           uv run --no-sync --python 3.14 pytest -q
           tests/api/test_fastapi_shell.py
           tests/api/test_client_execution_runtime.py
+          tests/infrastructure/test_postgres_client_artifacts.py

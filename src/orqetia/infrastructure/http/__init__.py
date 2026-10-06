@@ -1,9 +1,10 @@
 """FastAPI transport adapter for the client-facing ORQETIA API."""
 
+from orqetia.execution import ClientExchangeEvidence, SanitizedEvidenceRecord
+
 from .app import create_app
 from .execution_runtime import (
     BaselineOperationRequirementResolver,
-    ClientExchangeEvidence,
     ClientExecutionArtifactUnavailable,
     ClientExecutionConflict,
     ClientExecutionForbidden,
@@ -14,7 +15,6 @@ from .execution_runtime import (
     ClientRequestedTarget,
     ClientTaskResult,
     InMemoryClientExecutionArtifacts,
-    SanitizedEvidenceRecord,
 )
 from .models import (
     ErrorEnvelope,
@@ -37,10 +37,10 @@ __all__ = [
     "ClientRequestedTarget",
     "ClientTaskResult",
     "ErrorEnvelope",
-    "InMemoryClientExecutionArtifacts",
-    "SanitizedEvidenceRecord",
     "EstimateRequest",
     "EstimateResponse",
+    "InMemoryClientExecutionArtifacts",
+    "SanitizedEvidenceRecord",
     "SessionCreateRequest",
     "TaskCreateRequest",
     "create_app",
