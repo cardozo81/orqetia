@@ -202,6 +202,8 @@ class AccountingDimensions:
     reasoning_profile: str
     fragment_id: str = "primary"
     client_credential_id: UUID | None = None
+    provider_account_id: UUID | None = None
+    provider_credential_id: UUID | None = None
     session_id: UUID | None = None
     task_id: UUID | None = None
 
