@@ -97,7 +97,9 @@ never silently rewritten.
 
 Machine-readable event schemas belong under
 `contracts/events/<event-type>/v<event_version>.schema.json` when a concrete
-event type is implemented. The common envelope is versioned separately.
+event type is implemented. The common envelope is versioned separately at
+`contracts/events/envelope/v1.schema.json` and is checked for parity with the
+runtime `EventEnvelope`.
 
 ## Alembic expand/contract
 

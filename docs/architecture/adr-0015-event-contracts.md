@@ -127,11 +127,16 @@ An old persisted event payload is never silently rewritten to match a new schema
 
 ## Contract source
 
-Phase 1 stores machine-readable JSON Schema contracts under a versioned repository path such as:
+The common broker-neutral envelope is machine-readable at:
 
-    contracts/events/<event_type>/v<event_version>.json
+    contracts/events/envelope/v1.schema.json
+
+Concrete event payload contracts use versioned repository paths:
+
+    contracts/events/<event_type>/v<event_version>.schema.json
 
 Generated language models may exist, but JSON Schema/contract tests remain the compatibility boundary.
+Envelope and payload compatibility are governed by ADR-0042 / #155.
 
 AsyncAPI documentation may be generated later if it adds value; it is not required to choose a broker.
 

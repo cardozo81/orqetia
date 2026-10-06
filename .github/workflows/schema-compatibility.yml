@@ -7,10 +7,16 @@ on:
       - contracts/openapi/**
       - contracts/execution/**
       - contracts/compatibility/**
+      - contracts/events/**
+      - src/orqetia/shared/messaging.py
+      - contracts/events/**
+      - src/orqetia/shared/messaging.py
       - scripts/schema_compatibility_check.py
       - docs/architecture/adr-0042-schema-evolution-v1.md
       - docs/api/client-api-v1-manual.md
       - tests/contracts/test_schema_compatibility.py
+      - tests/contracts/test_event_envelope_schema.py
+      - tests/contracts/test_event_envelope_schema.py
       - .github/workflows/schema-compatibility.yml
   push:
     branches: [main]
@@ -51,7 +57,10 @@ jobs:
         run: uv sync --locked --python 3.14
 
       - name: Compatibility fixtures
-        run: uv run --no-sync --python 3.14 pytest -q tests/contracts/test_schema_compatibility.py
+        run: >-
+          uv run --no-sync --python 3.14 pytest -q
+          tests/contracts/test_schema_compatibility.py
+          tests/contracts/test_event_envelope_schema.py
 
       - name: Compare public contracts with base revision
         shell: bash
@@ -88,6 +97,8 @@ jobs:
             "contracts/openapi/orqetia-v1.openapi.json"
           compare_contract "task-execution-selection" "json-schema" \
             "contracts/execution/task-execution-selection.schema.json"
+          compare_contract "event-envelope-v1" "json-schema" \
+            "contracts/events/envelope/v1.schema.json"
 
           if ! git diff --quiet "${BASE_SHA}" HEAD -- \
             contracts/openapi/orqetia-v1.openapi.json \
