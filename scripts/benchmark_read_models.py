@@ -19,20 +19,16 @@ from orqetia.read_models import (
 )
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--size", type=int, default=10_000)
-    parser.add_argument("--max-seconds", type=float, default=10.0)
-    args = parser.parse_args()
-    if args.size < 1 or args.max_seconds <= 0:
-        raise SystemExit("size/max-seconds must be positive")
+def benchmark_read_models(*, size: int) -> float:
+    if size < 1:
+        raise ValueError("size must be positive")
 
     now = datetime.now(UTC)
     tenant_id, client_id = uuid7(), uuid7()
     cache = InMemoryReadModelCache()
     documents = []
     started = perf_counter()
-    for index in range(args.size):
+    for index in range(size):
         identity = ProjectionIdentity(
             surface=ReadSurface.USAGE_SUMMARY,
             audience=ReadAudience.CLIENT,
@@ -64,9 +60,21 @@ def main() -> int:
         page_size=100,
         query_fingerprint="synthetic-page",
     )
-    if len(page.items) != min(100, args.size):
+    if len(page.items) != min(100, size):
         raise RuntimeError("synthetic page size mismatch")
     elapsed = perf_counter() - started
+    return elapsed
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--size", type=int, default=10_000)
+    parser.add_argument("--max-seconds", type=float, default=10.0)
+    args = parser.parse_args()
+    if args.size < 1 or args.max_seconds <= 0:
+        raise SystemExit("size/max-seconds must be positive")
+
+    elapsed = benchmark_read_models(size=args.size)
     print(f"read_model_benchmark size={args.size} elapsed_seconds={elapsed:.6f}")
     if elapsed > args.max_seconds:
         raise SystemExit(
