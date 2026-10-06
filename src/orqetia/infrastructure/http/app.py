@@ -41,12 +41,19 @@ from orqetia.identity.authentication import (
 from orqetia.infrastructure.health import ReadinessProbe
 from orqetia.read_models import BoundedReadExceeded, ClientUsageReportService
 
+from .abuse import (
+    InMemoryApiAbuseController,
+    TechnicalAbuseRejected,
+    classify_route,
+    validate_request_body,
+)
 from .execution_runtime import (
     ClientExecutionArtifactUnavailable,
     ClientExecutionConflict,
     ClientExecutionForbidden,
     ClientExecutionNotFound,
     ClientExecutionRuntime,
+    ClientExecutionRuntimeError,
     ClientRequestedTarget,
 )
 from .models import (
@@ -109,8 +116,11 @@ def create_app(
     client_credential_service: ClientAccessCredentialService | None = None,
     client_usage_service: ClientUsageReportService | None = None,
     execution_runtime: ClientExecutionRuntime | None = None,
+    abuse_controller: InMemoryApiAbuseController | None = None,
 ) -> FastAPI:
     """Build the client API shell around the versioned canonical OpenAPI document."""
+
+    technical_abuse = abuse_controller or InMemoryApiAbuseController()
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -171,6 +181,66 @@ def create_app(
             content=envelope.model_dump(mode="json"),
         )
 
+    def abuse_response(
+        request: Request,
+        exc: TechnicalAbuseRejected,
+    ) -> JSONResponse:
+        response = error_response(
+            request,
+            status_code=exc.status_code,
+            code=exc.code,
+            message="Request rejected by technical abuse controls.",
+        )
+        if exc.retry_after_seconds is not None:
+            response.headers["Retry-After"] = str(exc.retry_after_seconds)
+        return response
+
+    @app.middleware("http")
+    async def abuse_controls_middleware(request: Request, call_next: Any) -> Any:
+        route_class = classify_route(request.method, request.url.path)
+        if route_class is None:
+            return await call_next(request)
+
+        acquired = False
+        try:
+            await technical_abuse.acquire_request()
+            acquired = True
+            origin = (
+                "unknown"
+                if request.client is None
+                else request.client.host
+            )
+            await technical_abuse.check_rate(
+                identity_key=f"origin:{origin}",
+                route_class=route_class,
+                occurred_at=datetime.now(UTC),
+            )
+            if request.method.upper() in {"POST", "PUT", "PATCH", "DELETE"}:
+                rule = technical_abuse.policy.rule_for(route_class)
+                content_length = request.headers.get("content-length")
+                if content_length is not None:
+                    try:
+                        declared = int(content_length)
+                    except ValueError:
+                        declared = 0
+                    if declared > rule.max_body_bytes:
+                        raise TechnicalAbuseRejected(
+                            status_code=413,
+                            code="REQUEST_BODY_TOO_LARGE",
+                        )
+                body = await request.body()
+                validate_request_body(
+                    rule=rule,
+                    body=body,
+                    content_type=request.headers.get("content-type", ""),
+                )
+            return await call_next(request)
+        except TechnicalAbuseRejected as exc:
+            return abuse_response(request, exc)
+        finally:
+            if acquired:
+                await technical_abuse.release_request()
+
     @app.middleware("http")
     async def security_headers_middleware(request: Request, call_next: Any) -> Any:
         response = await call_next(request)
@@ -194,6 +264,13 @@ def create_app(
         response = await call_next(request)
         response.headers["X-Correlation-ID"] = request.state.correlation_id
         return response
+
+    @app.exception_handler(TechnicalAbuseRejected)
+    async def handle_abuse_rejection(
+        request: Request,
+        exc: TechnicalAbuseRejected,
+    ) -> JSONResponse:
+        return abuse_response(request, exc)
 
     @app.exception_handler(ApiError)
     async def handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
@@ -247,6 +324,7 @@ def create_app(
         )
 
     async def current_principal(
+        request: Request,
         authorization: Annotated[str | None, Header(alias="Authorization")] = None,
     ) -> AuthenticatedPrincipal:
         if authorization is None:
@@ -257,7 +335,7 @@ def create_app(
             raise ApiError(401, "AUTHENTICATION_REQUIRED", "Authentication is required.")
 
         try:
-            return await authenticator.authenticate_bearer(token.strip())
+            principal = await authenticator.authenticate_bearer(token.strip())
         except AuthenticationRejected as exc:
             raise ApiError(401, "AUTHENTICATION_REJECTED", "Authentication was rejected.") from exc
         except AuthenticationBackendUnavailable as exc:
@@ -266,6 +344,18 @@ def create_app(
                 "AUTHENTICATION_UNAVAILABLE",
                 "Authentication service is unavailable.",
             ) from exc
+
+        route_class = classify_route(request.method, request.url.path)
+        if route_class is not None:
+            await technical_abuse.check_rate(
+                identity_key=(
+                    f"principal:{principal.subject_type}:{principal.subject_id}:"
+                    f"{principal.tenant_id or '-'}:{principal.client_id or '-'}"
+                ),
+                route_class=route_class,
+                occurred_at=datetime.now(UTC),
+            )
+        return principal
 
     def require_scopes(*required: str) -> Any:
         async def dependency(
@@ -507,6 +597,15 @@ def create_app(
             )
         runtime = required_execution_runtime()
         scope = principal_scope(principal)
+        try:
+            ready_depth = await runtime.submission_queue_depth()
+        except ClientExecutionRuntimeError as exc:
+            raise ApiError(
+                503,
+                "BACKPRESSURE_PROBE_UNAVAILABLE",
+                "Execution queue backpressure status is unavailable.",
+            ) from exc
+        await technical_abuse.check_queue_depth(ready_depth=ready_depth)
         try:
             task = await runtime.create_task(
                 scope=scope,

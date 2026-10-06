@@ -45,7 +45,7 @@ from orqetia.providers import (
     ProviderSpec,
     ReasoningProfileSpec,
 )
-from orqetia.shared.messaging import WorkItem
+from orqetia.shared.messaging import QueueName, WorkItem
 
 ROOT = Path(__file__).resolve().parents[2]
 CANONICAL = json.loads(
@@ -233,6 +233,11 @@ class FakeAttemptStore:
 class FakeWorkQueue:
     def __init__(self) -> None:
         self.items: dict[UUID, WorkItem] = {}
+        self.reported_depth = 0
+
+    async def ready_depth(self, queue_name: QueueName) -> int:
+        assert queue_name is QueueName.EXECUTION
+        return self.reported_depth
 
     async def enqueue(self, item: WorkItem) -> None:
         self.items.setdefault(item.work_id, item)
@@ -688,3 +693,35 @@ async def test_attempt_cursor_is_bound_to_task_query() -> None:
     )
     assert misuse.status_code == 400
     assert misuse.json()["code"] == "INVALID_REQUEST"
+
+
+@pytest.mark.asyncio
+async def test_task_submission_rejects_when_execution_queue_is_saturated() -> None:
+    runtime, _sessions, _tasks, _attempts, _artifacts, queue = _runtime()
+    queue.reported_depth = 10_000
+    app = create_app(
+        openapi_document=CANONICAL,
+        authenticator=FakeAuthenticator(),
+        execution_runtime=runtime,
+    )
+    session = await _request(
+        app,
+        "POST",
+        "/v1/sessions",
+        body={},
+        key="session-backpressure",
+    )
+    assert session.status_code == 201
+    session_id = UUID(session.json()["session_id"])
+
+    rejected = await _request(
+        app,
+        "POST",
+        f"/v1/sessions/{session_id}/tasks",
+        body={"operation": "TASK_EXECUTION", "input": {"message": "blocked"}},
+        key="task-backpressure",
+    )
+    assert rejected.status_code == 429
+    assert rejected.json()["code"] == "QUEUE_BACKPRESSURE"
+    assert rejected.headers["retry-after"] == "5"
+    assert queue.items == {}
