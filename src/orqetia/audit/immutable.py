@@ -215,6 +215,7 @@ def verify_event_integrity(event: ImmutableAuditEvent) -> bool:
 def build_immutable_audit_event(
     *,
     audit_class: AuditClass,
+    event_id: UUID | None = None,
     action: str,
     result: str,
     correlation_id: str,
@@ -228,10 +229,10 @@ def build_immutable_audit_event(
     resource_type: str | None = None,
     resource_id: str | None = None,
 ) -> ImmutableAuditEvent:
-    event_id = uuid7()
+    resolved_event_id = uuid7() if event_id is None else event_id
     retain_until = occurred_at + policy.retention_for(audit_class)
     provisional = ImmutableAuditEvent(
-        event_id=event_id,
+        event_id=resolved_event_id,
         audit_class=audit_class,
         action=action,
         result=result,

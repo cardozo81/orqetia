@@ -6,6 +6,7 @@ on:
     paths:
       - src/orqetia/audit/**
       - migrations/versions/20261006_0031_immutable_audit.py
+      - migrations/versions/20261006_0032_customer_activity_ledger.py
       - docs/security/audit-retention-integrity.md
       - tests/audit/test_immutable_audit.py
       - .github/workflows/audit-integrity.yml
@@ -14,6 +15,7 @@ on:
     paths:
       - src/orqetia/audit/**
       - migrations/versions/20261006_0031_immutable_audit.py
+      - migrations/versions/20261006_0032_customer_activity_ledger.py
       - docs/security/audit-retention-integrity.md
       - tests/audit/test_immutable_audit.py
       - .github/workflows/audit-integrity.yml

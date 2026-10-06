@@ -10,7 +10,9 @@ from sqlalchemy.exc import DBAPIError
 
 from orqetia.audit import (
     AuditClass,
+    CustomerActivityEvent,
     DEVELOPMENT_AUDIT_RETENTION_POLICY_V1,
+    PostgresCustomerActivityStore,
     PostgresImmutableAuditStore,
     build_immutable_audit_event,
 )
@@ -47,9 +49,6 @@ async def test_audit_is_append_only_and_integrity_is_reconciled() -> None:
     )
 
     try:
-        async with engine.begin() as connection:
-            await connection.execute(sa.text("TRUNCATE audit.audit_events"))
-
         await store.record(event)
         assert await store.find_integrity_failures(limit=100) == ()
 
@@ -75,6 +74,44 @@ async def test_audit_is_append_only_and_integrity_is_reconciled() -> None:
                 )
                 await session.commit()
             await session.rollback()
+
+        async with factory() as session:
+            with pytest.raises(DBAPIError):
+                await session.execute(sa.text("TRUNCATE audit.audit_events"))
+                await session.commit()
+            await session.rollback()
+
+        activity_store = PostgresCustomerActivityStore(factory)
+        activity_id = uuid7()
+        identity_id = uuid7()
+        membership_id = uuid7()
+        await activity_store.record(
+            CustomerActivityEvent(
+                event_id=activity_id,
+                tenant_id=tenant_id,
+                client_id=client_id,
+                identity_id=identity_id,
+                membership_id=membership_id,
+                action="TASK_CREATE",
+                result="SUCCESS",
+                occurred_at=NOW,
+                correlation_id="corr-client-activity",
+                resource_type="task",
+                resource_id=str(uuid7()),
+            )
+        )
+        activities = await activity_store.list_owned(
+            tenant_id=tenant_id,
+            client_id=client_id,
+            limit=100,
+        )
+        assert any(
+            item.event_id == activity_id
+            and item.identity_id == identity_id
+            and item.membership_id == membership_id
+            and item.correlation_id == "corr-client-activity"
+            for item in activities
+        )
 
         forged_id = uuid7()
         async with engine.begin() as connection:

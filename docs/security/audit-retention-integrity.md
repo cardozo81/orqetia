@@ -60,3 +60,15 @@ Never copy:
 
 Every canonical event requires a correlation id and both `occurred_at` and
 `recorded_at`. Ordering is deterministic by occurred_at + UUIDv7 event id.
+
+
+## Client Activity convergence
+
+Migration `20261006_0032` moves existing Customer Portal activity rows into the
+canonical immutable ledger using their original event id and a synthetic legacy
+correlation id equal to that event id. The compatibility table is emptied and no
+longer receives application writes.
+
+New Portal activity uses the canonical ledger directly and preserves
+identity+membership provenance in the bounded actor identifier. Both the ledger
+and compatibility table reject UPDATE, DELETE and TRUNCATE.

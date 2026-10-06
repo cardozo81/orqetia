@@ -23,6 +23,7 @@ class CustomerActivityEvent:
     action: str
     result: str
     occurred_at: datetime
+    correlation_id: str | None = None
     resource_type: str | None = None
     resource_id: str | None = None
 
@@ -31,6 +32,10 @@ class CustomerActivityEvent:
             raise ValueError("activity action must contain 1..100 characters")
         if self.result not in {"SUCCESS", "DENIED"}:
             raise ValueError("activity result must be SUCCESS or DENIED")
+        if self.correlation_id is not None and (
+            not self.correlation_id.strip() or len(self.correlation_id) > 200
+        ):
+            raise ValueError("correlation_id must contain 1..200 characters")
         for field, value, maximum in (
             ("resource_type", self.resource_type, 100),
             ("resource_id", self.resource_id, 500),
@@ -92,6 +97,7 @@ def activity_event(
     membership_id: UUID,
     action: str,
     occurred_at: datetime,
+    correlation_id: str | None = None,
     resource_type: str | None = None,
     resource_id: str | None = None,
 ) -> CustomerActivityEvent:
@@ -104,6 +110,7 @@ def activity_event(
         action=action,
         result="SUCCESS",
         occurred_at=occurred_at,
+        correlation_id=correlation_id,
         resource_type=resource_type,
         resource_id=resource_id,
     )
