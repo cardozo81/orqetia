@@ -1,5 +1,10 @@
 """Long-running process infrastructure for ORQETIA composition roots."""
 
+from .attempt_accounting import (
+    AttemptAccountingObserver,
+    PricingCatalogVersionLookup,
+    provider_usage_to_technical,
+)
 from .orchestration_candidates import ControlPlaneOrchestrationCandidateResolver
 from .provider_attempts import (
     PROVIDER_ATTEMPT_OPERATION,
@@ -32,7 +37,9 @@ __all__ = [
     "PROVIDER_ATTEMPT_OPERATION_VERSION",
     "TASK_ORCHESTRATION_OPERATION",
     "TASK_ORCHESTRATION_OPERATION_VERSION",
+    "AttemptAccountingObserver",
     "ControlPlaneOrchestrationCandidateResolver",
+    "PricingCatalogVersionLookup",
     "HandlerDisposition",
     "HandlerOutcome",
     "HandlerRegistry",
@@ -46,6 +53,7 @@ __all__ = [
     "build_task_orchestration_work_item",
     "install_signal_handlers",
     "provider_attempt_id",
+    "provider_usage_to_technical",
     "provider_dispatch_work_id",
     "task_orchestration_work_id",
 ]

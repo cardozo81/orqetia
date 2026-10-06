@@ -45,6 +45,10 @@ AttemptAdapterResolver = Callable[
 Clock = Callable[[], datetime]
 
 
+class CompletedAttemptObserver(Protocol):
+    async def record(self, attempt: ProviderAttempt) -> None: ...
+
+
 def _utc_now() -> datetime:
     return datetime.now(UTC)
 
@@ -96,6 +100,7 @@ class ProviderAttemptHandler:
         clock: Clock = _utc_now,
         telemetry: EventEmitter | None = None,
         continuation_queue: WorkQueuePort | None = None,
+        completed_observer: CompletedAttemptObserver | None = None,
     ) -> None:
         if infrastructure_retry_delay_seconds < 1:
             raise ValueError("infrastructure_retry_delay_seconds must be >= 1")
@@ -106,6 +111,7 @@ class ProviderAttemptHandler:
         self._clock = clock
         self._telemetry = telemetry or JsonEventEmitter()
         self._continuation_queue = continuation_queue
+        self._completed_observer = completed_observer
 
     async def __call__(self, lease: WorkLease) -> HandlerOutcome:
         if lease.tenant_id is None or lease.client_id is None:
@@ -177,6 +183,11 @@ class ProviderAttemptHandler:
                 DispatchAction.MARKED_AMBIGUOUS,
                 DispatchAction.CANCELLED_BY_TASK,
             }:
+                observed = await self._observe_completed(
+                    claim.attempt,
+                )
+                if observed is not None:
+                    return observed
                 continuation = await self._continue_task(
                     lease,
                     claim.attempt,
@@ -263,6 +274,14 @@ class ProviderAttemptHandler:
             result=result,
             occurred_at=self._clock(),
         )
+        completed = await self._store.get_owned(
+            scope=scope,
+            attempt_id=attempt_id,
+        )
+        if completed is None or completed.status is not ProviderAttemptStatus.COMPLETED:
+            return self._infrastructure_failure(
+                "COMPLETED_ATTEMPT_NOT_DURABLE"
+            )
         self._emit_attempt(
             "provider.dispatch_completed",
             lease,
@@ -275,12 +294,32 @@ class ProviderAttemptHandler:
             total_tokens=result.usage.total_tokens,
             attempt_status="COMPLETED",
         )
-        continuation = await self._continue_task(lease, journal)
+        observed = await self._observe_completed(completed)
+        if observed is not None:
+            return observed
+        continuation = await self._continue_task(lease, completed)
         return (
             HandlerOutcome.complete()
             if continuation is None
             else continuation
         )
+
+    async def _observe_completed(
+        self,
+        attempt: ProviderAttempt,
+    ) -> HandlerOutcome | None:
+        if (
+            self._completed_observer is None
+            or attempt.status is not ProviderAttemptStatus.COMPLETED
+        ):
+            return None
+        try:
+            await self._completed_observer.record(attempt)
+        except Exception as exc:
+            return self._infrastructure_failure(
+                f"ATTEMPT_POSTPROCESS_{type(exc).__name__.upper()}"
+            )
+        return None
 
     async def _resolve(
         self,
