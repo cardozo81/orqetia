@@ -1,0 +1,45 @@
+name: Incident response policy
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - SECURITY.md
+      - docs/security/incident-response.md
+      - docs/runbooks/security-incident.md
+      - tests/security/test_incident_response_docs.py
+      - .github/workflows/incident-response.yml
+  push:
+    branches: [main]
+    paths:
+      - SECURITY.md
+      - docs/security/incident-response.md
+      - docs/runbooks/security-incident.md
+      - tests/security/test_incident_response_docs.py
+      - .github/workflows/incident-response.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: incident-response-main
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned uv bootstrap tool
+        run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+
+      - name: Install locked runtime
+        run: uv sync --locked --no-dev --python 3.14
+
+      - name: Incident response documentation contract
+        run: uv run --no-sync --python 3.14 pytest -q tests/security/test_incident_response_docs.py
