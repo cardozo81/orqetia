@@ -10,6 +10,12 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
 
+from orqetia.execution import (
+    ExecutionTargetSnapshot,
+    OrchestrationCandidate,
+    rank_auto_candidates,
+)
+
 from .benchmarks import BenchmarkBuildResult, BenchmarkSnapshot, ReferenceScope
 
 
@@ -164,6 +170,57 @@ class EstimateTargetResolver(Protocol):
         """Check the same target envelope used by execution authorization."""
 
 
+class CanonicalEstimateTargetResolver:
+    """Reference resolver over already-authorized orchestration candidates."""
+
+    def __init__(
+        self,
+        entries: Mapping[tuple[str, str], tuple[OrchestrationCandidate, ...]],
+    ) -> None:
+        self._entries = dict(entries)
+
+    async def ranked_auto_targets(
+        self,
+        *,
+        subject: EstimateSubject,
+        operation: str,
+    ) -> tuple[EstimateTarget, ...]:
+        del operation
+        candidates = tuple(
+            candidate
+            for candidate in self._entries.get(
+                (subject.tenant_id, subject.client_id),
+                (),
+            )
+            if candidate.eligible
+        )
+        return tuple(
+            _estimate_target(candidate.target)
+            for candidate in rank_auto_candidates(candidates)
+        )
+
+    async def is_authorized(
+        self,
+        *,
+        subject: EstimateSubject,
+        operation: str,
+        target: EstimateTarget,
+    ) -> bool:
+        del operation
+        requested = ExecutionTargetSnapshot(
+            target.provider_id,
+            target.model_id,
+            target.reasoning_profile,
+        )
+        return any(
+            candidate.eligible and candidate.target == requested
+            for candidate in self._entries.get(
+                (subject.tenant_id, subject.client_id),
+                (),
+            )
+        )
+
+
 class EstimateBenchmarkLookup(Protocol):
     async def lookup(
         self,
@@ -237,7 +294,12 @@ class EstimateEngine:
                 target=spec.target,
                 scope=spec.reference_scope,
             )
-            return self._result_or_raise(spec=spec, target=spec.target, lookup=lookup)
+            return self._result_or_raise(
+                subject=subject,
+                spec=spec,
+                target=spec.target,
+                lookup=lookup,
+            )
 
         targets = await self._targets.ranked_auto_targets(
             subject=subject,
@@ -254,7 +316,12 @@ class EstimateEngine:
                 scope=spec.reference_scope,
             )
             if lookup.snapshot is not None:
-                return self._result_or_raise(spec=spec, target=target, lookup=lookup)
+                return self._result_or_raise(
+                    subject=subject,
+                    spec=spec,
+                    target=target,
+                    lookup=lookup,
+                )
             misses.append(lookup)
 
         fallback = next(
@@ -281,6 +348,7 @@ class EstimateEngine:
     def _result_or_raise(
         self,
         *,
+        subject: EstimateSubject,
         spec: EstimateSpec,
         target: EstimateTarget,
         lookup: BenchmarkBuildResult,
@@ -293,6 +361,12 @@ class EstimateEngine:
                 limitations=lookup.limitations,
             )
 
+        _validate_snapshot(
+            subject=subject,
+            spec=spec,
+            target=target,
+            snapshot=snapshot,
+        )
         input_tokens = self._input_tokens.estimate(spec.input_payload)
         return _result_from_snapshot(
             spec=spec,
@@ -350,3 +424,35 @@ def _result_from_snapshot(
         fallback_available=fallback_available,
         limitations=limitations,
     )
+
+
+
+def _estimate_target(target: ExecutionTargetSnapshot) -> EstimateTarget:
+    return EstimateTarget(
+        provider_id=target.provider_id,
+        model_id=target.model_id,
+        reasoning_profile=target.reasoning_profile,
+    )
+
+
+def _validate_snapshot(
+    *,
+    subject: EstimateSubject,
+    spec: EstimateSpec,
+    target: EstimateTarget,
+    snapshot: BenchmarkSnapshot,
+) -> None:
+    if snapshot.scope is not spec.reference_scope:
+        raise EstimateUnavailable("BENCHMARK_SCOPE_MISMATCH")
+    key = snapshot.feature_key
+    if (
+        key.provider_id != target.provider_id
+        or key.model_id != target.model_id
+        or key.reasoning_profile != target.reasoning_profile
+    ):
+        raise EstimateUnavailable("BENCHMARK_TARGET_MISMATCH")
+    if snapshot.scope is ReferenceScope.CLIENT_ONLY and (
+        str(snapshot.tenant_id) != subject.tenant_id
+        or str(snapshot.client_id) != subject.client_id
+    ):
+        raise EstimateForbidden("CLIENT_ONLY benchmark ownership mismatch")

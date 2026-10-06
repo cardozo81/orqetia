@@ -87,6 +87,30 @@ class OrchestrationCandidate:
             raise ValueError("pricing_reference exceeds 200 characters")
 
 
+def rank_auto_candidates(
+    candidates: tuple[OrchestrationCandidate, ...],
+) -> tuple[OrchestrationCandidate, ...]:
+    """Apply canonical AUTO ranking to already-authorized eligible candidates."""
+
+    return tuple(sorted(candidates, key=_auto_candidate_rank_key))
+
+
+def _auto_candidate_rank_key(
+    candidate: OrchestrationCandidate,
+) -> tuple[int, int, Decimal, int, str, str, str]:
+    priced = candidate.estimated_cost is not None
+    amount = candidate.estimated_cost
+    return (
+        candidate.comparison_group_rank,
+        0 if priced else 1,
+        amount if amount is not None else Decimal("Infinity"),
+        candidate.policy_rank,
+        candidate.target.provider_id,
+        candidate.target.model_id,
+        candidate.target.reasoning_profile,
+    )
+
+
 @dataclass(frozen=True)
 class RequirementProgress:
     accepted: tuple[str, ...]
@@ -521,23 +545,7 @@ class CanonicalOrchestrationPolicyEngine:
         if task.requested_execution_mode is ExecutionMode.EXPLICIT_TARGET:
             return tuple(eligible[:1])
 
-        return tuple(sorted(eligible, key=self._auto_rank_key))
-
-    @staticmethod
-    def _auto_rank_key(
-        candidate: OrchestrationCandidate,
-    ) -> tuple[int, int, Decimal, int, str, str, str]:
-        priced = candidate.estimated_cost is not None
-        amount = candidate.estimated_cost
-        return (
-            candidate.comparison_group_rank,
-            0 if priced else 1,
-            amount if amount is not None else Decimal("Infinity"),
-            candidate.policy_rank,
-            candidate.target.provider_id,
-            candidate.target.model_id,
-            candidate.target.reasoning_profile,
-        )
+        return rank_auto_candidates(tuple(eligible))
 
     @staticmethod
     def _apply_completed_observation(

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from uuid import uuid7
+from uuid import UUID, uuid7
 
 import pytest
 
@@ -12,6 +12,7 @@ from orqetia.estimation import (
     BenchmarkFeatureKey,
     BenchmarkMetrics,
     BenchmarkSnapshot,
+    CanonicalEstimateTargetResolver,
     EstimateEngine,
     EstimateExecutionMode,
     EstimateForbidden,
@@ -20,16 +21,23 @@ from orqetia.estimation import (
     EstimateTarget,
     ReferenceScope,
 )
+from orqetia.execution import ExecutionTargetSnapshot, OrchestrationCandidate
 
 NOW = datetime(2026, 10, 5, 20, tzinfo=UTC)
-SUBJECT = EstimateSubject("tenant-1", "client-1")
+TENANT_ID = UUID("0199b39a-9bf1-7000-8000-000000000010")
+CLIENT_ID = UUID("0199b39a-9bf1-7000-8000-000000000011")
+SUBJECT = EstimateSubject(str(TENANT_ID), str(CLIENT_ID))
 TARGET_A = EstimateTarget("openai", "gpt-a", "medium")
 TARGET_B = EstimateTarget("anthropic", "claude-b", "standard")
 
 
-def _snapshot(target: EstimateTarget, scope: ReferenceScope) -> BenchmarkSnapshot:
-    tenant_id = uuid7() if scope is ReferenceScope.CLIENT_ONLY else None
-    client_id = uuid7() if scope is ReferenceScope.CLIENT_ONLY else None
+def _snapshot(
+    target: EstimateTarget,
+    scope: ReferenceScope,
+    *,
+    tenant_id: UUID | None = TENANT_ID,
+    client_id: UUID | None = CLIENT_ID,
+) -> BenchmarkSnapshot:
     return BenchmarkSnapshot(
         snapshot_id=uuid7(),
         scope=scope,
@@ -58,63 +66,69 @@ def _snapshot(target: EstimateTarget, scope: ReferenceScope) -> BenchmarkSnapsho
             p90_output_tokens=50,
             p90_total_tokens=120,
         ),
-        tenant_id=tenant_id,
-        client_id=client_id,
+        tenant_id=tenant_id if scope is ReferenceScope.CLIENT_ONLY else None,
+        client_id=client_id if scope is ReferenceScope.CLIENT_ONLY else None,
     )
 
 
-class FakeTargets:
-    async def ranked_auto_targets(
-        self,
-        *,
-        subject: EstimateSubject,
-        operation: str,
-    ) -> tuple[EstimateTarget, ...]:
-        assert subject == SUBJECT
-        assert operation == "TASK_EXECUTION"
-        return (TARGET_A, TARGET_B)
-
-    async def is_authorized(
-        self,
-        *,
-        subject: EstimateSubject,
-        operation: str,
-        target: EstimateTarget,
-    ) -> bool:
-        assert subject == SUBJECT
-        assert operation == "TASK_EXECUTION"
-        return target == TARGET_B
+def _candidate(target: EstimateTarget, cost: str, policy_rank: int) -> OrchestrationCandidate:
+    return OrchestrationCandidate(
+        target=ExecutionTargetSnapshot(
+            target.provider_id,
+            target.model_id,
+            target.reasoning_profile,
+        ),
+        comparison_group="CURRENCY:USD",
+        comparison_group_rank=0,
+        estimated_cost=Decimal(cost),
+        policy_rank=policy_rank,
+        currency="USD",
+        pricing_reference=f"{target.provider_id}:pricing-v1",
+    )
 
 
 class FakeBenchmarks:
-    def __init__(self, available_target: EstimateTarget) -> None:
-        self.available_target = available_target
-
-    async def lookup(
+    def __init__(
         self,
         *,
-        subject: EstimateSubject,
-        target: EstimateTarget,
-        scope: ReferenceScope,
-    ) -> BenchmarkBuildResult:
+        owner_tenant: UUID = TENANT_ID,
+        owner_client: UUID = CLIENT_ID,
+    ) -> None:
+        self.owner_tenant = owner_tenant
+        self.owner_client = owner_client
+        self.lookups: list[EstimateTarget] = []
+
+    async def lookup(self, *, subject, target, scope):
         assert subject == SUBJECT
-        if target != self.available_target:
-            return BenchmarkBuildResult(
-                requested_scope=scope,
-                snapshot=None,
-                limitations=("synthetic_missing",),
-            )
+        self.lookups.append(target)
         return BenchmarkBuildResult(
             requested_scope=scope,
-            snapshot=_snapshot(target, scope),
+            snapshot=_snapshot(
+                target,
+                scope,
+                tenant_id=self.owner_tenant,
+                client_id=self.owner_client,
+            ),
         )
 
 
+def _resolver() -> CanonicalEstimateTargetResolver:
+    return CanonicalEstimateTargetResolver(
+        {
+            (SUBJECT.tenant_id, SUBJECT.client_id): (
+                _candidate(TARGET_A, "9", 0),
+                _candidate(TARGET_B, "1", 1),
+            )
+        }
+    )
+
+
 @pytest.mark.asyncio
-async def test_auto_uses_ranked_authorized_candidates_without_provider_call() -> None:
+async def test_auto_uses_canonical_cost_rank_without_provider_call() -> None:
+    benchmarks = FakeBenchmarks()
     engine = EstimateEngine(
-        targets=FakeTargets(),
-        benchmarks=FakeBenchmarks(TARGET_B),
+        targets=_resolver(),
+        benchmarks=benchmarks,
     )
     result = await engine.estimate(
         subject=SUBJECT,
@@ -126,10 +140,11 @@ async def test_auto_uses_ranked_authorized_candidates_without_provider_call() ->
     )
     assert result.requested_execution_mode is EstimateExecutionMode.AUTO
     assert result.effective_target == TARGET_B
+    assert benchmarks.lookups == [TARGET_B]
     assert result.usage.input_tokens > 0
     assert result.usage.output_tokens == 30
     assert result.usage.total_tokens == result.usage.input_tokens + 30
-    forbidden = {"cost", "currency", "price", "charge", "credit"}
+    forbidden = {"cost", "currency", "price", "pricing", "charge", "credit"}
     assert not any(
         token in key.lower()
         for key in result.client_payload()
@@ -138,10 +153,10 @@ async def test_auto_uses_ranked_authorized_candidates_without_provider_call() ->
 
 
 @pytest.mark.asyncio
-async def test_explicit_target_is_fixed_and_authorized() -> None:
+async def test_explicit_target_is_fixed_even_when_more_expensive() -> None:
     engine = EstimateEngine(
-        targets=FakeTargets(),
-        benchmarks=FakeBenchmarks(TARGET_B),
+        targets=_resolver(),
+        benchmarks=FakeBenchmarks(),
     )
     result = await engine.estimate(
         subject=SUBJECT,
@@ -150,12 +165,19 @@ async def test_explicit_target_is_fixed_and_authorized() -> None:
             input_payload={"message": "hello"},
             reference_scope=ReferenceScope.CLIENT_ONLY,
             execution_mode=EstimateExecutionMode.EXPLICIT_TARGET,
-            target=TARGET_B,
+            target=TARGET_A,
         ),
     )
-    assert result.effective_target == TARGET_B
+    assert result.effective_target == TARGET_A
     assert result.effective_execution_mode is EstimateExecutionMode.EXPLICIT_TARGET
 
+
+@pytest.mark.asyncio
+async def test_explicit_target_outside_authorized_envelope_fails_closed() -> None:
+    engine = EstimateEngine(
+        targets=_resolver(),
+        benchmarks=FakeBenchmarks(),
+    )
     with pytest.raises(EstimateForbidden):
         await engine.estimate(
             subject=SUBJECT,
@@ -164,6 +186,44 @@ async def test_explicit_target_is_fixed_and_authorized() -> None:
                 input_payload={},
                 reference_scope=ReferenceScope.CLIENT_ONLY,
                 execution_mode=EstimateExecutionMode.EXPLICIT_TARGET,
-                target=TARGET_A,
+                target=EstimateTarget("unknown", "unknown", "unknown"),
             ),
         )
+
+
+@pytest.mark.asyncio
+async def test_client_only_benchmark_owner_mismatch_fails_closed() -> None:
+    engine = EstimateEngine(
+        targets=_resolver(),
+        benchmarks=FakeBenchmarks(owner_client=uuid7()),
+    )
+    with pytest.raises(EstimateForbidden, match="ownership mismatch"):
+        await engine.estimate(
+            subject=SUBJECT,
+            spec=EstimateSpec(
+                operation="TASK_EXECUTION",
+                input_payload={},
+                reference_scope=ReferenceScope.CLIENT_ONLY,
+                execution_mode=EstimateExecutionMode.EXPLICIT_TARGET,
+                target=TARGET_B,
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_global_public_snapshot_has_no_owner_dependency() -> None:
+    engine = EstimateEngine(
+        targets=_resolver(),
+        benchmarks=FakeBenchmarks(owner_tenant=uuid7(), owner_client=uuid7()),
+    )
+    result = await engine.estimate(
+        subject=SUBJECT,
+        spec=EstimateSpec(
+            operation="TASK_EXECUTION",
+            input_payload={"message": "hello"},
+            reference_scope=ReferenceScope.GLOBAL_PUBLIC,
+        ),
+    )
+    assert result.reference_scope is ReferenceScope.GLOBAL_PUBLIC
+    assert result.sample_size == 40
+    assert result.cohort_size == 5

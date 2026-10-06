@@ -13,6 +13,7 @@ from .benchmarks import (
     ReferenceScope,
 )
 from .service import (
+    CanonicalEstimateTargetResolver,
     EstimateBenchmarkLookup,
     EstimatedTechnicalUsage,
     EstimateEngine,
@@ -42,6 +43,7 @@ __all__ = [
     "BenchmarkSnapshot",
     "BenchmarkSnapshotStore",
     "BenchmarkUnavailableReason",
+    "CanonicalEstimateTargetResolver",
     "EstimateBenchmarkLookup",
     "EstimateEngine",
     "EstimateExecutionMode",

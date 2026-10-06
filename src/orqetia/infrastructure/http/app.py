@@ -322,6 +322,10 @@ def create_app(
     async def create_estimate(
         payload: EstimateRequest,
         principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("estimates:write"))],
+        _idempotency_key: Annotated[
+            str,
+            Header(alias="Idempotency-Key", min_length=1, max_length=200),
+        ],
     ) -> EstimateResponse:
         if (
             isinstance(payload.execution, EstimateExplicitExecution)

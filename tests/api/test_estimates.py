@@ -78,7 +78,10 @@ async def _post(app: Any, body: dict[str, object]) -> httpx.Response:
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         return await client.post(
             "/v1/estimates",
-            headers={"Authorization": "Bearer synthetic"},
+            headers={
+                "Authorization": "Bearer synthetic",
+                "Idempotency-Key": "estimate-test-key",
+            },
             json=body,
         )
 
@@ -163,3 +166,31 @@ def test_explicit_estimate_preserves_requested_target() -> None:
     payload = response.json()
     assert payload["requested_execution_mode"] == "EXPLICIT_TARGET"
     assert payload["effective_target"]["provider_id"] == "anthropic"
+
+
+
+def test_estimate_requires_idempotency_key_from_canonical_contract() -> None:
+    app = create_app(
+        openapi_document=CANONICAL,
+        authenticator=FakeAuthenticator(frozenset({"estimates:write"})),
+        estimation_service=FakeEstimationService(),
+    )
+
+    async def post_without_key() -> httpx.Response:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://test",
+        ) as client:
+            return await client.post(
+                "/v1/estimates",
+                headers={"Authorization": "Bearer synthetic"},
+                json={
+                    "operation": "TASK_EXECUTION",
+                    "input": {},
+                },
+            )
+
+    response = asyncio.run(post_without_key())
+    assert response.status_code == 400
+    assert response.json()["code"] == "INVALID_REQUEST"

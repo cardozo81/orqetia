@@ -19,6 +19,7 @@ from .orchestration import (
     OrchestrationDisposition,
     OrchestrationPolicy,
     RequirementProgress,
+    rank_auto_candidates,
 )
 from .postgres import PostgresExecutionSessionStore
 from .sessions import (
@@ -94,6 +95,7 @@ __all__ = [
     "execution_metadata",
     "execution_sessions",
     "provider_attempts",
+    "rank_auto_candidates",
     "session_target_runtime",
     "task_cycle_decisions",
     "task_metadata",

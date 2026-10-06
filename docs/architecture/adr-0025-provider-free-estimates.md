@@ -17,9 +17,9 @@ authorization envelope used by runtime execution.
 
 If `execution` is omitted, the request is AUTO.
 
-AUTO receives authorized/capability-compatible targets in internal policy order. That
-order may use comparable internal provider-cost estimates, but no monetary value
-crosses the client boundary.
+AUTO receives authorized/capability-compatible targets in internal policy order.
+The reference resolver reuses the canonical orchestration AUTO rank for comparable
+internal provider-cost estimates; no monetary value crosses the client boundary.
 
 EXPLICIT_TARGET requires the target permission and the exact target must be
 authorized. The estimate never substitutes another target.
@@ -43,6 +43,16 @@ future client charge are absent by construction.
 Until model-specific local tokenizers are wired, canonical JSON UTF-8 byte length is
 divided by four and rounded upward. `estimation_method` makes the approximation
 explicit; it is not provider-observed truth.
+
+## Ownership and idempotency
+
+A CLIENT_ONLY benchmark snapshot is revalidated against the authenticated
+tenant/client before it is converted into a response. Mismatched owner, scope or
+target fails closed even if a lookup adapter returns malformed data.
+
+The HTTP adapter validates the required `Idempotency-Key` declared by the canonical
+OpenAPI. The estimate itself is side-effect free; the header keeps transport behavior
+consistent with the API-wide idempotency envelope.
 
 ## Failure mode
 
