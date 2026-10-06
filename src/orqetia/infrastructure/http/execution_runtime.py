@@ -29,6 +29,7 @@ from orqetia.execution import (
     OwnershipScope,
     ProviderAttempt,
     RequestedTargetSnapshot,
+    SanitizedEvidenceRecord as SanitizedEvidenceRecord,
     SessionStatus,
     TaskPayloadReferences,
     TaskStatus,

@@ -1270,10 +1270,26 @@ def create_backoffice_app(
                 + escape(tenant_id)
                 + "'></label>"
             )
-            + "<label>Client ID <input name='client_id' value='" + escape(client_id) + "'></label>"
-            + "<label>Provider <input name='provider_id' value='" + escape(provider_id) + "'></label>"
-            + "<label>Model <input name='model_id' value='" + escape(model_id) + "'></label>"
-            + "<label>Group by <input name='group_by' value='" + escape(group_by) + "'></label>"
+            + (
+                "<label>Client ID <input name='client_id' value='"
+                + escape(client_id)
+                + "'></label>"
+            )
+            + (
+                "<label>Provider <input name='provider_id' value='"
+                + escape(provider_id)
+                + "'></label>"
+            )
+            + (
+                "<label>Model <input name='model_id' value='"
+                + escape(model_id)
+                + "'></label>"
+            )
+            + (
+                "<label>Group by <input name='group_by' value='"
+                + escape(group_by)
+                + "'></label>"
+            )
             + "<button>Analyze</button></form>"
             + "<table><thead><tr><th>Dimensions</th><th>Attempts</th><th>Tokens</th>"
             + "<th>Failures</th><th>Avg latency</th><th>Observed cost</th>"

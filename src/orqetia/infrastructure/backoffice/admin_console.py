@@ -24,6 +24,7 @@ from orqetia.read_models import (
 )
 from orqetia.tenancy import TenancyAdminService, TenantClientRepository
 
+
 @dataclass(frozen=True)
 class BackofficeAdminServices:
     tenancy: TenancyAdminService
