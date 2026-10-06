@@ -45,3 +45,4 @@ jobs:
           uv run --no-sync --python 3.14 pytest -q
           tests/identity/test_customer_authz.py
           tests/identity/test_customer_portal_sessions.py
+          tests/portal/test_security_shell.py
