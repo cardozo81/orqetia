@@ -12,6 +12,22 @@ from .benchmarks import (
     BenchmarkUnavailableReason,
     ReferenceScope,
 )
+from .service import (
+    EstimateBenchmarkLookup,
+    EstimateEngine,
+    EstimateExecutionMode,
+    EstimateForbidden,
+    EstimateResult,
+    EstimateService,
+    EstimateSpec,
+    EstimateSubject,
+    EstimateTarget,
+    EstimateTargetResolver,
+    EstimateUnavailable,
+    EstimatedTechnicalUsage,
+    InputTokenEstimator,
+    JsonByteInputTokenEstimator,
+)
 from .store import BenchmarkSnapshotStore, PostgresBenchmarkSnapshotStore
 from .tables import benchmark_snapshots
 
@@ -26,6 +42,20 @@ __all__ = [
     "BenchmarkSnapshot",
     "BenchmarkSnapshotStore",
     "BenchmarkUnavailableReason",
+    "EstimateBenchmarkLookup",
+    "EstimateEngine",
+    "EstimateExecutionMode",
+    "EstimateForbidden",
+    "EstimateResult",
+    "EstimateService",
+    "EstimateSpec",
+    "EstimateSubject",
+    "EstimateTarget",
+    "EstimateTargetResolver",
+    "EstimateUnavailable",
+    "EstimatedTechnicalUsage",
+    "InputTokenEstimator",
+    "JsonByteInputTokenEstimator",
     "PostgresBenchmarkSnapshotStore",
     "ReferenceScope",
     "benchmark_snapshots",
