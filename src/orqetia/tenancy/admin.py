@@ -339,6 +339,18 @@ class TenancyAdminService:
         )
         return saved
 
+    async def require_active_tenant(
+        self,
+        *,
+        tenant_id: UUID,
+    ) -> TenantRecord:
+        tenant = await self._repository.get_tenant(tenant_id)
+        if tenant is None:
+            raise PermissionError("tenant ownership unavailable")
+        if tenant.status is not AdministrativeStatus.ACTIVE:
+            raise PermissionError("tenant is disabled")
+        return tenant
+
     async def resolve_active_owner(
         self,
         *,
@@ -348,12 +360,7 @@ class TenancyAdminService:
         client = await self._repository.get_client(client_id)
         if client is None or client.tenant_id != tenant_id:
             raise PermissionError("client ownership mismatch")
-        tenant = await self._repository.get_tenant(tenant_id)
-        if tenant is None:
-            raise PermissionError("tenant ownership unavailable")
-        if (
-            tenant.status is not AdministrativeStatus.ACTIVE
-            or client.status is not AdministrativeStatus.ACTIVE
-        ):
+        tenant = await self.require_active_tenant(tenant_id=tenant_id)
+        if client.status is not AdministrativeStatus.ACTIVE:
             raise PermissionError("tenant/client is disabled")
         return ActiveOwner(tenant_id=tenant_id, client_id=client_id)

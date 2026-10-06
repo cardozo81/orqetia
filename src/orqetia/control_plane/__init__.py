@@ -50,6 +50,14 @@ from .provider_credentials import (
     SecretReference,
     SecretValue,
 )
+from .quota_admin import (
+    InMemoryQuotaPolicyRepository,
+    QuotaOwnerResolver,
+    QuotaPolicyAdminService,
+    QuotaPolicyKey,
+    QuotaPolicyRepository,
+)
+from .quota_admin_postgres import PostgresQuotaPolicyRepository
 from .quota_tables import quota_policies
 from .quotas import (
     QuotaEnforcementMode,
@@ -93,7 +101,13 @@ __all__ = [
     "ProviderCredentialSelection",
     "ProviderCredentialStatus",
     "ProviderSecretStore",
+    "InMemoryQuotaPolicyRepository",
+    "PostgresQuotaPolicyRepository",
     "QuotaEnforcementMode",
+    "QuotaOwnerResolver",
+    "QuotaPolicyAdminService",
+    "QuotaPolicyKey",
+    "QuotaPolicyRepository",
     "QuotaMetric",
     "QuotaPolicySnapshot",
     "QuotaScope",
