@@ -14,6 +14,7 @@ from uuid import UUID, uuid7
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
+from orqetia.audit import CustomerActivityStore, activity_event
 from orqetia.estimation import (
     EstimateExecutionMode,
     EstimateForbidden,
@@ -102,6 +103,7 @@ def create_customer_portal_app(
     credentials: ClientAccessCredentialService | None = None,
     usage: ClientUsageReportService | None = None,
     estimation: EstimateService | None = None,
+    activity: CustomerActivityStore | None = None,
 ) -> FastAPI:
     origin = allowed_origin.rstrip("/")
     if not origin.startswith(("http://", "https://")):
@@ -232,6 +234,36 @@ def create_customer_portal_app(
                 "Client estimation service is unavailable"
             )
         return estimation
+
+    def required_activity() -> CustomerActivityStore:
+        if activity is None:
+            raise CustomerPortalUnavailable(
+                "Client activity service is unavailable"
+            )
+        return activity
+
+    async def record_activity(
+        current,
+        *,
+        action: str,
+        resource_type: str | None = None,
+        resource_id: str | None = None,
+    ) -> None:
+        if activity is None:
+            return
+        principal = current.principal
+        await activity.record(
+            activity_event(
+                tenant_id=principal.tenant_id,
+                client_id=principal.client_id,
+                identity_id=principal.identity_id,
+                membership_id=principal.membership_id,
+                action=action,
+                occurred_at=datetime.now(UTC),
+                resource_type=resource_type,
+                resource_id=resource_id,
+            )
+        )
 
     def delegable_scopes(permissions: frozenset[str]) -> frozenset[str]:
         output: set[str] = set()
@@ -661,6 +693,12 @@ def create_customer_portal_app(
             idempotency_key=data.get("idempotency_key", ""),
             occurred_at=datetime.now(UTC),
         )
+        await record_activity(
+            current,
+            action="SESSION_CREATE",
+            resource_type="session",
+            resource_id=str(session.session_id),
+        )
         return RedirectResponse(
             f"/portal/sessions/{session.session_id}",
             status_code=303,
@@ -760,6 +798,12 @@ def create_customer_portal_app(
             external_reference=data.get("external_reference", "").strip() or None,
             idempotency_key=data.get("idempotency_key", ""),
             occurred_at=datetime.now(UTC),
+        )
+        await record_activity(
+            current,
+            action="TASK_CREATE",
+            resource_type="task",
+            resource_id=str(task.task_id),
         )
         return RedirectResponse(
             f"/portal/tasks/{task.task_id}",
@@ -863,6 +907,12 @@ def create_customer_portal_app(
             task_id=task_id,
             idempotency_key=data.get("idempotency_key", ""),
             occurred_at=datetime.now(UTC),
+        )
+        await record_activity(
+            current,
+            action="TASK_CANCEL",
+            resource_type="task",
+            resource_id=str(task_id),
         )
         return RedirectResponse(
             f"/portal/tasks/{task_id}",
@@ -1130,10 +1180,67 @@ def create_customer_portal_app(
             ),
             spec=spec,
         )
+        await record_activity(
+            current,
+            action="ESTIMATE_CREATE",
+            resource_type="estimate",
+        )
         return page(
             "Estimate result",
             "<pre>" + safe_json(result.client_payload()) + "</pre>"
             "<p><a href='/portal/estimates'>New estimate</a></p>",
+            nav=navigation(current.principal.permissions),
+        )
+
+    @app.get("/portal/activity")
+    async def activity_page(request: Request) -> HTMLResponse:
+        current = await authorized(request, "audit:read")
+        items = await required_activity().list_owned(
+            tenant_id=current.principal.tenant_id,
+            client_id=current.principal.client_id,
+            limit=100,
+        )
+        rows = "".join(
+            "<tr><td>"
+            + escape(str(item.occurred_at))
+            + "</td><td>"
+            + escape(item.action)
+            + "</td><td>"
+            + escape(item.result)
+            + "</td><td>"
+            + escape(item.resource_type or "")
+            + "</td><td>"
+            + escape(item.resource_id or "")
+            + "</td></tr>"
+            for item in items
+        )
+        return page(
+            "Activity",
+            "<table><thead><tr><th>Time</th><th>Action</th>"
+            "<th>Result</th><th>Resource</th><th>ID</th>"
+            "</tr></thead><tbody>"
+            + rows
+            + "</tbody></table>",
+            nav=navigation(current.principal.permissions),
+        )
+
+    @app.get("/portal/docs")
+    async def documentation_page(request: Request) -> HTMLResponse:
+        current = await authorized(request, "docs:read")
+        body = (
+            "<p>Canonical machine-readable API contract: "
+            "<a href='/openapi.json'>/openapi.json</a></p>"
+            "<p>Client API base path: <code>/v1</code>.</p>"
+            "<p>Service integrations authenticate with Bearer credentials "
+            "created in API Credentials. Secrets are shown once.</p>"
+            "<p>Omit an execution target for AUTO. Explicit targets remain "
+            "inside the authorized provider/model/reasoning envelope.</p>"
+            "<p>The complete endpoint manual is maintained by #27 and must "
+            "remain synchronized with this OpenAPI contract.</p>"
+        )
+        return page(
+            "Documentation",
+            body,
             nav=navigation(current.principal.permissions),
         )
 
@@ -1294,6 +1401,12 @@ def create_customer_portal_app(
             idempotency_key=data.get("idempotency_key", ""),
             occurred_at=datetime.now(UTC),
         )
+        await record_activity(
+            current,
+            action="CREDENTIAL_ISSUE",
+            resource_type="credential",
+            resource_id=str(result.credential.credential_id),
+        )
         return one_time_secret_page(
             title="Credential issued",
             result=result,
@@ -1316,6 +1429,12 @@ def create_customer_portal_app(
             idempotency_key=data.get("idempotency_key", ""),
             occurred_at=datetime.now(UTC),
         )
+        await record_activity(
+            current,
+            action="CREDENTIAL_ROTATE",
+            resource_type="credential",
+            resource_id=str(result.credential.credential_id),
+        )
         return one_time_secret_page(
             title="Credential rotated",
             result=result,
@@ -1331,12 +1450,18 @@ def create_customer_portal_app(
             request,
             "credentials:write",
         )
-        await required_credentials().revoke(
+        result = await required_credentials().revoke(
             tenant_id=current.principal.tenant_id,
             client_id=current.principal.client_id,
             credential_id=credential_id,
             idempotency_key=data.get("idempotency_key", ""),
             occurred_at=datetime.now(UTC),
+        )
+        await record_activity(
+            current,
+            action="CREDENTIAL_REVOKE",
+            resource_type="credential",
+            resource_id=str(result.credential.credential_id),
         )
         return RedirectResponse("/portal/credentials", status_code=303)
 

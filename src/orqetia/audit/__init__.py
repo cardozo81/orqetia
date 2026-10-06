@@ -1,5 +1,19 @@
-"""audit bounded-context package.
+"""Audit bounded-context contracts."""
 
-This package is intentionally a scaffold only in Phase 1. Business behavior is
-introduced through its owning implementation issues.
-"""
+from .customer_activity import (
+    CustomerActivityEvent,
+    CustomerActivityStore,
+    InMemoryCustomerActivityStore,
+    activity_event,
+)
+from .customer_activity_postgres import PostgresCustomerActivityStore
+from .customer_activity_tables import customer_activity_events
+
+__all__ = [
+    "CustomerActivityEvent",
+    "CustomerActivityStore",
+    "InMemoryCustomerActivityStore",
+    "PostgresCustomerActivityStore",
+    "activity_event",
+    "customer_activity_events",
+]
