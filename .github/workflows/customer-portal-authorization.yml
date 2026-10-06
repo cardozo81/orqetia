@@ -41,4 +41,7 @@ jobs:
       - name: Apply migrations
         run: uv run --no-sync --python 3.14 alembic upgrade head
       - name: Customer authorization tests
-        run: uv run --no-sync --python 3.14 pytest -q tests/identity/test_customer_authz.py
+        run: >-
+          uv run --no-sync --python 3.14 pytest -q
+          tests/identity/test_customer_authz.py
+          tests/identity/test_customer_portal_sessions.py

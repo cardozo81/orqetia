@@ -650,6 +650,31 @@ class CustomerAuthorizationService:
             acr=context.acr,
         )
 
+    async def authenticate_membership(
+        self,
+        *,
+        context: HumanAuthenticationContext,
+        membership_id: UUID,
+        occurred_at: datetime,
+    ) -> CustomerPrincipal:
+        memberships = await self.list_available_memberships(context=context)
+        selected = next(
+            (
+                membership
+                for membership in memberships
+                if membership.membership_id == membership_id
+            ),
+            None,
+        )
+        if selected is None:
+            raise PermissionError("customer membership is not available")
+        return await self.authenticate(
+            context=context,
+            tenant_id=selected.tenant_id,
+            client_id=selected.client_id,
+            occurred_at=occurred_at,
+        )
+
     def require_permission(
         self,
         *,
