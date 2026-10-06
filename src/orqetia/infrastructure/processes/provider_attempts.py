@@ -28,6 +28,7 @@ from orqetia.shared.messaging import (
     QueueName,
     WorkItem,
     WorkLease,
+    WorkQueuePort,
 )
 
 from .worker import HandlerOutcome
@@ -88,6 +89,7 @@ class ProviderAttemptHandler:
         infrastructure_retry_delay_seconds: int = 1,
         clock: Clock = _utc_now,
         telemetry: EventEmitter | None = None,
+        continuation_queue: WorkQueuePort | None = None,
     ) -> None:
         if infrastructure_retry_delay_seconds < 1:
             raise ValueError("infrastructure_retry_delay_seconds must be >= 1")
@@ -96,6 +98,7 @@ class ProviderAttemptHandler:
         self._infrastructure_retry_delay = infrastructure_retry_delay_seconds
         self._clock = clock
         self._telemetry = telemetry or JsonEventEmitter()
+        self._continuation_queue = continuation_queue
 
     async def __call__(self, lease: WorkLease) -> HandlerOutcome:
         if lease.tenant_id is None or lease.client_id is None:
@@ -132,18 +135,6 @@ class ProviderAttemptHandler:
             model_id=attempt.target.model_id,
             reasoning_profile=attempt.target.reasoning_profile,
         )
-        try:
-            adapter = self._resolve_adapter(target)
-        except Exception as exc:
-            error_class = f"ADAPTER_RESOLUTION_{type(exc).__name__.upper()}"
-            self._emit_attempt(
-                "provider.adapter_resolution_failed",
-                lease,
-                attempt,
-                error_class=error_class,
-            )
-            return self._infrastructure_failure(error_class)
-
         claim = await self._store.claim_dispatch(
             scope=scope,
             attempt_id=attempt_id,
@@ -157,7 +148,31 @@ class ProviderAttemptHandler:
                 claim.attempt,
                 dispatch_action=claim.action.value,
             )
+            if claim.action in {
+                DispatchAction.SKIP_COMPLETED,
+                DispatchAction.SKIP_TERMINAL,
+                DispatchAction.MARKED_AMBIGUOUS,
+                DispatchAction.CANCELLED_BY_TASK,
+            }:
+                continuation = await self._continue_task(
+                    lease,
+                    claim.attempt,
+                )
+                if continuation is not None:
+                    return continuation
             return HandlerOutcome.complete()
+
+        try:
+            adapter = self._resolve_adapter(target)
+        except Exception as exc:
+            error_class = f"ADAPTER_RESOLUTION_{type(exc).__name__.upper()}"
+            self._emit_attempt(
+                "provider.adapter_resolution_failed",
+                lease,
+                claim.attempt,
+                error_class=error_class,
+            )
+            return self._infrastructure_failure(error_class)
 
         journal = claim.attempt
         self._emit_attempt("provider.dispatch_started", lease, journal)
@@ -193,7 +208,12 @@ class ProviderAttemptHandler:
                 occurred_at=self._clock(),
                 error_class=type(exc).__name__,
             )
-            return HandlerOutcome.complete()
+            continuation = await self._continue_task(lease, journal)
+            return (
+                HandlerOutcome.complete()
+                if continuation is None
+                else continuation
+            )
 
         await self._store.complete_dispatch(
             scope=scope,
@@ -214,7 +234,39 @@ class ProviderAttemptHandler:
             total_tokens=result.usage.total_tokens,
             attempt_status="COMPLETED",
         )
-        return HandlerOutcome.complete()
+        continuation = await self._continue_task(lease, journal)
+        return (
+            HandlerOutcome.complete()
+            if continuation is None
+            else continuation
+        )
+
+    async def _continue_task(
+        self,
+        lease: WorkLease,
+        attempt: ProviderAttempt,
+    ) -> HandlerOutcome | None:
+        if self._continuation_queue is None or attempt.task_id is None:
+            return None
+        from .task_orchestration import build_task_orchestration_work_item
+
+        try:
+            await self._continuation_queue.enqueue(
+                build_task_orchestration_work_item(
+                    scope=attempt.ownership,
+                    task_id=attempt.task_id,
+                    available_at=self._clock(),
+                    continuation_key=f"attempt:{attempt.attempt_id}",
+                    correlation_id=lease.correlation_id,
+                    causation_id=lease.work_id,
+                    trace_id=lease.trace_id,
+                )
+            )
+        except Exception as exc:
+            return self._infrastructure_failure(
+                f"TASK_CONTINUATION_{type(exc).__name__.upper()}"
+            )
+        return None
 
     def _emit_attempt(
         self,

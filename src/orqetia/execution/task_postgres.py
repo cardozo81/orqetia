@@ -77,6 +77,13 @@ def _effective_target(value: object) -> ExecutionTargetSnapshot | None:
     )
 
 
+def _target_from_json(value: object) -> ExecutionTargetSnapshot:
+    target = _effective_target(value)
+    if target is None:
+        raise ValueError("persisted target must be an object")
+    return target
+
+
 def _str_tuple(value: object, field: str) -> tuple[str, ...]:
     if not isinstance(value, list):
         raise ValueError(f"persisted {field} must be an array")
