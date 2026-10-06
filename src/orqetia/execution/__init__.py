@@ -32,6 +32,15 @@ from .client_api_idempotency import (
 )
 from .client_api_postgres import PostgresClientApiIdempotencyJournal
 from .client_api_tables import client_api_idempotency
+from .retention import (
+    ArtifactRetentionCutoffs,
+    ClientArtifactRetentionCoordinator,
+    ClientArtifactRetentionPolicy,
+    ClientArtifactRetentionStore,
+    DEFAULT_CLIENT_ARTIFACT_RETENTION_POLICY,
+    RetentionHold,
+    RetentionPurgeResult,
+)
 from .orchestration import (
     AttemptObservation,
     AttemptObservationStatus,
@@ -85,13 +94,18 @@ __all__ = [
     "ClientApiIdempotencyConflict",
     "ClientApiIdempotencyJournal",
     "ClientApiIdempotencyReservation",
+    "ArtifactRetentionCutoffs",
+    "ClientArtifactRetentionCoordinator",
+    "ClientArtifactRetentionPolicy",
     "ClientArtifactRetentionPort",
+    "ClientArtifactRetentionStore",
     "ClientExchangeEvidence",
     "ClientExchangeEvidenceReader",
     "ClientExchangeEvidenceWriter",
     "ClientRequestArtifactWriter",
     "ClientResultArtifactReader",
     "ClientResultArtifactWriter",
+    "DEFAULT_CLIENT_ARTIFACT_RETENTION_POLICY",
     "DispatchAction",
     "DispatchClaim",
     "ExecutionMode",
@@ -117,6 +131,8 @@ __all__ = [
     "QuarantineState",
     "RequestedTargetSnapshot",
     "RequirementProgress",
+    "RetentionHold",
+    "RetentionPurgeResult",
     "SanitizedEvidenceRecord",
     "SessionPolicySnapshot",
     "SessionStatus",

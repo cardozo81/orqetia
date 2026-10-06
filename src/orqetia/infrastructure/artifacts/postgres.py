@@ -21,6 +21,7 @@ from orqetia.execution import (
     client_exchange_evidence,
     provider_attempts,
 )
+from orqetia.execution.retention import ArtifactRetentionCutoffs
 from orqetia.providers import (
     OutputKind,
     ProviderInvocationPayload,
@@ -467,6 +468,65 @@ class PostgresClientArtifactStore:
             )
         return tuple(items)
 
+    async def purge_owned(
+        self,
+        *,
+        scope: OwnershipScope,
+        cutoffs: ArtifactRetentionCutoffs,
+    ) -> int:
+        evidence_delete = sa.delete(client_exchange_evidence).where(
+            client_exchange_evidence.c.tenant_id == scope.tenant_id,
+            client_exchange_evidence.c.client_id == scope.client_id,
+            client_exchange_evidence.c.created_at < cutoffs.evidence_before,
+        )
+        artifact_delete = sa.delete(client_artifacts).where(
+            client_artifacts.c.tenant_id == scope.tenant_id,
+            client_artifacts.c.client_id == scope.client_id,
+            sa.or_(
+                sa.and_(
+                    client_artifacts.c.kind == "REQUEST",
+                    client_artifacts.c.created_at < cutoffs.request_before,
+                ),
+                sa.and_(
+                    client_artifacts.c.kind == "RESULT",
+                    client_artifacts.c.created_at < cutoffs.result_before,
+                ),
+                sa.and_(
+                    client_artifacts.c.kind == "PROVIDER_RESPONSE",
+                    client_artifacts.c.created_at
+                    < cutoffs.provider_response_before,
+                ),
+            ),
+        )
+        async with self._sessions.begin() as database:
+            evidence_result = await database.execute(evidence_delete)
+            artifact_result = await database.execute(artifact_delete)
+        return max(0, evidence_result.rowcount or 0) + max(
+            0,
+            artifact_result.rowcount or 0,
+        )
+
+    async def purge_owned_all(
+        self,
+        *,
+        scope: OwnershipScope,
+    ) -> int:
+        evidence_delete = sa.delete(client_exchange_evidence).where(
+            client_exchange_evidence.c.tenant_id == scope.tenant_id,
+            client_exchange_evidence.c.client_id == scope.client_id,
+        )
+        artifact_delete = sa.delete(client_artifacts).where(
+            client_artifacts.c.tenant_id == scope.tenant_id,
+            client_artifacts.c.client_id == scope.client_id,
+        )
+        async with self._sessions.begin() as database:
+            evidence_result = await database.execute(evidence_delete)
+            artifact_result = await database.execute(artifact_delete)
+        return max(0, evidence_result.rowcount or 0) + max(
+            0,
+            artifact_result.rowcount or 0,
+        )
+
     async def delete_owned_before(
         self,
         *,
@@ -474,20 +534,15 @@ class PostgresClientArtifactStore:
         older_than: datetime,
     ) -> int:
         _aware(older_than, "older_than")
-        evidence_delete = sa.delete(client_exchange_evidence).where(
-            client_exchange_evidence.c.tenant_id == scope.tenant_id,
-            client_exchange_evidence.c.client_id == scope.client_id,
-            client_exchange_evidence.c.created_at < older_than,
+        return await self.purge_owned(
+            scope=scope,
+            cutoffs=ArtifactRetentionCutoffs(
+                request_before=older_than,
+                result_before=older_than,
+                provider_response_before=older_than,
+                evidence_before=older_than,
+            ),
         )
-        artifact_delete = sa.delete(client_artifacts).where(
-            client_artifacts.c.tenant_id == scope.tenant_id,
-            client_artifacts.c.client_id == scope.client_id,
-            client_artifacts.c.created_at < older_than,
-        )
-        async with self._sessions.begin() as database:
-            evidence_result = await database.execute(evidence_delete)
-            artifact_result = await database.execute(artifact_delete)
-        return max(0, evidence_result.rowcount or 0) + max(0, artifact_result.rowcount or 0)
 
     async def _store_json(
         self,
