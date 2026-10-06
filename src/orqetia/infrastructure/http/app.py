@@ -4,7 +4,7 @@ import re
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from copy import deepcopy
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
@@ -24,6 +24,10 @@ from orqetia.estimation import (
     EstimateUnavailable,
     ReferenceScope,
 )
+from orqetia.identity import (
+    ClientAccessCredentialService,
+    IdempotencyConflict,
+)
 from orqetia.identity.authentication import (
     AuthenticatedPrincipal,
     AuthenticationBackendUnavailable,
@@ -33,6 +37,10 @@ from orqetia.identity.authentication import (
 from orqetia.infrastructure.health import ReadinessProbe
 
 from .models import (
+    CredentialCreateRequest,
+    CredentialIssueResponse,
+    CredentialListResponse,
+    CredentialMetadataView,
     ErrorDetail,
     ErrorEnvelope,
     EstimateExplicitExecution,
@@ -71,6 +79,7 @@ def create_app(
     enable_hsts: bool = False,
     shutdown_callback: Callable[[], Awaitable[None]] | None = None,
     estimation_service: EstimateService | None = None,
+    client_credential_service: ClientAccessCredentialService | None = None,
 ) -> FastAPI:
     """Build the client API shell around the versioned canonical OpenAPI document."""
 
@@ -239,6 +248,31 @@ def create_app(
 
         return dependency
 
+
+    def required_credential_service() -> ClientAccessCredentialService:
+        if client_credential_service is None:
+            raise ApiError(
+                503,
+                "CREDENTIAL_SERVICE_UNAVAILABLE",
+                "Client credential service is not configured.",
+            )
+        return client_credential_service
+
+    def principal_owner(principal: AuthenticatedPrincipal) -> tuple[UUID, UUID]:
+        if principal.tenant_id is None or principal.client_id is None:
+            raise ApiError(403, "FORBIDDEN", "Tenant/client ownership is required.")
+        try:
+            return UUID(principal.tenant_id), UUID(principal.client_id)
+        except ValueError as exc:
+            raise ApiError(
+                403,
+                "FORBIDDEN",
+                "Authenticated ownership identifiers are invalid.",
+            ) from exc
+
+    def credential_metadata_view(credential: Any) -> CredentialMetadataView:
+        return CredentialMetadataView.model_validate(credential.safe_view())
+
     def not_implemented() -> None:
         raise ApiError(
             501,
@@ -386,6 +420,150 @@ def create_app(
                 details=details,
             ) from exc
         return EstimateResponse.model_validate(result.client_payload())
+
+
+    @app.get("/v1/credentials", response_model=CredentialListResponse)
+    async def list_client_credentials(
+        principal: Annotated[
+            AuthenticatedPrincipal,
+            Depends(require_scopes("credentials:read")),
+        ],
+    ) -> CredentialListResponse:
+        service = required_credential_service()
+        tenant_id, client_id = principal_owner(principal)
+        items = await service.list_owned(
+            tenant_id=tenant_id,
+            client_id=client_id,
+        )
+        return CredentialListResponse(
+            items=[credential_metadata_view(item) for item in items]
+        )
+
+    @app.post("/v1/credentials", response_model=CredentialIssueResponse)
+    async def issue_client_credential(
+        payload: CredentialCreateRequest,
+        principal: Annotated[
+            AuthenticatedPrincipal,
+            Depends(require_scopes("credentials:write")),
+        ],
+        idempotency_key: Annotated[
+            str,
+            Header(alias="Idempotency-Key", min_length=1, max_length=200),
+        ],
+    ) -> CredentialIssueResponse:
+        if set(payload.scopes) - principal.scopes:
+            raise ApiError(
+                403,
+                "FORBIDDEN",
+                "A credential cannot receive scopes the caller does not hold.",
+            )
+        service = required_credential_service()
+        tenant_id, client_id = principal_owner(principal)
+        try:
+            result = await service.issue(
+                tenant_id=tenant_id,
+                client_id=client_id,
+                display_label=payload.display_label,
+                scopes=tuple(payload.scopes),
+                idempotency_key=idempotency_key,
+                occurred_at=datetime.now(UTC),
+                expires_at=payload.expires_at,
+            )
+        except IdempotencyConflict as exc:
+            raise ApiError(
+                409,
+                "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST",
+                "Idempotency key was reused with a different request.",
+            ) from exc
+        secret = None if result.secret is None else result.secret.reveal_once()
+        return CredentialIssueResponse(
+            credential=credential_metadata_view(result.credential),
+            secret=secret,
+            secret_available=secret is not None,
+            replayed=result.replayed,
+        )
+
+    @app.post(
+        "/v1/credentials/{credential_id}/rotate",
+        response_model=CredentialIssueResponse,
+    )
+    async def rotate_client_credential(
+        credential_id: UUID,
+        principal: Annotated[
+            AuthenticatedPrincipal,
+            Depends(require_scopes("credentials:write")),
+        ],
+        idempotency_key: Annotated[
+            str,
+            Header(alias="Idempotency-Key", min_length=1, max_length=200),
+        ],
+    ) -> CredentialIssueResponse:
+        service = required_credential_service()
+        tenant_id, client_id = principal_owner(principal)
+        try:
+            result = await service.rotate(
+                tenant_id=tenant_id,
+                client_id=client_id,
+                credential_id=credential_id,
+                idempotency_key=idempotency_key,
+                occurred_at=datetime.now(UTC),
+            )
+        except IdempotencyConflict as exc:
+            raise ApiError(
+                409,
+                "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST",
+                "Idempotency key was reused with a different request.",
+            ) from exc
+        except (LookupError, PermissionError) as exc:
+            raise ApiError(404, "NOT_FOUND", "Credential was not found.") from exc
+        except ValueError as exc:
+            raise ApiError(
+                409,
+                "CREDENTIAL_STATE_CONFLICT",
+                "Credential cannot be rotated from its current state.",
+            ) from exc
+        secret = None if result.secret is None else result.secret.reveal_once()
+        return CredentialIssueResponse(
+            credential=credential_metadata_view(result.credential),
+            secret=secret,
+            secret_available=secret is not None,
+            replayed=result.replayed,
+        )
+
+    @app.post(
+        "/v1/credentials/{credential_id}/revoke",
+        response_model=CredentialMetadataView,
+    )
+    async def revoke_client_credential(
+        credential_id: UUID,
+        principal: Annotated[
+            AuthenticatedPrincipal,
+            Depends(require_scopes("credentials:write")),
+        ],
+        idempotency_key: Annotated[
+            str,
+            Header(alias="Idempotency-Key", min_length=1, max_length=200),
+        ],
+    ) -> CredentialMetadataView:
+        service = required_credential_service()
+        tenant_id, client_id = principal_owner(principal)
+        try:
+            result = await service.revoke(
+                tenant_id=tenant_id,
+                client_id=client_id,
+                credential_id=credential_id,
+                idempotency_key=idempotency_key,
+                occurred_at=datetime.now(UTC),
+            )
+        except IdempotencyConflict as exc:
+            raise ApiError(
+                409,
+                "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST",
+                "Idempotency key was reused with a different request.",
+            ) from exc
+        except (LookupError, PermissionError) as exc:
+            raise ApiError(404, "NOT_FOUND", "Credential was not found.") from exc
+        return credential_metadata_view(result.credential)
 
     @app.get("/v1/providers", response_model=None)
     async def list_providers(

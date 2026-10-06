@@ -55,6 +55,22 @@ again. A caller that lost the first secret must perform a new rotation.
 
 Same key + different semantic request fails closed.
 
+## Client API surface
+
+The canonical client API exposes:
+
+- `GET /v1/credentials`;
+- `POST /v1/credentials`;
+- `POST /v1/credentials/{credential_id}/rotate`;
+- `POST /v1/credentials/{credential_id}/revoke`.
+
+Mutations require `Idempotency-Key`. A service client may mint only a subset of the
+scopes held by its current authenticated principal, preventing scope escalation.
+
+Initial issuance by Backoffice uses the same application service and is surfaced by
+the administrative UI in #22. Client Portal UX consumes these endpoints in #23; those
+UI issues do not redefine credential security semantics.
+
 ## Separation from provider secrets
 
 Provider credentials (#25/#59) may require managed recoverable secret material because

@@ -29,6 +29,9 @@
     },
     {
       "name": "Usage"
+    },
+    {
+      "name": "Credentials"
     }
   ],
   "security": [
@@ -748,6 +751,205 @@
           }
         }
       }
+    },
+    "/v1/credentials": {
+      "get": {
+        "tags": [
+          "Credentials"
+        ],
+        "operationId": "listClientCredentials",
+        "summary": "List integration credentials owned by the authenticated tenant/client.",
+        "x-orqetia-required-scopes": [
+          "credentials:read"
+        ],
+        "x-orqetia-object-ownership": "credentials filtered to authenticated tenant/client",
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Credentials"
+        ],
+        "operationId": "issueClientCredential",
+        "summary": "Issue a hashed ORQETIA integration credential; secret is returned only once.",
+        "x-orqetia-required-scopes": [
+          "credentials:write"
+        ],
+        "x-orqetia-object-ownership": "credential bound to authenticated tenant/client",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Credential issued or idempotently replayed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialIssueResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/credentials/{credential_id}/rotate": {
+      "post": {
+        "tags": [
+          "Credentials"
+        ],
+        "operationId": "rotateClientCredential",
+        "summary": "Rotate an owned integration credential and invalidate the previous secret.",
+        "x-orqetia-required-scopes": [
+          "credentials:write"
+        ],
+        "x-orqetia-object-ownership": "credential must belong to authenticated tenant/client",
+        "parameters": [
+          {
+            "name": "credential_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UUID"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Credential rotated or idempotently replayed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialIssueResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/credentials/{credential_id}/revoke": {
+      "post": {
+        "tags": [
+          "Credentials"
+        ],
+        "operationId": "revokeClientCredential",
+        "summary": "Revoke an owned integration credential.",
+        "x-orqetia-required-scopes": [
+          "credentials:write"
+        ],
+        "x-orqetia-object-ownership": "credential must belong to authenticated tenant/client",
+        "parameters": [
+          {
+            "name": "credential_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UUID"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Credential revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialMetadataView"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -755,8 +957,8 @@
       "BearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "description": "Validated according to ADR-0009. Required scopes are declared with x-orqetia-required-scopes and x-orqetia-conditional-scopes."
+        "bearerFormat": "JWT or ORQETIA access credential",
+        "description": "Validated according to ADR-0009/#24. Bearer may be a standards-based human/service token or an ORQETIA hashed client access credential. Required scopes are declared with x-orqetia-required-scopes."
       }
     },
     "parameters": {
@@ -1679,6 +1881,159 @@
               "null"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "CredentialCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "display_label",
+          "scopes"
+        ],
+        "properties": {
+          "display_label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "scopes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "pattern": "^[a-z][a-z0-9:_-]*$"
+            }
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "CredentialMetadataView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "credential_id",
+          "display_label",
+          "scopes",
+          "fingerprint",
+          "key_version",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "credential_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "display_label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{16}$"
+          },
+          "key_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "REVOKED"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rotated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "CredentialIssueResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "credential",
+          "secret_available",
+          "replayed"
+        ],
+        "properties": {
+          "credential": {
+            "$ref": "#/components/schemas/CredentialMetadataView"
+          },
+          "secret": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One-time bearer secret. Null on idempotent replay; never retrievable later."
+          },
+          "secret_available": {
+            "type": "boolean"
+          },
+          "replayed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CredentialListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CredentialMetadataView"
+            }
           }
         }
       }
