@@ -67,4 +67,5 @@ jobs:
         run: |
           uv run --no-sync --python 3.14 python -m unittest \
             tests.processes.test_provider_attempt_recovery \
+            tests.processes.test_task_orchestration_worker \
             -v
