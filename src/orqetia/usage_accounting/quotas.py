@@ -158,6 +158,16 @@ class QuotaEnforcer(Protocol):
         occurred_at: datetime,
     ) -> QuotaReservation: ...
 
+    async def renew(
+        self,
+        *,
+        policy: QuotaPolicySnapshot,
+        reservation_id: UUID,
+        tenant_id: UUID,
+        client_id: UUID,
+        occurred_at: datetime,
+    ) -> QuotaDecision: ...
+
 
 def quota_window(policy: QuotaPolicySnapshot, occurred_at: datetime) -> QuotaWindow:
     _require_aware(occurred_at, "occurred_at")
@@ -357,6 +367,86 @@ class InMemoryQuotaEnforcer:
             self._reservations[reservation_id] = released
             return released
 
+    async def renew(
+        self,
+        *,
+        policy: QuotaPolicySnapshot,
+        reservation_id: UUID,
+        tenant_id: UUID,
+        client_id: UUID,
+        occurred_at: datetime,
+    ) -> QuotaDecision:
+        _require_aware(occurred_at, "occurred_at")
+        if policy.metric is not QuotaMetric.CONCURRENT_TASKS:
+            raise ValueError("only CONCURRENT_TASKS reservations can be renewed")
+        async with self._lock:
+            reservation = self._reservations.get(reservation_id)
+            if reservation is None:
+                raise LookupError("quota reservation not found")
+            self._validate_renewal_identity(
+                policy=policy,
+                reservation=reservation,
+                tenant_id=tenant_id,
+                client_id=client_id,
+            )
+            window = reservation.window
+            self._expire(window=window, occurred_at=occurred_at)
+            reservation = self._reservations[reservation_id]
+            if reservation.status is QuotaReservationStatus.RESERVED:
+                renewed = replace(
+                    reservation,
+                    expires_at=occurred_at
+                    + timedelta(seconds=policy.reservation_ttl_seconds),
+                    reason_code="RENEWED",
+                )
+                self._reservations[reservation_id] = renewed
+                utilization = self._utilization(policy=policy, window=window)
+                return QuotaDecision(
+                    allowed=True,
+                    reservation=renewed,
+                    utilization=utilization,
+                    reason_code="RENEWED",
+                )
+            if reservation.status is not QuotaReservationStatus.EXPIRED:
+                raise ValueError(
+                    "quota reservation cannot be renewed from current status"
+                )
+
+            before = self._utilization(policy=policy, window=window)
+            projected = before.total_committed + reservation.amount
+            overage = projected > policy.capacity
+            allowed = not (
+                policy.enforcement is QuotaEnforcementMode.HARD
+                and overage
+            )
+            if not allowed:
+                return QuotaDecision(
+                    allowed=False,
+                    reservation=reservation,
+                    utilization=before,
+                    reason_code="RENEWAL_LIMIT_EXCEEDED",
+                )
+
+            renewed = replace(
+                reservation,
+                status=QuotaReservationStatus.RESERVED,
+                expires_at=occurred_at
+                + timedelta(seconds=policy.reservation_ttl_seconds),
+                reason_code="RENEWED_AFTER_EXPIRY",
+            )
+            self._reservations[reservation_id] = renewed
+            utilization = self._utilization(policy=policy, window=window)
+            return QuotaDecision(
+                allowed=True,
+                reservation=renewed,
+                utilization=utilization,
+                reason_code=(
+                    "SOFT_RENEWAL_OVERAGE"
+                    if overage
+                    else "RENEWED_AFTER_EXPIRY"
+                ),
+            )
+
     async def list_by_idempotency_key(
         self,
         *,
@@ -448,6 +538,35 @@ class InMemoryQuotaEnforcer:
             burst=policy.burst,
             window=window,
         )
+
+    @staticmethod
+    def _validate_renewal_identity(
+        *,
+        policy: QuotaPolicySnapshot,
+        reservation: QuotaReservation,
+        tenant_id: UUID,
+        client_id: UUID,
+    ) -> None:
+        expected = (
+            policy.policy_id,
+            policy.version,
+            tenant_id,
+            client_id,
+            policy.metric,
+            policy.provider_id,
+            policy.native_unit,
+        )
+        actual = (
+            reservation.policy_id,
+            reservation.policy_version,
+            reservation.tenant_id,
+            reservation.client_id,
+            reservation.metric,
+            reservation.provider_id,
+            reservation.native_unit,
+        )
+        if actual != expected:
+            raise ValueError("quota renewal identity conflict")
 
     @staticmethod
     def _validate_replay(
