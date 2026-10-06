@@ -9,6 +9,7 @@ import json
 import re
 import tomllib
 import uuid
+from collections import deque
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -326,6 +327,159 @@ def generate_artifacts(
     return sbom_path, provenance_path
 
 
+def _lock_graph(
+    lock: dict[str, Any],
+) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
+    graph: dict[str, set[str]] = {}
+    versions: dict[str, set[str]] = {}
+    for package in _locked_packages(lock):
+        name = _normalized_name(str(package["name"]))
+        versions.setdefault(name, set()).add(str(package["version"]))
+        dependencies: set[str] = set()
+        raw_dependencies = package.get("dependencies", [])
+        if isinstance(raw_dependencies, list):
+            for raw in raw_dependencies:
+                if isinstance(raw, dict) and isinstance(raw.get("name"), str):
+                    dependencies.add(_normalized_name(str(raw["name"])))
+        graph.setdefault(name, set()).update(dependencies)
+    return graph, versions
+
+
+def _shortest_dependency_path(
+    *,
+    target: str,
+    project_name: str,
+    runtime: set[str],
+    dev: set[str],
+    graph: dict[str, set[str]],
+) -> tuple[str, ...] | None:
+    roots = sorted(runtime | dev)
+    queue: deque[tuple[str, tuple[str, ...]]] = deque(
+        (root, (project_name, root)) for root in roots
+    )
+    visited: set[str] = set()
+    while queue:
+        current, path = queue.popleft()
+        if current in visited:
+            continue
+        visited.add(current)
+        if current == target:
+            return path
+        for dependency in sorted(graph.get(current, set())):
+            if dependency not in visited:
+                queue.append((dependency, (*path, dependency)))
+    return None
+
+
+def _audit_dependencies(value: object) -> list[dict[str, Any]]:
+    if isinstance(value, dict):
+        dependencies = value.get("dependencies")
+        if isinstance(dependencies, list):
+            return [
+                item
+                for item in dependencies
+                if isinstance(item, dict)
+            ]
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    raise ValueError("pip-audit JSON must contain a dependency array")
+
+
+def summarize_audit(
+    *,
+    audit_path: Path,
+    lock_path: Path,
+    pyproject_path: Path,
+) -> None:
+    audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    lock = _read_toml(lock_path)
+    pyproject = _read_toml(pyproject_path)
+    project_name, _project_version, _requires_python = _project_identity(
+        pyproject
+    )
+    runtime, dev = _direct_dependencies(pyproject)
+    graph, versions = _lock_graph(lock)
+
+    vulnerable: list[tuple[str, str, str, bool, tuple[str, ...] | None, int]] = []
+    for dependency in _audit_dependencies(audit):
+        raw_name = dependency.get("name")
+        raw_version = dependency.get("version")
+        vulns = dependency.get("vulns", [])
+        if (
+            not isinstance(raw_name, str)
+            or not isinstance(raw_version, str)
+            or not isinstance(vulns, list)
+            or not vulns
+        ):
+            continue
+
+        name = _normalized_name(raw_name)
+        locked_versions = versions.get(name)
+        if locked_versions is None or raw_version not in locked_versions:
+            raise ValueError(
+                f"audited dependency is not present in uv.lock: {raw_name}=={raw_version}"
+            )
+
+        dependency_class = _dependency_scope(
+            name,
+            runtime=runtime,
+            dev=dev,
+        )
+        path = _shortest_dependency_path(
+            target=name,
+            project_name=_normalized_name(project_name),
+            runtime=runtime,
+            dev=dev,
+            graph=graph,
+        )
+        fix_available = any(
+            isinstance(vulnerability, dict)
+            and isinstance(vulnerability.get("fix_versions"), list)
+            and bool(vulnerability["fix_versions"])
+            for vulnerability in vulns
+        )
+        vulnerable.append(
+            (
+                raw_name,
+                raw_version,
+                dependency_class,
+                fix_available,
+                path,
+                len(vulns),
+            )
+        )
+
+    if not vulnerable:
+        print("Audit summary: no known vulnerabilities reported for locked export.")
+        return
+
+    findings = sum(item[5] for item in vulnerable)
+    print(
+        "Audit summary: "
+        f"vulnerable_packages={len(vulnerable)} findings={findings}"
+    )
+    for (
+        name,
+        version,
+        dependency_class,
+        fix_available,
+        path,
+        finding_count,
+    ) in sorted(vulnerable):
+        rendered_path = (
+            "unresolved"
+            if path is None
+            else " -> ".join(path)
+        )
+        print(
+            f"- {name}=={version} "
+            f"class={dependency_class} "
+            f"findings={finding_count} "
+            f"fix_available={'yes' if fix_available else 'no'} "
+            f"lock_path={rendered_path}"
+        )
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -338,6 +492,15 @@ def _parser() -> argparse.ArgumentParser:
     )
     generate.add_argument("--source-revision", required=True)
     generate.add_argument("--output-dir", type=Path, required=True)
+
+    summarize = subcommands.add_parser("summarize-audit")
+    summarize.add_argument("--audit", type=Path, required=True)
+    summarize.add_argument("--lock", type=Path, default=Path("uv.lock"))
+    summarize.add_argument(
+        "--pyproject",
+        type=Path,
+        default=Path("pyproject.toml"),
+    )
     return parser
 
 
@@ -352,6 +515,13 @@ def main() -> int:
         )
         print(f"SBOM: {sbom}")
         print(f"Provenance: {provenance}")
+        return 0
+    if args.command == "summarize-audit":
+        summarize_audit(
+            audit_path=args.audit,
+            lock_path=args.lock,
+            pyproject_path=args.pyproject,
+        )
         return 0
     raise AssertionError("unreachable command")
 

@@ -98,3 +98,53 @@ def test_provenance_verifies_sbom_and_locked_materials(tmp_path: Path) -> None:
     assert lock["digest"]["sha256"] == hashlib.sha256(
         (ROOT / "uv.lock").read_bytes()
     ).hexdigest()
+
+
+
+def test_audit_summary_reports_dependency_path_without_description(
+    tmp_path: Path,
+) -> None:
+    audit = tmp_path / "audit.json"
+    audit.write_text(
+        json.dumps(
+            {
+                "dependencies": [
+                    {
+                        "name": "fastapi",
+                        "version": "0.141.1",
+                        "vulns": [
+                            {
+                                "id": "PRIVATE-DETAIL-NOT-FOR-LOG",
+                                "description": "exploit narrative must not leak",
+                                "fix_versions": ["0.141.2"],
+                            }
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "summarize-audit",
+            "--audit",
+            str(audit),
+            "--lock",
+            str(ROOT / "uv.lock"),
+            "--pyproject",
+            str(ROOT / "pyproject.toml"),
+        ],
+        check=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert "fastapi==0.141.1" in completed.stdout
+    assert "class=runtime-direct" in completed.stdout
+    assert "lock_path=orqetia -> fastapi" in completed.stdout
+    assert "fix_available=yes" in completed.stdout
+    assert "PRIVATE-DETAIL-NOT-FOR-LOG" not in completed.stdout
+    assert "exploit narrative" not in completed.stdout

@@ -56,6 +56,47 @@ def check_secrets(paths: list[Path], errors: list[str]) -> None:
                 break
 
 
+def check_minimal_permissions(
+    *,
+    path: Path,
+    content: str,
+    errors: list[str],
+) -> None:
+    lines = content.splitlines()
+    for index, line in enumerate(lines):
+        stripped = line.lstrip()
+        if not stripped.startswith("permissions:"):
+            continue
+        indent = len(line) - len(stripped)
+        inline = stripped.split(":", 1)[1].split("#", 1)[0].strip()
+        if inline in {"read-all", "write-all"}:
+            errors.append(
+                f"SEC-013 broad workflow permissions prohibited: "
+                f"{path.relative_to(ROOT)} -> {inline}"
+            )
+            continue
+        if inline:
+            continue
+
+        for child in lines[index + 1 :]:
+            child_stripped = child.lstrip()
+            if not child_stripped or child_stripped.startswith("#"):
+                continue
+            child_indent = len(child) - len(child_stripped)
+            if child_indent <= indent:
+                break
+            match = re.match(
+                r"([A-Za-z0-9_-]+):\s*(read|write|none)\b",
+                child_stripped,
+            )
+            if match is not None and match.group(2) == "write":
+                errors.append(
+                    f"SEC-013 workflow write permission requires explicit "
+                    f"security exception: {path.relative_to(ROOT)} -> "
+                    f"{match.group(1)}: write"
+                )
+
+
 def check_workflows(errors: list[str]) -> None:
     directory = ROOT / ".github" / "workflows"
     if not directory.exists():
@@ -66,6 +107,7 @@ def check_workflows(errors: list[str]) -> None:
             errors.append(f"SEC-013 pull_request_target prohibited: {path.relative_to(ROOT)}")
         if "permissions:" not in content:
             errors.append(f"SEC-013 workflow lacks explicit permissions: {path.relative_to(ROOT)}")
+        check_minimal_permissions(path=path, content=content, errors=errors)
         if re.search(r"(?:curl|wget).*[|]\s*(?:sh|bash)\b", content):
             errors.append(f"SEC-013 pipe-to-shell in workflow: {path.relative_to(ROOT)}")
         for action, ref in ACTION_USE.findall(content):

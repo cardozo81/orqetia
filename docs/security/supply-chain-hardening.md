@@ -78,8 +78,11 @@ proofs of concept or secrets. A failing audit may expose only the affected
 package/version, dependency class and whether a fixed version is available.
 
 Dependency class is triage evidence, not proof that a transitive dependency is
-unreachable. A vulnerable transitive package must be traced through the lockfile
-graph before it can be accepted as non-reachable.
+unreachable. The gate computes the shortest dependency path visible in
+`uv.lock` for each finding. That path proves dependency-graph reachability only;
+it does not prove the vulnerable code path is executed at runtime. A vulnerable
+transitive package therefore requires explicit code-path triage before any
+exception.
 
 ## Emergency dependency CVE procedure
 
@@ -113,3 +116,25 @@ The isolated `Supply chain` workflow must prove:
 - dedicated supply-chain tests pass;
 - vulnerability audit uses the hashed locked export without printing exploit
   detail.
+
+
+## Audit command used by CI
+
+The workflow exports the exact locked graph with hashes and sends pip-audit JSON
+to a temporary file. The JSON file is not printed. A local equivalent is:
+
+```bash
+uv export --locked --all-groups --no-emit-project \
+  --format requirements.txt \
+  --output-file /tmp/orqetia-audit-requirements.txt
+uv run --no-sync --python 3.14 pip-audit \
+  --strict \
+  --requirement /tmp/orqetia-audit-requirements.txt \
+  --require-hashes \
+  --format json \
+  --output /tmp/orqetia-pip-audit.json
+python scripts/generate_supply_chain_artifacts.py summarize-audit \
+  --audit /tmp/orqetia-pip-audit.json
+```
+
+Only the sanitized summary is intended for CI logs.

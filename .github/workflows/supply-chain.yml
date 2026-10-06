@@ -61,8 +61,32 @@ jobs:
           sha256sum /tmp/orqetia-supply-chain-a/orqetia.cdx.json
           sha256sum /tmp/orqetia-supply-chain-a/orqetia.provenance.json
 
-      - name: Repository action and secret baseline
+      - name: Repository action, permission and secret baseline
         run: uv run --no-sync --python 3.14 python scripts/security_baseline_check.py
+
+      - name: Export hashed locked dependency set
+        run: |
+          uv export --locked --all-groups --no-emit-project \
+            --format requirements.txt \
+            --output-file /tmp/orqetia-audit-requirements.txt
+
+      - name: Audit locked dependencies without exploit detail
+        shell: bash
+        run: |
+          set +e
+          uv run --no-sync --python 3.14 pip-audit \
+            --strict \
+            --requirement /tmp/orqetia-audit-requirements.txt \
+            --require-hashes \
+            --format json \
+            --output /tmp/orqetia-pip-audit.json
+          audit_status=$?
+          set -e
+          uv run --no-sync --python 3.14 python scripts/generate_supply_chain_artifacts.py summarize-audit \
+            --audit /tmp/orqetia-pip-audit.json \
+            --lock uv.lock \
+            --pyproject pyproject.toml
+          exit "$audit_status"
 
       - name: Supply-chain artifact tests
         run: uv run --no-sync --python 3.14 pytest -q tests/security/test_supply_chain.py
