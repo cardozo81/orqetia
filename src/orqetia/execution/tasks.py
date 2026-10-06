@@ -243,12 +243,15 @@ class TaskCycleDecision:
     missing_snapshot: tuple[str, ...]
     recorded_at: datetime
     escalation_reason_code: str | None = None
+    delay_seconds: int = 0
 
     def __post_init__(self) -> None:
         if self.cycle_index < 1:
             raise ValueError("cycle_index must be positive")
         if len(set(self.candidate_order)) != len(self.candidate_order):
             raise ValueError("candidate_order must not contain duplicate targets")
+        if self.delay_seconds < 0:
+            raise ValueError("delay_seconds cannot be negative")
         _bounded_optional(self.escalation_reason_code, "escalation_reason_code", 200)
         _require_aware(self.recorded_at, "recorded_at")
 
@@ -279,6 +282,15 @@ class ExecutionTaskStore(Protocol):
         reason: TaskReasonEnvelope | None = None,
     ) -> bool:
         """Compare-and-set one valid state transition."""
+
+    async def get_cycle_decision(
+        self,
+        *,
+        scope: OwnershipScope,
+        task_id: UUID,
+        cycle_index: int,
+    ) -> TaskCycleDecision | None:
+        """Read one frozen cycle plan through tenant/client ownership."""
 
     async def record_cycle_decision(
         self,

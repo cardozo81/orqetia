@@ -162,6 +162,21 @@ def _task_from_row(row: RowMapping) -> ExecutionTask:
     )
 
 
+def _cycle_decision_from_row(row: RowMapping) -> TaskCycleDecision:
+    raw_candidates = row["candidate_order"]
+    if not isinstance(raw_candidates, list):
+        raise ValueError("persisted candidate_order must be an array")
+    return TaskCycleDecision(
+        cycle_index=cast(int, row["cycle_index"]),
+        candidate_order=tuple(_target_from_json(item) for item in raw_candidates),
+        accepted_snapshot=_str_tuple(row["accepted_snapshot"], "accepted_snapshot"),
+        missing_snapshot=_str_tuple(row["missing_snapshot"], "missing_snapshot"),
+        escalation_reason_code=cast(str | None, row["escalation_reason_code"]),
+        delay_seconds=cast(int, row["delay_seconds"]),
+        recorded_at=cast(datetime, row["recorded_at"]),
+    )
+
+
 def _reason_values(reason: TaskReasonEnvelope | None) -> dict[str, object]:
     return {
         "reason_code": None if reason is None else reason.reason_code,
@@ -392,6 +407,25 @@ class PostgresExecutionTaskStore:
             )
             return True
 
+    async def get_cycle_decision(
+        self,
+        *,
+        scope: OwnershipScope,
+        task_id: UUID,
+        cycle_index: int,
+    ) -> TaskCycleDecision | None:
+        if cycle_index < 1:
+            raise ValueError("cycle_index must be positive")
+        statement = sa.select(task_cycle_decisions).where(
+            task_cycle_decisions.c.task_id == task_id,
+            task_cycle_decisions.c.tenant_id == scope.tenant_id,
+            task_cycle_decisions.c.client_id == scope.client_id,
+            task_cycle_decisions.c.cycle_index == cycle_index,
+        )
+        async with self._sessions() as database:
+            row = (await database.execute(statement)).mappings().one_or_none()
+        return None if row is None else _cycle_decision_from_row(row)
+
     async def record_cycle_decision(
         self,
         *,
@@ -476,6 +510,7 @@ class PostgresExecutionTaskStore:
                         _target_json(item) for item in decision.candidate_order
                     ],
                     escalation_reason_code=decision.escalation_reason_code,
+                    delay_seconds=decision.delay_seconds,
                     accepted_snapshot=list(decision.accepted_snapshot),
                     missing_snapshot=list(decision.missing_snapshot),
                     recorded_at=decision.recorded_at,

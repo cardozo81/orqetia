@@ -283,6 +283,7 @@ task_cycle_decisions = sa.Table(
     sa.Column("task_version", sa.Integer(), nullable=False),
     sa.Column("candidate_order", JSONB(), nullable=False),
     sa.Column("escalation_reason_code", sa.Text(), nullable=True),
+    sa.Column("delay_seconds", sa.Integer(), nullable=False, server_default="0"),
     sa.Column("accepted_snapshot", JSONB(), nullable=False),
     sa.Column("missing_snapshot", JSONB(), nullable=False),
     sa.Column("recorded_at", sa.DateTime(timezone=True), nullable=False),
@@ -303,6 +304,7 @@ task_cycle_decisions = sa.Table(
     ),
     sa.CheckConstraint("cycle_index >= 1", name="cycle_index_positive"),
     sa.CheckConstraint("task_version >= 1", name="task_version_positive"),
+    sa.CheckConstraint("delay_seconds >= 0", name="delay_seconds_non_negative"),
     sa.CheckConstraint(
         "jsonb_typeof(candidate_order) = 'array'",
         name="candidate_order_array",

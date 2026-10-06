@@ -223,6 +223,7 @@ class OrchestrationCyclePlan:
             accepted_snapshot=self.accepted_snapshot,
             missing_snapshot=self.missing_snapshot,
             recorded_at=recorded_at,
+            delay_seconds=self.delay_seconds,
         )
 
 
