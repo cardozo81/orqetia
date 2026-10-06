@@ -90,35 +90,6 @@ class ClientRequestedTarget:
 
 
 @dataclass(frozen=True)
-class SanitizedEvidenceRecord:
-    media_type: str
-    sanitized_raw_body: str
-    sanitized_sha256: str
-    truncated: bool = False
-
-    def __post_init__(self) -> None:
-        if not self.media_type.strip() or len(self.media_type) > 200:
-            raise ValueError("evidence media_type must contain 1..200 characters")
-        if len(self.sanitized_sha256) != 64 or any(
-            char not in "0123456789abcdef" for char in self.sanitized_sha256
-        ):
-            raise ValueError("sanitized_sha256 must be lowercase SHA-256 hex")
-
-
-@dataclass(frozen=True)
-class ClientExchangeEvidence:
-    exchange_id: UUID
-    attempt_id: UUID
-    provider_id: str
-    provider_name: str
-    operation: str
-    status: str
-    status_label: str
-    request_evidence: SanitizedEvidenceRecord
-    response_evidence: SanitizedEvidenceRecord | None = None
-
-
-@dataclass(frozen=True)
 class ClientAttemptPage:
     items: tuple[ProviderAttempt, ...]
     next_cursor: str | None
@@ -161,38 +132,6 @@ class EffectivePolicyResolver(Protocol):
 
 class EffectiveProviderCatalogResolver(Protocol):
     async def resolve_effective(self) -> EffectiveProviderCatalog: ...
-
-
-class ClientRequestArtifactWriter(Protocol):
-    async def store_request(
-        self,
-        *,
-        scope: OwnershipScope,
-        task_id: UUID,
-        payload: dict[str, object],
-        occurred_at: datetime,
-    ) -> TaskPayloadReferences:
-        """Persist client-private input and return only durable references."""
-
-
-class ClientResultArtifactReader(Protocol):
-    async def read_result(
-        self,
-        *,
-        scope: OwnershipScope,
-        result_reference: str,
-    ) -> dict[str, object] | None:
-        """Read a client-safe result by already-authorized owner/reference."""
-
-
-class ClientExchangeEvidenceReader(Protocol):
-    async def list_for_attempt(
-        self,
-        *,
-        scope: OwnershipScope,
-        attempt_id: UUID,
-    ) -> tuple[ClientExchangeEvidence, ...]:
-        """Return retained sanitized raw evidence only."""
 
 
 class OperationRequirementResolver(Protocol):
