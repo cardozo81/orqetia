@@ -98,6 +98,11 @@ class ProviderPricingCatalogRepository(Protocol):
 
     async def get_effective(self) -> EffectiveProviderPricingCatalog | None: ...
 
+    async def get_version(
+        self,
+        catalog_version_id: UUID,
+    ) -> ProviderPricingCatalogVersion | None: ...
+
     async def publish_and_activate(
         self,
         *,
@@ -116,6 +121,12 @@ class InMemoryProviderPricingCatalogRepository:
         return tuple(
             sorted(self._versions.values(), key=lambda item: item.version_number)
         )
+
+    async def get_version(
+        self,
+        catalog_version_id: UUID,
+    ) -> ProviderPricingCatalogVersion | None:
+        return self._versions.get(catalog_version_id)
 
     async def get_effective(self) -> EffectiveProviderPricingCatalog | None:
         if self._assignment is None:

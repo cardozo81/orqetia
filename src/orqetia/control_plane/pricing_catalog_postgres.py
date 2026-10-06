@@ -208,6 +208,18 @@ class PostgresProviderPricingCatalogRepository(ProviderPricingCatalogRepository)
             rows = (await database.execute(statement)).mappings().all()
         return tuple(_version_from_row(row) for row in rows)
 
+    async def get_version(
+        self,
+        catalog_version_id: UUID,
+    ) -> ProviderPricingCatalogVersion | None:
+        statement = sa.select(provider_pricing_catalog_versions).where(
+            provider_pricing_catalog_versions.c.catalog_version_id
+            == catalog_version_id
+        )
+        async with self._sessions() as database:
+            row = (await database.execute(statement)).mappings().one_or_none()
+        return None if row is None else _version_from_row(row)
+
     async def get_effective(self) -> EffectiveProviderPricingCatalog | None:
         statement = (
             sa.select(

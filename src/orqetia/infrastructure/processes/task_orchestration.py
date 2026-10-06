@@ -12,6 +12,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 from orqetia.control_plane import (
     ExecutionPolicyRepository,
     ProviderCredentialSelection,
+    ProviderPricingCatalogRepository,
 )
 from orqetia.execution import (
     AttemptObservation,
@@ -151,6 +152,7 @@ class TaskOrchestrationHandler:
         candidates: OrchestrationCandidateResolver,
         credentials: ProviderCredentialSelector,
         work_queue: WorkQueuePort,
+        pricing_catalogs: ProviderPricingCatalogRepository | None = None,
         engine: CanonicalOrchestrationPolicyEngine | None = None,
         clock: Callable[[], datetime] = _utc_now,
     ) -> None:
@@ -161,6 +163,7 @@ class TaskOrchestrationHandler:
         self._candidates = candidates
         self._credentials = credentials
         self._queue = work_queue
+        self._pricing_catalogs = pricing_catalogs
         self._engine = engine or CanonicalOrchestrationPolicyEngine()
         self._clock = clock
 
@@ -554,6 +557,14 @@ class TaskOrchestrationHandler:
             raise ValueError(
                 "credential selector returned cross-provider credential"
             )
+        pricing_catalog_version_id = None
+        if self._pricing_catalogs is not None:
+            effective_pricing = await self._pricing_catalogs.get_effective()
+            if effective_pricing is not None:
+                pricing_catalog_version_id = (
+                    effective_pricing.version.catalog_version_id
+                )
+
         now = self._clock()
         attempt = ProviderAttempt(
             attempt_id=attempt_id,
@@ -569,6 +580,7 @@ class TaskOrchestrationHandler:
             status=ProviderAttemptStatus.PREPARED,
             provider_account_id=selected.provider_account_id,
             provider_credential_id=selected.provider_credential_id,
+            pricing_catalog_version_id=pricing_catalog_version_id,
             missing_requirements=missing_requirements,
             created_at=now,
             updated_at=now,

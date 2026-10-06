@@ -64,6 +64,7 @@ class ProviderAttempt:
     session_id: UUID | None = None
     provider_account_id: UUID | None = None
     provider_credential_id: UUID | None = None
+    pricing_catalog_version_id: UUID | None = None
     dispatch_work_id: UUID | None = None
     provider_outcome: str | None = None
     accepted_requirements: tuple[str, ...] = ()

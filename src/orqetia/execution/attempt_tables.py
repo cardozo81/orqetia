@@ -21,6 +21,7 @@ provider_attempts = sa.Table(
     sa.Column("provider_id", sa.Text(), nullable=False),
     sa.Column("provider_account_id", UUID(as_uuid=True), nullable=True),
     sa.Column("provider_credential_id", UUID(as_uuid=True), nullable=True),
+    sa.Column("pricing_catalog_version_id", UUID(as_uuid=True), nullable=True),
     sa.Column("model_id", sa.Text(), nullable=False),
     sa.Column("reasoning_profile", sa.Text(), nullable=False),
     sa.Column("cycle", sa.Integer(), nullable=False),
