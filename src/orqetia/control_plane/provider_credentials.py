@@ -57,6 +57,7 @@ class ProviderCredentialMetadata:
     secret_reference: SecretReference
     fingerprint: str
     key_version: int
+    state_version: int
     status: ProviderCredentialStatus
     created_at: datetime
     rotated_at: datetime | None = None
@@ -74,6 +75,8 @@ class ProviderCredentialMetadata:
             raise ValueError("fingerprint must be 16 lowercase hex characters")
         if self.key_version < 1:
             raise ValueError("key_version must be positive")
+        if self.state_version < 1:
+            raise ValueError("state_version must be positive")
         _require_aware(self.created_at, "created_at")
         for field, value in (
             ("rotated_at", self.rotated_at),
@@ -96,6 +99,7 @@ class ProviderCredentialMetadata:
             "provider_account_id": str(self.provider_account_id),
             "fingerprint": self.fingerprint,
             "key_version": self.key_version,
+            "state_version": self.state_version,
             "status": self.status.value,
             "created_at": self.created_at,
             "rotated_at": self.rotated_at,
@@ -144,7 +148,7 @@ class ProviderCredentialRepository(Protocol):
         self,
         metadata: ProviderCredentialMetadata,
         *,
-        expected_version: int,
+        expected_state_version: int,
     ) -> ProviderCredentialMetadata: ...
 
 
@@ -203,12 +207,12 @@ class InMemoryProviderCredentialRepository:
         self,
         metadata: ProviderCredentialMetadata,
         *,
-        expected_version: int,
+        expected_state_version: int,
     ) -> ProviderCredentialMetadata:
         existing = self._items.get(metadata.credential_id)
         if existing is None:
             raise LookupError("provider credential not found")
-        if existing.key_version != expected_version:
+        if existing.state_version != expected_state_version:
             raise ValueError("provider credential version conflict")
         self._items[metadata.credential_id] = metadata
         return metadata
@@ -254,6 +258,7 @@ class ProviderCredentialService:
             secret_reference=reference,
             fingerprint=_fingerprint(secret),
             key_version=1,
+            state_version=1,
             status=ProviderCredentialStatus.ACTIVE,
             created_at=occurred_at,
             expires_at=expires_at,
@@ -281,12 +286,13 @@ class ProviderCredentialService:
             secret_reference=new_reference,
             fingerprint=_fingerprint(new_secret),
             key_version=existing.key_version + 1,
+            state_version=existing.state_version + 1,
             rotated_at=occurred_at,
         )
         try:
             saved = await self._repository.replace(
                 rotated,
-                expected_version=existing.key_version,
+                expected_state_version=existing.state_version,
             )
         except Exception:
             await self._secrets.delete(new_reference)
@@ -310,11 +316,12 @@ class ProviderCredentialService:
         revoked = replace(
             existing,
             status=ProviderCredentialStatus.REVOKED,
+            state_version=existing.state_version + 1,
             revoked_at=occurred_at,
         )
         saved = await self._repository.replace(
             revoked,
-            expected_version=existing.key_version,
+            expected_state_version=existing.state_version,
         )
         await self._retire_secret(
             metadata=saved,
@@ -347,8 +354,9 @@ class ProviderCredentialService:
             last_failed_use_at=(
                 existing.last_failed_use_at if result.ok else occurred_at
             ),
+            state_version=existing.state_version + 1,
         )
-        await self._repository.replace(updated, expected_version=existing.key_version)
+        await self._repository.replace(updated, expected_state_version=existing.state_version)
         await self._audit_event(
             updated,
             "PREFLIGHT",
