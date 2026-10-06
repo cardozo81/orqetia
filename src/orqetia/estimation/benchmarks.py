@@ -38,6 +38,42 @@ class BenchmarkUnavailableReason(StrEnum):
     METHODOLOGY_VERSION_MISMATCH = "METHODOLOGY_VERSION_MISMATCH"
 
 
+GLOBAL_PUBLIC_PRIVACY_CONTRACT_VERSION = "global-public-v1"
+GLOBAL_PUBLIC_MINIMUM_SAMPLES = 30
+GLOBAL_PUBLIC_MINIMUM_CLIENTS = 5
+GLOBAL_PUBLIC_MINIMUM_SAMPLE_BUCKET = 10
+GLOBAL_PUBLIC_MINIMUM_COHORT_BUCKET = 5
+GLOBAL_PUBLIC_PURPOSE = "technical_token_estimation"
+GLOBAL_PUBLIC_ALLOWED_FEATURE_DIMENSIONS = frozenset(
+    {
+        "provider_id",
+        "model_id",
+        "reasoning_profile",
+        "input_size_bucket",
+        "output_class",
+        "schema_class",
+    }
+)
+GLOBAL_PUBLIC_PROHIBITED_SAMPLE_FIELDS = frozenset(
+    {
+        "prompt",
+        "input",
+        "context",
+        "output",
+        "content",
+        "user_id",
+        "subject_id",
+        "email",
+        "ip_address",
+        "provider_cost",
+        "currency",
+        "client_charge",
+        "provider_credential_id",
+        "provider_secret",
+    }
+)
+
+
 @dataclass(frozen=True)
 class BenchmarkFeatureKey:
     """Typed, non-content dimensions allowed to partition benchmark cohorts."""
@@ -115,6 +151,36 @@ class BenchmarkPolicy:
         ):
             if value < 1:
                 raise ValueError(f"{field} must be positive")
+
+        privacy_floors = (
+            (
+                "minimum_global_samples",
+                self.minimum_global_samples,
+                GLOBAL_PUBLIC_MINIMUM_SAMPLES,
+            ),
+            (
+                "minimum_global_clients",
+                self.minimum_global_clients,
+                GLOBAL_PUBLIC_MINIMUM_CLIENTS,
+            ),
+            (
+                "public_count_bucket",
+                self.public_count_bucket,
+                GLOBAL_PUBLIC_MINIMUM_SAMPLE_BUCKET,
+            ),
+            (
+                "public_cohort_bucket",
+                self.public_cohort_bucket,
+                GLOBAL_PUBLIC_MINIMUM_COHORT_BUCKET,
+            ),
+        )
+        for field, value, minimum in privacy_floors:
+            if value < minimum:
+                raise ValueError(
+                    f"{field} cannot weaken "
+                    f"{GLOBAL_PUBLIC_PRIVACY_CONTRACT_VERSION} privacy floor "
+                    f"below {minimum}"
+                )
 
 
 @dataclass(frozen=True)

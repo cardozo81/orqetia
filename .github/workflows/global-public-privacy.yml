@@ -1,0 +1,45 @@
+name: GLOBAL_PUBLIC privacy
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - src/orqetia/estimation/benchmarks.py
+      - src/orqetia/estimation/__init__.py
+      - docs/privacy/global-public-benchmark-policy.md
+      - tests/estimation/test_global_public_privacy.py
+      - .github/workflows/global-public-privacy.yml
+  push:
+    branches: [main]
+    paths:
+      - src/orqetia/estimation/benchmarks.py
+      - src/orqetia/estimation/__init__.py
+      - docs/privacy/global-public-benchmark-policy.md
+      - tests/estimation/test_global_public_privacy.py
+      - .github/workflows/global-public-privacy.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: global-public-privacy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned uv bootstrap tool
+        run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+
+      - name: Install locked test environment
+        run: uv sync --locked --python 3.14
+
+      - name: GLOBAL_PUBLIC privacy contract tests
+        run: uv run --no-sync --python 3.14 pytest -q tests/estimation/test_global_public_privacy.py
