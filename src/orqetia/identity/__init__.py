@@ -22,6 +22,24 @@ from .backoffice_authz import (
 )
 from .backoffice_authz_postgres import PostgresBackofficeBindingRepository
 from .backoffice_authz_tables import backoffice_user_bindings
+from .customer_authz import (
+    CUSTOMER_ROLE_MATRIX_VERSION,
+    CustomerAuthorizationService,
+    CustomerAuthzAuditEvent,
+    CustomerAuthzAuditSink,
+    CustomerIdentity,
+    CustomerIdentityRepository,
+    CustomerIdentityStatus,
+    CustomerMembership,
+    CustomerMembershipStatus,
+    CustomerOwnerResolver,
+    CustomerPrincipal,
+    CustomerRole,
+    InMemoryCustomerAuthzAuditSink,
+    InMemoryCustomerIdentityRepository,
+)
+from .customer_authz_postgres import PostgresCustomerIdentityRepository
+from .customer_authz_tables import customer_identities, customer_memberships
 from .client_credential_postgres import PostgresClientCredentialStore
 from .client_credential_tables import (
     client_access_credentials,
@@ -57,6 +75,18 @@ __all__ = [
     "ClientAccessCredentialService",
     "ClientCredentialStatus",
     "ClientCredentialStore",
+    "CUSTOMER_ROLE_MATRIX_VERSION",
+    "CustomerAuthorizationService",
+    "CustomerAuthzAuditEvent",
+    "CustomerAuthzAuditSink",
+    "CustomerIdentity",
+    "CustomerIdentityRepository",
+    "CustomerIdentityStatus",
+    "CustomerMembership",
+    "CustomerMembershipStatus",
+    "CustomerOwnerResolver",
+    "CustomerPrincipal",
+    "CustomerRole",
     "CredentialMutationResult",
     "CredentialOperation",
     "IdempotencyConflict",
@@ -64,9 +94,12 @@ __all__ = [
     "InMemoryBackofficeAuthzAuditSink",
     "InMemoryBackofficeBindingRepository",
     "InMemoryClientCredentialStore",
+    "InMemoryCustomerAuthzAuditSink",
+    "InMemoryCustomerIdentityRepository",
     "OneTimeCredentialSecret",
     "PostgresBackofficeBindingRepository",
     "PostgresClientCredentialStore",
+    "PostgresCustomerIdentityRepository",
     "ROLE_MATRIX_VERSION",
     "StoredClientCredentialAuthenticator",
     "AuthenticatedWebSession",
@@ -79,6 +112,8 @@ __all__ = [
     "WebSessionRejected",
     "backoffice_user_bindings",
     "backoffice_web_sessions",
+    "customer_identities",
+    "customer_memberships",
     "client_access_credentials",
     "client_credential_operations",
 ]
