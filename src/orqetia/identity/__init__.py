@@ -6,6 +6,22 @@ from .authentication import (
     AuthenticationRejected,
     BearerAuthenticator,
 )
+from .backoffice_authz import (
+    BackofficeAuthorizationService,
+    BackofficeAuthzAuditEvent,
+    BackofficeAuthzAuditSink,
+    BackofficeBindingRepository,
+    BackofficeBindingStatus,
+    BackofficePrincipal,
+    BackofficeRole,
+    BackofficeUserBinding,
+    HumanAuthenticationContext,
+    InMemoryBackofficeAuthzAuditSink,
+    InMemoryBackofficeBindingRepository,
+    ROLE_MATRIX_VERSION,
+)
+from .backoffice_authz_postgres import PostgresBackofficeBindingRepository
+from .backoffice_authz_tables import backoffice_user_bindings
 from .client_credential_postgres import PostgresClientCredentialStore
 from .client_credential_tables import (
     client_access_credentials,
@@ -26,6 +42,14 @@ from .client_credentials import (
 
 __all__ = [
     "AuthenticatedPrincipal",
+    "BackofficeAuthorizationService",
+    "BackofficeAuthzAuditEvent",
+    "BackofficeAuthzAuditSink",
+    "BackofficeBindingRepository",
+    "BackofficeBindingStatus",
+    "BackofficePrincipal",
+    "BackofficeRole",
+    "BackofficeUserBinding",
     "AuthenticationBackendUnavailable",
     "AuthenticationRejected",
     "BearerAuthenticator",
@@ -36,10 +60,16 @@ __all__ = [
     "CredentialMutationResult",
     "CredentialOperation",
     "IdempotencyConflict",
+    "HumanAuthenticationContext",
+    "InMemoryBackofficeAuthzAuditSink",
+    "InMemoryBackofficeBindingRepository",
     "InMemoryClientCredentialStore",
     "OneTimeCredentialSecret",
+    "PostgresBackofficeBindingRepository",
     "PostgresClientCredentialStore",
+    "ROLE_MATRIX_VERSION",
     "StoredClientCredentialAuthenticator",
+    "backoffice_user_bindings",
     "client_access_credentials",
     "client_credential_operations",
 ]
