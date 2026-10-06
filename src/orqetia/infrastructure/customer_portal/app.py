@@ -14,6 +14,16 @@ from uuid import UUID, uuid7
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
+from orqetia.estimation import (
+    EstimateExecutionMode,
+    EstimateForbidden,
+    EstimateService,
+    EstimateSpec,
+    EstimateSubject,
+    EstimateTarget,
+    EstimateUnavailable,
+    ReferenceScope,
+)
 from orqetia.identity import (
     ClientAccessCredentialService,
     IdempotencyConflict,
@@ -33,6 +43,7 @@ from orqetia.infrastructure.http.execution_runtime import (
     ClientExecutionRuntime,
     ClientRequestedTarget,
 )
+from orqetia.read_models import ClientUsageReportService
 
 _SESSION_COOKIE = "__Host-orqetia-portal-session"
 _CSRF_COOKIE = "__Host-orqetia-portal-csrf"
@@ -89,6 +100,8 @@ def create_customer_portal_app(
     enable_hsts: bool = False,
     execution: ClientExecutionRuntime | None = None,
     credentials: ClientAccessCredentialService | None = None,
+    usage: ClientUsageReportService | None = None,
+    estimation: EstimateService | None = None,
 ) -> FastAPI:
     origin = allowed_origin.rstrip("/")
     if not origin.startswith(("http://", "https://")):
@@ -206,6 +219,20 @@ def create_customer_portal_app(
             )
         return credentials
 
+    def required_usage() -> ClientUsageReportService:
+        if usage is None:
+            raise CustomerPortalUnavailable(
+                "Client usage reporting is unavailable"
+            )
+        return usage
+
+    def required_estimation() -> EstimateService:
+        if estimation is None:
+            raise CustomerPortalUnavailable(
+                "Client estimation service is unavailable"
+            )
+        return estimation
+
     def delegable_scopes(permissions: frozenset[str]) -> frozenset[str]:
         output: set[str] = set()
         if "sessions:read" in permissions:
@@ -322,6 +349,38 @@ def create_customer_portal_app(
     ) -> HTMLResponse:
         response = page("Forbidden", "<p>Permission denied.</p>")
         response.status_code = 403
+        return response
+
+    @app.exception_handler(EstimateForbidden)
+    async def handle_estimate_forbidden(
+        _request: Request,
+        _exc: EstimateForbidden,
+    ) -> HTMLResponse:
+        response = page(
+            "Forbidden",
+            "<p>Requested estimate target is not authorized.</p>",
+        )
+        response.status_code = 403
+        return response
+
+    @app.exception_handler(EstimateUnavailable)
+    async def handle_estimate_unavailable(
+        _request: Request,
+        exc: EstimateUnavailable,
+    ) -> HTMLResponse:
+        limitations = "".join(
+            "<li>" + escape(item) + "</li>"
+            for item in exc.limitations[:10]
+        )
+        response = page(
+            "Estimate unavailable",
+            "<p>"
+            + escape(exc.reason)
+            + "</p><ul>"
+            + limitations
+            + "</ul>",
+        )
+        response.status_code = 422
         return response
 
     @app.exception_handler(IdempotencyConflict)
@@ -933,6 +992,148 @@ def create_customer_portal_app(
         return page(
             "Exchange evidence",
             "".join(rows),
+            nav=navigation(current.principal.permissions),
+        )
+
+    @app.get("/portal/usage")
+    async def usage_page(
+        request: Request,
+        period_from: datetime | None = None,
+        period_to: datetime | None = None,
+    ) -> HTMLResponse:
+        current = await authorized(request, "usage:read")
+        report = await required_usage().read(
+            tenant_id=current.principal.tenant_id,
+            client_id=current.principal.client_id,
+            period_from=period_from,
+            period_to=period_to,
+            cursor=None,
+            limit=50,
+        )
+        rows = "".join(
+            "<tr><td>"
+            + escape(str(item.period_start))
+            + "</td><td>"
+            + escape(str(item.period_end))
+            + "</td><td>"
+            + escape(str(item.input_tokens))
+            + "</td><td>"
+            + escape(str(item.cached_input_tokens))
+            + "</td><td>"
+            + escape(str(item.output_tokens))
+            + "</td><td>"
+            + escape(str(item.reasoning_tokens))
+            + "</td><td>"
+            + escape(str(item.total_tokens))
+            + "</td><td>"
+            + escape(
+                ", ".join(
+                    f"{native.unit}: {native.quantity}"
+                    for native in item.native_usage
+                )
+            )
+            + "</td></tr>"
+            for item in report.items
+        )
+        body = (
+            "<p>Technical usage only. Monetary provider data is not exposed.</p>"
+            "<table><thead><tr><th>From</th><th>To</th>"
+            "<th>Input</th><th>Cached input</th><th>Output</th>"
+            "<th>Reasoning</th><th>Total</th><th>Native usage</th>"
+            "</tr></thead><tbody>"
+            + rows
+            + "</tbody></table><p>As of: "
+            + escape("" if report.as_of is None else str(report.as_of))
+            + "</p>"
+        )
+        return page(
+            "Usage",
+            body,
+            nav=navigation(current.principal.permissions),
+        )
+
+    @app.get("/portal/estimates")
+    async def estimates_page(request: Request) -> HTMLResponse:
+        current = await authorized(request, "estimates:write")
+        body = (
+            "<p>Estimates are provider-free and based on governed benchmarks.</p>"
+            "<form method='post' action='/portal/estimates'>"
+            + csrf_field(request)
+            + "<label>Operation <input name='operation' "
+            "value='TASK_EXECUTION' required></label>"
+            "<label>Input JSON <textarea name='input_json' required>"
+            '{"input_text":""}'
+            "</textarea></label>"
+            "<label>Reference scope <select name='reference_scope'>"
+            "<option>CLIENT_ONLY</option><option>GLOBAL_PUBLIC</option>"
+            "</select></label>"
+            "<label>Provider <input name='provider_id'></label>"
+            "<label>Model <input name='model_id'></label>"
+            "<label>Reasoning profile "
+            "<input name='reasoning_profile'></label>"
+            "<button type='submit'>Estimate</button></form>"
+            "<p>Leave target fields empty for AUTO.</p>"
+        )
+        return page(
+            "Token Estimates",
+            body,
+            nav=navigation(current.principal.permissions),
+        )
+
+    @app.post("/portal/estimates")
+    async def create_estimate(request: Request) -> HTMLResponse:
+        current, data = await authorized_mutation(
+            request,
+            "estimates:write",
+        )
+        try:
+            payload = json.loads(data.get("input_json", ""))
+        except json.JSONDecodeError as error:
+            raise ValueError("input_json must be valid JSON") from error
+        if not isinstance(payload, dict):
+            raise ValueError("input_json must be a JSON object")
+
+        provider_id = data.get("provider_id", "").strip()
+        model_id = data.get("model_id", "").strip()
+        reasoning = data.get("reasoning_profile", "").strip()
+        if any((provider_id, model_id, reasoning)) and not all(
+            (provider_id, model_id, reasoning)
+        ):
+            raise ValueError(
+                "explicit estimate requires provider/model/reasoning profile"
+            )
+        mode = EstimateExecutionMode.AUTO
+        target = None
+        if provider_id:
+            if "tasks:write" not in current.principal.permissions:
+                raise PermissionError("explicit target permission denied")
+            mode = EstimateExecutionMode.EXPLICIT_TARGET
+            target = EstimateTarget(
+                provider_id=provider_id,
+                model_id=model_id,
+                reasoning_profile=reasoning,
+            )
+
+        spec = EstimateSpec(
+            operation=data.get("operation", "").strip(),
+            input_payload=payload,
+            reference_scope=ReferenceScope(
+                data.get("reference_scope", "CLIENT_ONLY")
+            ),
+            execution_mode=mode,
+            target=target,
+        )
+        result = await required_estimation().estimate(
+            subject=EstimateSubject(
+                tenant_id=str(current.principal.tenant_id),
+                client_id=str(current.principal.client_id),
+            ),
+            spec=spec,
+        )
+        return page(
+            "Estimate result",
+            "<pre>" + safe_json(result.client_payload()) + "</pre>"
+            "<p><a href='/portal/estimates'>New estimate</a></p>",
             nav=navigation(current.principal.permissions),
         )
 
