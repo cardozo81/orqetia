@@ -8,8 +8,8 @@ import pytest
 
 from orqetia.tenancy import (
     AdministrativeStatus,
-    InMemoryTenantClientRepository,
     InMemoryTenancyAuditSink,
+    InMemoryTenantClientRepository,
     TenancyAdminService,
 )
 

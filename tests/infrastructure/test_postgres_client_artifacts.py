@@ -4,11 +4,10 @@ import asyncio
 import hashlib
 import json
 import os
+import sqlalchemy as sa
 import unittest
 from datetime import UTC, datetime, timedelta
 from uuid import uuid7
-
-import sqlalchemy as sa
 
 from orqetia.execution import (
     ClientExchangeEvidence,
@@ -16,11 +15,14 @@ from orqetia.execution import (
     SanitizedEvidenceRecord,
     provider_attempts,
 )
-from orqetia.infrastructure.artifacts import ArtifactConflict, ArtifactTooLarge, PostgresClientArtifactStore
+from orqetia.infrastructure.artifacts import (
+    ArtifactConflict,
+    ArtifactTooLarge,
+    PostgresClientArtifactStore,
+)
 from orqetia.infrastructure.persistence import create_engine, create_session_factory
 from orqetia.providers import OutputKind, ProviderTarget
 from orqetia.settings import RuntimeSettings
-
 
 def _fingerprint(value: object) -> str:
     encoded = json.dumps(

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from uuid import uuid7
 
 import pytest
 
@@ -17,8 +16,8 @@ from orqetia.identity import (
 )
 from orqetia.tenancy import (
     AdministrativeStatus,
-    InMemoryTenantClientRepository,
     InMemoryTenancyAuditSink,
+    InMemoryTenantClientRepository,
     TenancyAdminService,
 )
 
