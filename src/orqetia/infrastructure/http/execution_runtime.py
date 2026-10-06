@@ -66,12 +66,16 @@ def _work_id(task_id: UUID) -> UUID:
     return uuid5(NAMESPACE_URL, f"orqetia:task-orchestration:{task_id}")
 
 
-def _cursor(offset: int) -> str:
-    raw = json.dumps({"offset": offset}, separators=(",", ":")).encode("utf-8")
+def _cursor(offset: int, *, query_fingerprint: str) -> str:
+    raw = json.dumps(
+        {"v": 1, "offset": offset, "query": query_fingerprint},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
     return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
 
-def _offset(cursor: str | None) -> int:
+def _offset(cursor: str | None, *, query_fingerprint: str) -> int:
     if cursor is None:
         return 0
     if not cursor.strip() or len(cursor) > 500:
@@ -81,6 +85,12 @@ def _offset(cursor: str | None) -> int:
         value = json.loads(
             base64.urlsafe_b64decode((cursor + padding).encode("ascii"))
         )
+        if (
+            not isinstance(value, dict)
+            or value.get("v") != 1
+            or value.get("query") != query_fingerprint
+        ):
+            raise ValueError("attempt cursor query fingerprint mismatch")
         offset = int(value["offset"])
     except (ValueError, TypeError, KeyError, json.JSONDecodeError) as error:
         raise ValueError("invalid attempt cursor") from error
@@ -539,12 +549,23 @@ class ClientExecutionRuntime:
             scope=scope,
             task_id=task_id,
         )
-        start = _offset(cursor)
+        query_fingerprint = _fingerprint(
+            {
+                "tenant_id": str(scope.tenant_id),
+                "client_id": str(scope.client_id),
+                "task_id": str(task_id),
+            }
+        )
+        start = _offset(cursor, query_fingerprint=query_fingerprint)
         page = items[start : start + limit]
         next_offset = start + len(page)
         return ClientAttemptPage(
             items=page,
-            next_cursor=_cursor(next_offset) if next_offset < len(items) else None,
+            next_cursor=(
+                _cursor(next_offset, query_fingerprint=query_fingerprint)
+                if next_offset < len(items)
+                else None
+            ),
         )
 
     async def list_attempt_exchanges(

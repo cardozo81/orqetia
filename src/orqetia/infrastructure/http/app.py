@@ -39,7 +39,7 @@ from orqetia.identity.authentication import (
     BearerAuthenticator,
 )
 from orqetia.infrastructure.health import ReadinessProbe
-from orqetia.read_models import ClientUsageReportService
+from orqetia.read_models import BoundedReadExceeded, ClientUsageReportService
 
 from .execution_runtime import (
     ClientExecutionArtifactUnavailable,
@@ -958,6 +958,12 @@ def create_app(
                 cursor=cursor,
                 limit=limit,
             )
+        except BoundedReadExceeded as exc:
+            raise ApiError(
+                413,
+                "READ_LIMIT_EXCEEDED",
+                "Usage report exceeds the bounded read contract.",
+            ) from exc
         except ValueError as exc:
             raise ApiError(
                 400,

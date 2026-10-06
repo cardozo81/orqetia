@@ -618,3 +618,73 @@ async def test_result_attempt_and_exchange_views_are_client_safe() -> None:
         token="other",
     )
     assert cross_owner.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_attempt_cursor_is_bound_to_task_query() -> None:
+    runtime, _sessions, tasks, attempts, _artifacts, _queue = _runtime()
+    app = create_app(
+        openapi_document=CANONICAL,
+        authenticator=FakeAuthenticator(),
+        execution_runtime=runtime,
+    )
+    session = await _request(
+        app, "POST", "/v1/sessions", body={}, key="session-cursor"
+    )
+    session_id = UUID(session.json()["session_id"])
+    first_task = await _request(
+        app,
+        "POST",
+        f"/v1/sessions/{session_id}/tasks",
+        body={"operation": "TASK_EXECUTION", "input": {"message": "first"}},
+        key="task-cursor-1",
+    )
+    second_task = await _request(
+        app,
+        "POST",
+        f"/v1/sessions/{session_id}/tasks",
+        body={"operation": "TASK_EXECUTION", "input": {"message": "second"}},
+        key="task-cursor-2",
+    )
+    first_id = UUID(first_task.json()["task_id"])
+    second_id = UUID(second_task.json()["task_id"])
+    first_domain = tasks.items[first_id]
+
+    for index in (1, 2):
+        attempt = ProviderAttempt(
+            attempt_id=uuid7(),
+            task_id=first_id,
+            session_id=session_id,
+            ownership=first_domain.ownership,
+            operation="TASK_EXECUTION",
+            target=ExecutionTargetSnapshot("alpha", "alpha-1", "standard"),
+            cycle=1,
+            attempt_index=index,
+            request_reference=first_domain.payloads.input_reference,
+            request_fingerprint=first_domain.payloads.input_fingerprint,
+            status=ProviderAttemptStatus.COMPLETED,
+            provider_outcome="SUCCESS",
+            accepted_requirements=(),
+            missing_requirements=(),
+            created_at=NOW,
+            updated_at=NOW,
+            terminal_at=NOW,
+        )
+        attempts.items[attempt.attempt_id] = attempt
+
+    page = await _request(
+        app,
+        "GET",
+        f"/v1/tasks/{first_id}/attempts?limit=1",
+    )
+    assert page.status_code == 200
+    cursor = page.json()["next_cursor"]
+    assert cursor is not None
+
+    misuse = await _request(
+        app,
+        "GET",
+        f"/v1/tasks/{second_id}/attempts?limit=1&cursor={cursor}",
+    )
+    assert misuse.status_code == 400
+    assert misuse.json()["code"] == "INVALID_REQUEST"
