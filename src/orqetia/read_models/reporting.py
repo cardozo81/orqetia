@@ -47,10 +47,21 @@ class ReportRollup:
     client_credential_id: UUID | None = None
     provider_account_id: UUID | None = None
     provider_credential_id: UUID | None = None
+    session_id: UUID | None = None
+    task_id: UUID | None = None
+    attempt_id: UUID | None = None
+    policy_version_id: UUID | None = None
     error_class: str | None = None
+    requests: int = 0
+    tasks: int = 0
+    peak_concurrent: int = 0
+    quota_utilization: Decimal | None = None
     latency_ms_total: int = 0
     cycles: int = 0
     retries: int = 0
+    fallbacks: int = 0
+    health_events: int = 0
+    quarantine_events: int = 0
     estimated_cost: Decimal | None = None
     estimated_currency: str | None = None
     observed_cost: Decimal | None = None
@@ -75,9 +86,16 @@ class ReportRollup:
             ("output_tokens", self.output_tokens),
             ("reasoning_tokens", self.reasoning_tokens),
             ("total_tokens", self.total_tokens),
+            ("requests", self.requests),
+            ("tasks", self.tasks),
+            ("peak_concurrent", self.peak_concurrent),
+            ("quota_utilization", self.quota_utilization),
             ("latency_ms_total", self.latency_ms_total),
             ("cycles", self.cycles),
             ("retries", self.retries),
+            ("fallbacks", self.fallbacks),
+            ("health_events", self.health_events),
+            ("quarantine_events", self.quarantine_events),
             ("unpriced_attempts", self.unpriced_attempts),
             ("estimated_cost", self.estimated_cost),
             ("observed_cost", self.observed_cost),
@@ -85,6 +103,8 @@ class ReportRollup:
             _non_negative(value, field)
         if self.cached_input_tokens > self.input_tokens:
             raise ValueError("cached_input_tokens cannot exceed input_tokens")
+        if self.quota_utilization is not None and self.quota_utilization > 1:
+            raise ValueError("quota_utilization cannot exceed 1")
         if self.provider_credential_id is not None and self.provider_account_id is None:
             raise ValueError("provider credential provenance requires provider account")
         for field, value, maximum in (
@@ -124,10 +144,22 @@ class ReportRollup:
                 if self.provider_credential_id is None
                 else str(self.provider_credential_id)
             ),
+            "session_id": None if self.session_id is None else str(self.session_id),
+            "task_id": None if self.task_id is None else str(self.task_id),
+            "attempt_id": None if self.attempt_id is None else str(self.attempt_id),
+            "policy_version_id": (
+                None if self.policy_version_id is None else str(self.policy_version_id)
+            ),
             "model_id": self.model_id,
             "status": self.status,
             "error_class": self.error_class,
+            "requests": self.requests,
+            "tasks": self.tasks,
             "attempts": self.attempts,
+            "peak_concurrent": self.peak_concurrent,
+            "quota_utilization": (
+                None if self.quota_utilization is None else str(self.quota_utilization)
+            ),
             "input_tokens": self.input_tokens,
             "cached_input_tokens": self.cached_input_tokens,
             "output_tokens": self.output_tokens,
@@ -144,6 +176,9 @@ class ReportRollup:
             "latency_ms_total": self.latency_ms_total,
             "cycles": self.cycles,
             "retries": self.retries,
+            "fallbacks": self.fallbacks,
+            "health_events": self.health_events,
+            "quarantine_events": self.quarantine_events,
             "estimated_cost": (
                 None if self.estimated_cost is None else str(self.estimated_cost)
             ),
@@ -166,6 +201,10 @@ class ReportQuery:
     provider_id: str | None = None
     provider_account_id: UUID | None = None
     provider_credential_id: UUID | None = None
+    session_id: UUID | None = None
+    task_id: UUID | None = None
+    attempt_id: UUID | None = None
+    policy_version_id: UUID | None = None
     model_id: str | None = None
     status: str | None = None
     error_class: str | None = None
@@ -490,6 +529,10 @@ def _matches(item: ReportRollup, filters: ReportQuery) -> bool:
         "provider_id",
         "provider_account_id",
         "provider_credential_id",
+        "session_id",
+        "task_id",
+        "attempt_id",
+        "policy_version_id",
         "model_id",
         "status",
         "error_class",

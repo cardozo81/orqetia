@@ -32,6 +32,10 @@ class IntelligenceDimension(StrEnum):
     MODEL = "MODEL"
     STATUS = "STATUS"
     ERROR_CLASS = "ERROR_CLASS"
+    SESSION = "SESSION"
+    TASK = "TASK"
+    ATTEMPT = "ATTEMPT"
+    POLICY_VERSION = "POLICY_VERSION"
     PERIOD = "PERIOD"
 
 
@@ -63,7 +67,11 @@ class IntelligenceDimensionValue:
 
 @dataclass(frozen=True)
 class IntelligenceMetrics:
+    requests: int
+    tasks: int
     attempts: int
+    peak_concurrent: int
+    maximum_quota_utilization: Decimal | None
     input_tokens: int
     cached_input_tokens: int
     output_tokens: int
@@ -76,7 +84,11 @@ class IntelligenceMetrics:
     average_latency_ms: Decimal | None
     cycles: int
     retries: int
+    fallbacks: int
+    health_events: int
+    quarantine_events: int
     peak_attempts_per_bucket: int
+    throughput_attempts_per_hour: Decimal | None
     failure_rate: Decimal
     retry_rate: Decimal
     estimated_costs: tuple[CurrencyTotal, ...]
@@ -204,7 +216,11 @@ def _aggregate(
         item = state.setdefault(
             key,
             {
+                "requests": 0,
+                "tasks": 0,
                 "attempts": 0,
+                "peak_concurrent": 0,
+                "maximum_quota_utilization": None,
                 "input_tokens": 0,
                 "cached_input_tokens": 0,
                 "output_tokens": 0,
@@ -217,14 +233,32 @@ def _aggregate(
                 "latency_ms_total": 0,
                 "cycles": 0,
                 "retries": 0,
+                "fallbacks": 0,
+                "health_events": 0,
+                "quarantine_events": 0,
                 "period_attempts": {},
+                "period_start_min": None,
+                "period_end_max": None,
                 "estimated": {},
                 "observed": {},
                 "unpriced": 0,
             },
         )
+        item["requests"] = int(item["requests"]) + row.requests
+        item["tasks"] = int(item["tasks"]) + row.tasks
         attempts = int(item["attempts"]) + row.attempts
         item["attempts"] = attempts
+        item["peak_concurrent"] = max(
+            int(item["peak_concurrent"]),
+            row.peak_concurrent,
+        )
+        if row.quota_utilization is not None:
+            current_quota = item["maximum_quota_utilization"]
+            item["maximum_quota_utilization"] = (
+                row.quota_utilization
+                if current_quota is None
+                else max(Decimal(current_quota), row.quota_utilization)
+            )
         for field in (
             "input_tokens",
             "cached_input_tokens",
@@ -234,6 +268,9 @@ def _aggregate(
             "latency_ms_total",
             "cycles",
             "retries",
+            "fallbacks",
+            "health_events",
+            "quarantine_events",
         ):
             item[field] = int(item[field]) + getattr(row, field)
 
@@ -256,6 +293,18 @@ def _aggregate(
         period_key = row.period_start.astimezone(zone).isoformat()
         period_attempts[period_key] = (
             int(period_attempts.get(period_key, 0)) + row.attempts
+        )
+        current_start = item["period_start_min"]
+        current_end = item["period_end_max"]
+        item["period_start_min"] = (
+            row.period_start
+            if current_start is None
+            else min(current_start, row.period_start)
+        )
+        item["period_end_max"] = (
+            row.period_end
+            if current_end is None
+            else max(current_end, row.period_end)
         )
 
         _add_currency(
@@ -280,6 +329,8 @@ def _aggregate(
         period_attempts = item["period_attempts"]
         estimated = item["estimated"]
         observed = item["observed"]
+        period_start_min = item["period_start_min"]
+        period_end_max = item["period_end_max"]
         assert isinstance(native, dict)
         assert isinstance(period_attempts, dict)
         assert isinstance(estimated, dict)
@@ -292,7 +343,15 @@ def _aggregate(
                     for dimension, value in zip(dimensions, key, strict=True)
                 ),
                 metrics=IntelligenceMetrics(
+                    requests=int(item["requests"]),
+                    tasks=int(item["tasks"]),
                     attempts=attempts,
+                    peak_concurrent=int(item["peak_concurrent"]),
+                    maximum_quota_utilization=(
+                        None
+                        if item["maximum_quota_utilization"] is None
+                        else Decimal(item["maximum_quota_utilization"])
+                    ),
                     input_tokens=int(item["input_tokens"]),
                     cached_input_tokens=int(item["cached_input_tokens"]),
                     output_tokens=int(item["output_tokens"]),
@@ -316,9 +375,17 @@ def _aggregate(
                     ),
                     cycles=int(item["cycles"]),
                     retries=retries,
+                    fallbacks=int(item["fallbacks"]),
+                    health_events=int(item["health_events"]),
+                    quarantine_events=int(item["quarantine_events"]),
                     peak_attempts_per_bucket=max(
                         (int(value) for value in period_attempts.values()),
                         default=0,
+                    ),
+                    throughput_attempts_per_hour=_throughput(
+                        attempts,
+                        period_start_min,
+                        period_end_max,
                     ),
                     failure_rate=_ratio(failures, attempts),
                     retry_rate=_ratio(retries, attempts),
@@ -360,6 +427,16 @@ def _dimension_value(
         IntelligenceDimension.MODEL: row.model_id,
         IntelligenceDimension.STATUS: row.status,
         IntelligenceDimension.ERROR_CLASS: row.error_class or "-",
+        IntelligenceDimension.SESSION: (
+            "-" if row.session_id is None else str(row.session_id)
+        ),
+        IntelligenceDimension.TASK: "-" if row.task_id is None else str(row.task_id),
+        IntelligenceDimension.ATTEMPT: (
+            "-" if row.attempt_id is None else str(row.attempt_id)
+        ),
+        IntelligenceDimension.POLICY_VERSION: (
+            "-" if row.policy_version_id is None else str(row.policy_version_id)
+        ),
         IntelligenceDimension.PERIOD: row.period_start.astimezone(zone).isoformat(),
     }
     return mapping[dimension]
@@ -387,6 +464,19 @@ def _ratio(numerator: int, denominator: int) -> Decimal:
     if denominator == 0:
         return Decimal("0")
     return Decimal(numerator) / Decimal(denominator)
+
+
+def _throughput(
+    attempts: int,
+    period_start: object,
+    period_end: object,
+) -> Decimal | None:
+    if not isinstance(period_start, datetime) or not isinstance(period_end, datetime):
+        return None
+    seconds = Decimal(str((period_end - period_start).total_seconds()))
+    if seconds <= 0:
+        return None
+    return Decimal(attempts) * Decimal("3600") / seconds
 
 
 def _authorize(

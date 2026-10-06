@@ -11,16 +11,19 @@ typed reporting rollups from #26. It never scans raw execution/accounting ledger
 normal dashboard queries.
 
 Supported cross-dimensions include tenant, client, client access credential, provider,
-provider account, provider credential, model, status/error class and time period.
+provider account, provider credential, model, session, task, attempt, policy version,
+status/error class and time period.
 
 ## Metrics
 
 For each grouping the service derives:
 
-- attempts and technical token/native usage;
+- requests, tasks, attempts and technical token/native usage;
+- peak concurrent execution and maximum quota utilization;
 - success/partial/failure counts and failure rate;
-- latency average;
-- cycles/retries and retry rate;
+- latency average and throughput;
+- cycles/retries/fallbacks and retry rate;
+- health/quarantine event counters;
 - peak attempts per projected time bucket;
 - estimated provider cost by currency;
 - observed provider cost by currency;
@@ -54,3 +57,15 @@ Larger workloads require pre-aggregation or an asynchronous export/report job ra
 than falling back to a ledger scan.
 
 Synthetic volume tests exercise grouping over 1,000 rollups with no provider calls.
+
+
+## Completion hardening
+
+The final #60 hardening extends the same `readmodel.report_rollups` model rather than
+creating a competing analytical source. Optional execution identities
+(session/task/attempt/policy version) and operational counters are added by migration
+`20261005_0015`.
+
+Existing #26 rows remain valid because newly introduced counters default to zero and
+execution identities are nullable. Normal analytical queries remain bounded and
+index-backed.

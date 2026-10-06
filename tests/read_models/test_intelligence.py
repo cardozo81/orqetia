@@ -37,6 +37,17 @@ def _rollup(
     retries: int = 0,
     error_class: str | None = None,
     period_start: datetime = START,
+    requests: int = 1,
+    tasks: int = 1,
+    peak_concurrent: int = 1,
+    quota_utilization: str | None = None,
+    fallbacks: int = 0,
+    health_events: int = 0,
+    quarantine_events: int = 0,
+    session_id=None,
+    task_id=None,
+    attempt_id=None,
+    policy_version_id=None,
 ) -> ReportRollup:
     period_end = period_start + timedelta(hours=1)
     return ReportRollup(
@@ -50,10 +61,20 @@ def _rollup(
         provider_id=provider,
         provider_account_id=uuid7(),
         provider_credential_id=uuid7(),
+        session_id=session_id,
+        task_id=task_id,
+        attempt_id=attempt_id,
+        policy_version_id=policy_version_id,
         model_id=model,
         status=status,
         error_class=error_class,
+        requests=requests,
+        tasks=tasks,
         attempts=attempts,
+        peak_concurrent=peak_concurrent,
+        quota_utilization=(
+            None if quota_utilization is None else Decimal(quota_utilization)
+        ),
         input_tokens=100 * attempts,
         cached_input_tokens=10 * attempts,
         output_tokens=20 * attempts,
@@ -62,6 +83,9 @@ def _rollup(
         latency_ms_total=latency,
         cycles=attempts,
         retries=retries,
+        fallbacks=fallbacks,
+        health_events=health_events,
+        quarantine_events=quarantine_events,
         estimated_cost=None if cost is None else Decimal(cost),
         estimated_currency=currency,
         observed_cost=None if cost is None else Decimal(cost),
@@ -261,3 +285,86 @@ async def test_intelligence_synthetic_volume_uses_rollups_not_ledger() -> None:
     assert result.source_row_count == 1000
     assert sum(row.metrics.attempts for row in result.rows) == 1000
     assert len(result.rows) == 15
+
+
+
+@pytest.mark.asyncio
+async def test_intelligence_covers_execution_policy_and_operational_metrics() -> None:
+    tenant_id, client_id = uuid7(), uuid7()
+    session_id, task_id, attempt_id, policy_version_id = (
+        uuid7(),
+        uuid7(),
+        uuid7(),
+        uuid7(),
+    )
+    store = InMemoryReportRollupStore()
+    await store.put(
+        _rollup(
+            tenant_id=tenant_id,
+            client_id=client_id,
+            provider="openai",
+            model="gpt-x",
+            status="PARTIAL",
+            attempts=3,
+            cost="0.30",
+            currency="USD",
+            latency=900,
+            retries=2,
+            requests=2,
+            tasks=1,
+            peak_concurrent=4,
+            quota_utilization="0.75",
+            fallbacks=1,
+            health_events=2,
+            quarantine_events=1,
+            session_id=session_id,
+            task_id=task_id,
+            attempt_id=attempt_id,
+            policy_version_id=policy_version_id,
+        )
+    )
+
+    result = await OperationalFinancialIntelligenceService(
+        rollups=store
+    ).analyze(
+        access=BackofficeReportAccess(
+            can_view_financial=True,
+            can_export=False,
+            allowed_tenant_ids=frozenset({tenant_id}),
+        ),
+        query=IntelligenceQuery(
+            filters=ReportQuery(
+                tenant_id=tenant_id,
+                client_id=client_id,
+                session_id=session_id,
+                task_id=task_id,
+                attempt_id=attempt_id,
+                policy_version_id=policy_version_id,
+            ),
+            group_by=(
+                IntelligenceDimension.SESSION,
+                IntelligenceDimension.TASK,
+                IntelligenceDimension.ATTEMPT,
+                IntelligenceDimension.POLICY_VERSION,
+            ),
+        ),
+    )
+
+    assert len(result.rows) == 1
+    row = result.rows[0]
+    assert [value.value for value in row.dimensions] == [
+        str(session_id),
+        str(task_id),
+        str(attempt_id),
+        str(policy_version_id),
+    ]
+    metrics = row.metrics
+    assert metrics.requests == 2
+    assert metrics.tasks == 1
+    assert metrics.attempts == 3
+    assert metrics.peak_concurrent == 4
+    assert metrics.maximum_quota_utilization == Decimal("0.75")
+    assert metrics.fallbacks == 1
+    assert metrics.health_events == 2
+    assert metrics.quarantine_events == 1
+    assert metrics.throughput_attempts_per_hour == Decimal("3")

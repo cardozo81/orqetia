@@ -22,10 +22,18 @@ report_rollups = sa.Table(
     sa.Column("provider_id", sa.Text(), nullable=False),
     sa.Column("provider_account_id", UUID(as_uuid=True), nullable=True),
     sa.Column("provider_credential_id", UUID(as_uuid=True), nullable=True),
+    sa.Column("session_id", UUID(as_uuid=True), nullable=True),
+    sa.Column("task_id", UUID(as_uuid=True), nullable=True),
+    sa.Column("attempt_id", UUID(as_uuid=True), nullable=True),
+    sa.Column("policy_version_id", UUID(as_uuid=True), nullable=True),
     sa.Column("model_id", sa.Text(), nullable=False),
     sa.Column("status", sa.Text(), nullable=False),
     sa.Column("error_class", sa.Text(), nullable=True),
+    sa.Column("requests", sa.BigInteger(), nullable=False, server_default="0"),
+    sa.Column("tasks", sa.BigInteger(), nullable=False, server_default="0"),
     sa.Column("attempts", sa.BigInteger(), nullable=False),
+    sa.Column("peak_concurrent", sa.BigInteger(), nullable=False, server_default="0"),
+    sa.Column("quota_utilization", sa.Numeric(20, 12), nullable=True),
     sa.Column("input_tokens", sa.BigInteger(), nullable=False),
     sa.Column("cached_input_tokens", sa.BigInteger(), nullable=False),
     sa.Column("output_tokens", sa.BigInteger(), nullable=False),
@@ -35,6 +43,9 @@ report_rollups = sa.Table(
     sa.Column("latency_ms_total", sa.BigInteger(), nullable=False),
     sa.Column("cycles", sa.BigInteger(), nullable=False),
     sa.Column("retries", sa.BigInteger(), nullable=False),
+    sa.Column("fallbacks", sa.BigInteger(), nullable=False, server_default="0"),
+    sa.Column("health_events", sa.BigInteger(), nullable=False, server_default="0"),
+    sa.Column("quarantine_events", sa.BigInteger(), nullable=False, server_default="0"),
     sa.Column("estimated_cost", sa.Numeric(38, 18), nullable=True),
     sa.Column("estimated_currency", sa.Text(), nullable=True),
     sa.Column("observed_cost", sa.Numeric(38, 18), nullable=True),
@@ -47,9 +58,12 @@ report_rollups = sa.Table(
         name="report_credential_requires_account",
     ),
     sa.CheckConstraint(
-        "attempts >= 0 AND input_tokens >= 0 AND cached_input_tokens >= 0 "
+        "requests >= 0 AND tasks >= 0 AND attempts >= 0 AND peak_concurrent >= 0 "
+        "AND (quota_utilization IS NULL OR (quota_utilization >= 0 AND quota_utilization <= 1)) "
+        "AND input_tokens >= 0 AND cached_input_tokens >= 0 "
         "AND output_tokens >= 0 AND reasoning_tokens >= 0 AND total_tokens >= 0 "
         "AND latency_ms_total >= 0 AND cycles >= 0 AND retries >= 0 "
+        "AND fallbacks >= 0 AND health_events >= 0 AND quarantine_events >= 0 "
         "AND unpriced_attempts >= 0",
         name="report_metrics_non_negative",
     ),
@@ -85,5 +99,17 @@ sa.Index(
 sa.Index(
     "ix_report_rollups_client_credential_period",
     report_rollups.c.client_credential_id,
+    report_rollups.c.period_start,
+)
+
+sa.Index(
+    "ix_report_rollups_session_task_attempt",
+    report_rollups.c.session_id,
+    report_rollups.c.task_id,
+    report_rollups.c.attempt_id,
+)
+sa.Index(
+    "ix_report_rollups_policy_period",
+    report_rollups.c.policy_version_id,
     report_rollups.c.period_start,
 )
