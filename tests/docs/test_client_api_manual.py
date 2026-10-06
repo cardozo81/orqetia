@@ -88,6 +88,6 @@ def test_auto_and_explicit_quickstarts_match_http_model() -> None:
     assert auto.execution is None
     assert explicit.execution is not None
     assert explicit.execution.mode == "EXPLICIT_TARGET"
-    assert explicit.execution.target.provider_id == "provider-visible-id"
-    assert explicit.execution.target.model_id == "model-visible-id"
+    assert explicit.execution.target.provider == "provider-visible-id"
+    assert explicit.execution.target.model == "model-visible-id"
     assert explicit.execution.target.reasoning_profile == "standard"
