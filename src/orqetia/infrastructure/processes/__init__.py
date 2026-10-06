@@ -6,13 +6,13 @@ from .attempt_accounting import (
     provider_usage_to_technical,
 )
 from .orchestration_candidates import ControlPlaneOrchestrationCandidateResolver
-from .runtime_adapters import DurableProviderAdapterResolver
 from .provider_attempts import (
     PROVIDER_ATTEMPT_OPERATION,
     PROVIDER_ATTEMPT_OPERATION_VERSION,
     ProviderAttemptHandler,
     build_provider_attempt_work_item,
 )
+from .runtime_adapters import DurableProviderAdapterResolver
 from .task_orchestration import (
     TASK_ORCHESTRATION_OPERATION,
     TASK_ORCHESTRATION_OPERATION_VERSION,
@@ -24,10 +24,6 @@ from .task_orchestration import (
     provider_dispatch_work_id,
     task_orchestration_work_id,
 )
-from .worker_composition import (
-    UnavailableProviderSecretStore,
-    build_execution_handler_registry,
-)
 from .worker import (
     HandlerDisposition,
     HandlerOutcome,
@@ -35,6 +31,10 @@ from .worker import (
     SchedulerProcess,
     WorkerProcess,
     install_signal_handlers,
+)
+from .worker_composition import (
+    UnavailableProviderSecretStore,
+    build_execution_handler_registry,
 )
 
 __all__ = [

@@ -10,6 +10,9 @@ from orqetia.control_plane import (
     ProviderPricingAssignment,
     ProviderPricingCatalogVersion,
 )
+from orqetia.control_plane.pricing_catalogs import (
+    InMemoryProviderPricingCatalogRepository,
+)
 from orqetia.execution import (
     ExecutionTargetSnapshot,
     OwnershipScope,
@@ -26,9 +29,6 @@ from orqetia.usage_accounting import (
     PricingModel,
     PricingRule,
     TokenRates,
-)
-from orqetia.control_plane.pricing_catalogs import (
-    InMemoryProviderPricingCatalogRepository,
 )
 
 NOW = datetime(2026, 10, 6, 17, 0, tzinfo=UTC)

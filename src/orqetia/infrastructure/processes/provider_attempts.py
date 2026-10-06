@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from typing import Protocol
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid7
 
