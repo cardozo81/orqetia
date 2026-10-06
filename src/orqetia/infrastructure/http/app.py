@@ -14,6 +14,16 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
 
+from orqetia.estimation import (
+    EstimateExecutionMode,
+    EstimateForbidden,
+    EstimateService,
+    EstimateSpec,
+    EstimateSubject,
+    EstimateTarget,
+    EstimateUnavailable,
+    ReferenceScope,
+)
 from orqetia.identity.authentication import (
     AuthenticatedPrincipal,
     AuthenticationBackendUnavailable,
@@ -25,7 +35,9 @@ from orqetia.infrastructure.health import ReadinessProbe
 from .models import (
     ErrorDetail,
     ErrorEnvelope,
+    EstimateExplicitExecution,
     EstimateRequest,
+    EstimateResponse,
     ExplicitExecution,
     SessionCreateRequest,
     TaskCreateRequest,
@@ -58,6 +70,7 @@ def create_app(
     cors_allowed_origins: Sequence[str] = (),
     enable_hsts: bool = False,
     shutdown_callback: Callable[[], Awaitable[None]] | None = None,
+    estimation_service: EstimateService | None = None,
 ) -> FastAPI:
     """Build the client API shell around the versioned canonical OpenAPI document."""
 
@@ -305,12 +318,70 @@ def create_app(
         del task_id, attempt_id
         not_implemented()
 
-    @app.post("/v1/estimates", response_model=None)
+    @app.post("/v1/estimates", response_model=EstimateResponse)
     async def create_estimate(
-        _payload: EstimateRequest,
-        _principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("estimates:write"))],
-    ) -> None:
-        not_implemented()
+        payload: EstimateRequest,
+        principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("estimates:write"))],
+    ) -> EstimateResponse:
+        if (
+            isinstance(payload.execution, EstimateExplicitExecution)
+            and "tasks:target" not in principal.scopes
+        ):
+            raise ApiError(403, "FORBIDDEN", "Explicit target permission is missing.")
+        if principal.tenant_id is None or principal.client_id is None:
+            raise ApiError(403, "FORBIDDEN", "Tenant/client ownership is required.")
+        if estimation_service is None:
+            raise ApiError(
+                503,
+                "ESTIMATION_UNAVAILABLE",
+                "Estimation service is not configured.",
+            )
+
+        execution_mode = EstimateExecutionMode.AUTO
+        target = None
+        if isinstance(payload.execution, EstimateExplicitExecution):
+            execution_mode = EstimateExecutionMode.EXPLICIT_TARGET
+            target = EstimateTarget(
+                provider_id=payload.execution.target.provider_id,
+                model_id=payload.execution.target.model_id,
+                reasoning_profile=payload.execution.target.reasoning_profile,
+            )
+        spec = EstimateSpec(
+            operation=payload.operation,
+            input_payload=payload.input,
+            reference_scope=ReferenceScope(payload.reference_scope),
+            execution_mode=execution_mode,
+            target=target,
+        )
+        try:
+            result = await estimation_service.estimate(
+                subject=EstimateSubject(
+                    tenant_id=principal.tenant_id,
+                    client_id=principal.client_id,
+                ),
+                spec=spec,
+            )
+        except EstimateForbidden as exc:
+            raise ApiError(
+                403,
+                "TARGET_FORBIDDEN",
+                "Requested target is not authorized.",
+            ) from exc
+        except EstimateUnavailable as exc:
+            details = [
+                ErrorDetail(field="reference_scope", reason=exc.reason),
+                *[
+                    ErrorDetail(field="limitations", reason=limitation)
+                    for limitation in exc.limitations[:10]
+                ],
+            ]
+            raise ApiError(
+                422,
+                "ESTIMATE_UNAVAILABLE",
+                "A safe technical estimate is not available for this request.",
+                details=details,
+            ) from exc
+        return EstimateResponse.model_validate(result.client_payload())
 
     @app.get("/v1/providers", response_model=None)
     async def list_providers(
