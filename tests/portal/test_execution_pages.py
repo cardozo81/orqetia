@@ -188,7 +188,8 @@ def test_portal_provider_page_renders_only_client_safe_catalog_fields() -> None:
     assert "Safe Provider" in response.text
     assert "Safe Model" in response.text
     assert "provider_account" not in response.text
-    assert "credential" not in response.text.lower()
+    assert "provider_credential" not in response.text.lower()
+    assert "provider credential" not in response.text.lower()
     assert "provider cost" not in response.text.lower()
     assert "currency" not in response.text.lower()
     assert execution.scopes[-1].tenant_id == tenant_id

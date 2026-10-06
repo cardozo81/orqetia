@@ -156,5 +156,5 @@ def test_customer_portal_rejects_cross_origin_mutation() -> None:
         },
         data={"csrf_token": "irrelevant"},
     )
-    assert response.status_code == 200
+    assert response.status_code == 401
     assert "Unauthorized" in response.text
