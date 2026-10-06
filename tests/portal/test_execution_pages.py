@@ -70,11 +70,17 @@ class _Status:
 class _Execution:
     def __init__(self) -> None:
         self.scopes = []
+        self.targets = []
         self.session_id = uuid7()
 
     async def create_session(self, **kwargs):
         self.scopes.append(kwargs["scope"])
         return SimpleNamespace(session_id=self.session_id)
+
+    async def create_task(self, **kwargs):
+        self.scopes.append(kwargs["scope"])
+        self.targets.append(kwargs["target"])
+        return SimpleNamespace(task_id=uuid7())
 
     async def list_providers(self, *, scope):
         self.scopes.append(scope)
@@ -194,3 +200,66 @@ def test_portal_provider_page_renders_only_client_safe_catalog_fields() -> None:
     assert "currency" not in response.text.lower()
     assert execution.scopes[-1].tenant_id == tenant_id
     assert execution.scopes[-1].client_id == client_id
+
+
+def test_portal_task_creation_preserves_auto_and_explicit_target_modes() -> None:
+    client, execution, tenant_id, client_id = _portal()
+    csrf = client.cookies.get("__Host-orqetia-portal-csrf")
+    headers = {
+        "origin": "https://portal.example",
+        "sec-fetch-site": "same-origin",
+    }
+
+    auto = client.post(
+        f"/portal/sessions/{execution.session_id}/tasks",
+        headers=headers,
+        data={
+            "csrf_token": csrf,
+            "idempotency_key": "task-auto",
+            "operation": "TASK_EXECUTION",
+            "input_json": '{"input_text":"hello"}',
+            "provider_id": "",
+            "model_id": "",
+            "reasoning_profile": "",
+        },
+    )
+    assert auto.status_code == 303
+    assert execution.targets[-1] is None
+    assert execution.scopes[-1].tenant_id == tenant_id
+    assert execution.scopes[-1].client_id == client_id
+
+    explicit = client.post(
+        f"/portal/sessions/{execution.session_id}/tasks",
+        headers=headers,
+        data={
+            "csrf_token": csrf,
+            "idempotency_key": "task-explicit",
+            "operation": "TASK_EXECUTION",
+            "input_json": '{"input_text":"hello"}',
+            "provider_id": "safe-provider",
+            "model_id": "safe-model",
+            "reasoning_profile": "standard",
+        },
+    )
+    assert explicit.status_code == 303
+    target = execution.targets[-1]
+    assert target is not None
+    assert target.provider_id == "safe-provider"
+    assert target.model_id == "safe-model"
+    assert target.reasoning_profile == "standard"
+
+
+def test_portal_has_no_administrative_control_plane_routes() -> None:
+    client, _execution, _tenant_id, _client_id = _portal()
+    for path in (
+        "/portal/tenants",
+        "/portal/clients",
+        "/portal/backoffice-users",
+        "/portal/provider-accounts",
+        "/portal/provider-credentials",
+        "/portal/provider-pricing",
+        "/portal/quotas",
+        "/portal/execution-policy",
+    ):
+        response = client.get(path)
+        assert response.status_code == 404
