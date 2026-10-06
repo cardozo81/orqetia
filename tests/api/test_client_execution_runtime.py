@@ -27,7 +27,6 @@ from orqetia.execution import (
     OwnershipScope,
     ProviderAttempt,
     ProviderAttemptStatus,
-    SessionStatus,
     TaskStatus,
     validate_transition,
 )
@@ -164,8 +163,16 @@ class FakeTaskStore:
             status=target_status,
             accepted_requirements=accepted,
             missing_requirements=missing,
-            result_reference=task.result_reference if result_reference is None else result_reference,
-            queued_at=occurred_at if target_status is TaskStatus.QUEUED else task.queued_at,
+            result_reference=(
+                task.result_reference
+                if result_reference is None
+                else result_reference
+            ),
+            queued_at=(
+                occurred_at
+                if target_status is TaskStatus.QUEUED
+                else task.queued_at
+            ),
             terminal_at=occurred_at if target_status.terminal else None,
             updated_at=occurred_at,
             version=task.version + 1,

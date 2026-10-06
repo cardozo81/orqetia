@@ -194,8 +194,9 @@ def test_endpoint_metadata_is_admin_only_and_rejects_unsafe_urls() -> None:
 
 def test_endpoint_must_reference_known_provider() -> None:
     with pytest.raises(ValueError, match="unknown provider"):
-        from orqetia.control_plane import ProviderCatalogVersion
         from uuid import uuid7
+
+        from orqetia.control_plane import ProviderCatalogVersion
 
         ProviderCatalogVersion(
             catalog_version_id=uuid7(),

@@ -11,8 +11,8 @@ from orqetia.control_plane import (
     InMemoryExecutionPolicyRepository,
 )
 from orqetia.tenancy import (
-    InMemoryTenantClientRepository,
     InMemoryTenancyAuditSink,
+    InMemoryTenantClientRepository,
     TenancyAdminService,
 )
 

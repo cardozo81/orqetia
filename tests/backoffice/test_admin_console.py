@@ -50,8 +50,8 @@ from orqetia.read_models import (
     ReportRollup,
 )
 from orqetia.tenancy import (
-    InMemoryTenantClientRepository,
     InMemoryTenancyAuditSink,
+    InMemoryTenantClientRepository,
     TenancyAdminService,
 )
 

@@ -15,8 +15,8 @@ from orqetia.control_plane import (
 )
 from orqetia.tenancy import (
     AdministrativeStatus,
-    InMemoryTenantClientRepository,
     InMemoryTenancyAuditSink,
+    InMemoryTenantClientRepository,
     TenancyAdminService,
 )
 
@@ -189,8 +189,9 @@ async def test_tenant_quota_requires_active_tenant() -> None:
 
 
 def test_existing_quota_domain_validation_remains_canonical() -> None:
-    from orqetia.control_plane import QuotaPolicySnapshot
     from uuid import uuid7
+
+    from orqetia.control_plane import QuotaPolicySnapshot
 
     with pytest.raises(ValueError, match="NATIVE_UNITS quota requires"):
         QuotaPolicySnapshot(
