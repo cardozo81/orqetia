@@ -94,7 +94,7 @@ class ProviderAttemptHandler:
         self,
         *,
         store: ProviderAttemptStore,
-        resolve_adapter: AdapterResolver,
+        resolve_adapter: AdapterResolver | None = None,
         resolve_attempt_adapter: AttemptAdapterResolver | None = None,
         infrastructure_retry_delay_seconds: int = 1,
         clock: Clock = _utc_now,
@@ -104,6 +104,8 @@ class ProviderAttemptHandler:
     ) -> None:
         if infrastructure_retry_delay_seconds < 1:
             raise ValueError("infrastructure_retry_delay_seconds must be >= 1")
+        if resolve_adapter is None and resolve_attempt_adapter is None:
+            raise ValueError("a provider adapter resolver is required")
         self._store = store
         self._resolve_adapter = resolve_adapter
         self._resolve_attempt_adapter = resolve_attempt_adapter
@@ -328,6 +330,7 @@ class ProviderAttemptHandler:
         if self._resolve_attempt_adapter is not None:
             resolved = self._resolve_attempt_adapter(attempt)
         else:
+            assert self._resolve_adapter is not None
             resolved = self._resolve_adapter(
                 ProviderTarget(
                     provider_id=attempt.target.provider_id,
