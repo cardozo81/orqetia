@@ -5,13 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
+from uuid import UUID, uuid7
 
 from orqetia.execution import (
     ExecutionTargetSnapshot,
     OrchestrationPolicy,
     SessionPolicySnapshot,
 )
-from uuid import UUID, uuid7
 
 
 def _aware(value: datetime, field: str) -> None:

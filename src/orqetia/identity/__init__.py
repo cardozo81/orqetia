@@ -7,6 +7,7 @@ from .authentication import (
     BearerAuthenticator,
 )
 from .backoffice_authz import (
+    ROLE_MATRIX_VERSION,
     BackofficeAuthorizationService,
     BackofficeAuthzAuditEvent,
     BackofficeAuthzAuditSink,
@@ -18,10 +19,26 @@ from .backoffice_authz import (
     HumanAuthenticationContext,
     InMemoryBackofficeAuthzAuditSink,
     InMemoryBackofficeBindingRepository,
-    ROLE_MATRIX_VERSION,
 )
 from .backoffice_authz_postgres import PostgresBackofficeBindingRepository
 from .backoffice_authz_tables import backoffice_user_bindings
+from .client_credential_postgres import PostgresClientCredentialStore
+from .client_credential_tables import (
+    client_access_credentials,
+    client_credential_operations,
+)
+from .client_credentials import (
+    ClientAccessCredential,
+    ClientAccessCredentialService,
+    ClientCredentialStatus,
+    ClientCredentialStore,
+    CredentialMutationResult,
+    CredentialOperation,
+    IdempotencyConflict,
+    InMemoryClientCredentialStore,
+    OneTimeCredentialSecret,
+    StoredClientCredentialAuthenticator,
+)
 from .customer_authz import (
     CUSTOMER_ROLE_MATRIX_VERSION,
     CustomerAuthorizationService,
@@ -40,23 +57,6 @@ from .customer_authz import (
 )
 from .customer_authz_postgres import PostgresCustomerIdentityRepository
 from .customer_authz_tables import customer_identities, customer_memberships
-from .client_credential_postgres import PostgresClientCredentialStore
-from .client_credential_tables import (
-    client_access_credentials,
-    client_credential_operations,
-)
-from .client_credentials import (
-    ClientAccessCredential,
-    ClientAccessCredentialService,
-    ClientCredentialStatus,
-    ClientCredentialStore,
-    CredentialMutationResult,
-    CredentialOperation,
-    IdempotencyConflict,
-    InMemoryClientCredentialStore,
-    OneTimeCredentialSecret,
-    StoredClientCredentialAuthenticator,
-)
 
 __all__ = [
     "AuthenticatedPrincipal",

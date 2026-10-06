@@ -22,8 +22,7 @@ from orqetia.read_models import (
     BackofficeReportingService,
     OperationalFinancialIntelligenceService,
 )
-from orqetia.tenancy import TenantClientRepository, TenancyAdminService
-
+from orqetia.tenancy import TenancyAdminService, TenantClientRepository
 
 @dataclass(frozen=True)
 class BackofficeAdminServices:
