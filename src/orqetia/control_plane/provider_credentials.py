@@ -127,12 +127,6 @@ class CredentialAuditEvent:
 class ProviderSecretStore(Protocol):
     async def put(self, secret: SecretValue) -> SecretReference: ...
 
-    async def replace(
-        self,
-        previous: SecretReference,
-        secret: SecretValue,
-    ) -> SecretReference: ...
-
     async def get(self, reference: SecretReference) -> SecretValue: ...
 
     async def delete(self, reference: SecretReference) -> None: ...
@@ -176,15 +170,6 @@ class InMemoryProviderSecretStore:
     async def put(self, secret: SecretValue) -> SecretReference:
         reference = SecretReference(f"memory://{uuid7()}")
         self._secrets[reference.value] = secret.reveal()
-        return reference
-
-    async def replace(
-        self,
-        previous: SecretReference,
-        secret: SecretValue,
-    ) -> SecretReference:
-        reference = await self.put(secret)
-        self._secrets.pop(previous.value, None)
         return reference
 
     async def get(self, reference: SecretReference) -> SecretValue:
@@ -290,10 +275,7 @@ class ProviderCredentialService:
     ) -> ProviderCredentialMetadata:
         _require_aware(occurred_at, "occurred_at")
         existing = await self._required_active(credential_id)
-        new_reference = await self._secrets.replace(
-            existing.secret_reference,
-            new_secret,
-        )
+        new_reference = await self._secrets.put(new_secret)
         rotated = replace(
             existing,
             secret_reference=new_reference,
@@ -309,6 +291,11 @@ class ProviderCredentialService:
         except Exception:
             await self._secrets.delete(new_reference)
             raise
+        await self._retire_secret(
+            metadata=saved,
+            reference=existing.secret_reference,
+            occurred_at=occurred_at,
+        )
         await self._audit_event(saved, "ROTATE", "SUCCESS", occurred_at)
         return saved
 
@@ -320,7 +307,6 @@ class ProviderCredentialService:
     ) -> ProviderCredentialMetadata:
         _require_aware(occurred_at, "occurred_at")
         existing = await self._required_active(credential_id)
-        await self._secrets.delete(existing.secret_reference)
         revoked = replace(
             existing,
             status=ProviderCredentialStatus.REVOKED,
@@ -329,6 +315,11 @@ class ProviderCredentialService:
         saved = await self._repository.replace(
             revoked,
             expected_version=existing.key_version,
+        )
+        await self._retire_secret(
+            metadata=saved,
+            reference=existing.secret_reference,
+            occurred_at=occurred_at,
         )
         await self._audit_event(saved, "REVOKE", "SUCCESS", occurred_at)
         return saved
@@ -376,6 +367,23 @@ class ProviderCredentialService:
         if metadata.status is not ProviderCredentialStatus.ACTIVE:
             raise ValueError("provider credential is not active")
         return metadata
+
+    async def _retire_secret(
+        self,
+        *,
+        metadata: ProviderCredentialMetadata,
+        reference: SecretReference,
+        occurred_at: datetime,
+    ) -> None:
+        try:
+            await self._secrets.delete(reference)
+        except Exception:
+            await self._audit_event(
+                metadata,
+                "SECRET_CLEANUP",
+                "FAILED",
+                occurred_at,
+            )
 
     async def _audit_event(
         self,
