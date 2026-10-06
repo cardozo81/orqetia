@@ -429,7 +429,7 @@ class BackofficeReportingService:
         *,
         access: BackofficeReportAccess,
         filters: ReportQuery,
-        limit: int = 1000,
+        limit: int = 200,
     ) -> BackofficeReportPage:
         _authorize_filters(access, filters)
         if not access.can_view_financial:
