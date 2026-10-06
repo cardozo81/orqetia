@@ -7,6 +7,8 @@ boundaries before and after a provider side effect.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
@@ -24,6 +26,7 @@ from orqetia.providers import (
     ProviderOutcome,
     ProviderUsage,
 )
+from orqetia.usage_accounting.domain import NativeUsageQuantity
 from orqetia.usage_accounting.quotas import (
     QuotaEnforcer,
     QuotaReservation,
@@ -40,6 +43,11 @@ _ATTEMPT_QUOTA_METRICS = frozenset(
     }
 )
 _INTERNAL_QUOTA_ERROR_PREFIX = "ORQETIA_CLIENT_QUOTA_"
+Clock = Callable[[], datetime]
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 class RuntimeQuotaStore(QuotaEnforcer, Protocol):
@@ -72,16 +80,22 @@ class AttemptQuotaCoordinator:
         policies: QuotaPolicyRepository,
         quotas: RuntimeQuotaStore,
         usage_estimator: UsageReservationEstimator | None = None,
+        clock: Clock = _utc_now,
     ) -> None:
         self._policies = policies
         self._quotas = quotas
         self._usage_estimator = usage_estimator
+        self._clock = clock
 
     async def pre_dispatch(
         self,
         attempt: ProviderAttempt,
     ) -> ProviderAttemptResult | None:
-        policies = await self._applicable_policies(attempt)
+        occurred_at = self._clock()
+        policies = await self._applicable_policies(
+            attempt,
+            occurred_at=occurred_at,
+        )
         held: list[QuotaReservation] = []
         for policy in policies:
             amount = await self._reservation_amount(
@@ -100,7 +114,7 @@ class AttemptQuotaCoordinator:
                 client_id=attempt.ownership.client_id,
                 idempotency_key=self._idempotency_key(attempt),
                 amount=amount,
-                occurred_at=attempt.created_at,
+                occurred_at=occurred_at,
                 provider_id=attempt.target.provider_id,
                 native_unit=policy.native_unit,
             )
@@ -153,7 +167,6 @@ class AttemptQuotaCoordinator:
                 continue
             actual = self._actual_amount(
                 reservation=reservation,
-                attempt=attempt,
                 total_tokens=technical.total_tokens,
                 native=technical.native,
             )
@@ -166,6 +179,8 @@ class AttemptQuotaCoordinator:
     async def _applicable_policies(
         self,
         attempt: ProviderAttempt,
+        *,
+        occurred_at: datetime,
     ) -> tuple[QuotaPolicySnapshot, ...]:
         tenant = await self._policies.list_for_subject(
             tenant_id=attempt.ownership.tenant_id,
@@ -179,7 +194,7 @@ class AttemptQuotaCoordinator:
         for policy in (*tenant, *client):
             if policy.metric not in _ATTEMPT_QUOTA_METRICS:
                 continue
-            if not policy.active_at(attempt.created_at):
+            if not policy.active_at(occurred_at):
                 continue
             if (
                 policy.provider_id is not None
@@ -262,16 +277,15 @@ class AttemptQuotaCoordinator:
                 continue
             await self._quotas.release(
                 reservation_id=reservation.reservation_id,
-                occurred_at=reservation.created_at,
+                occurred_at=self._clock(),
             )
 
     @staticmethod
     def _actual_amount(
         *,
         reservation: QuotaReservation,
-        attempt: ProviderAttempt,
         total_tokens: int | None,
-        native: tuple[object, ...],
+        native: tuple[NativeUsageQuantity, ...],
     ) -> Decimal:
         if reservation.metric is QuotaMetric.PROVIDER_REQUESTS:
             return Decimal("1")
@@ -283,7 +297,7 @@ class AttemptQuotaCoordinator:
                 (
                     item.quantity
                     for item in native
-                    if getattr(item, "unit", None) == unit
+                    if item.unit == unit
                 ),
                 Decimal("0"),
             )
