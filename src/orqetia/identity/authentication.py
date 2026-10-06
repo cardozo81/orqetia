@@ -17,6 +17,8 @@ class AuthenticatedPrincipal:
     tenant_id: str | None
     client_id: str | None
     scopes: frozenset[str]
+    credential_id: str | None = None
+    credential_fingerprint: str | None = None
 
 
 class AuthenticationRejected(Exception):
