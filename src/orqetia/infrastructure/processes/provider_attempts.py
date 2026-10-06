@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Protocol
 from datetime import UTC, datetime, timedelta
+from typing import Protocol
 from uuid import UUID, uuid7
 
 from orqetia.execution import (
