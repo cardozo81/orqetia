@@ -101,6 +101,22 @@ class PostgresExecutionPolicyRepository:
             rows = (await database.execute(statement)).mappings().all()
         return tuple(_version_from_row(row) for row in rows)
 
+    async def get_version(
+        self,
+        *,
+        tenant_id: UUID,
+        client_id: UUID,
+        policy_version_id: UUID,
+    ) -> ExecutionPolicyVersion | None:
+        statement = sa.select(execution_policy_versions).where(
+            execution_policy_versions.c.policy_version_id == policy_version_id,
+            execution_policy_versions.c.tenant_id == tenant_id,
+            execution_policy_versions.c.client_id == client_id,
+        )
+        async with self._sessions() as database:
+            row = (await database.execute(statement)).mappings().one_or_none()
+        return None if row is None else _version_from_row(row)
+
     async def get_effective(
         self,
         *,

@@ -122,6 +122,14 @@ class ExecutionPolicyRepository(Protocol):
         client_id: UUID,
     ) -> tuple[ExecutionPolicyVersion, ...]: ...
 
+    async def get_version(
+        self,
+        *,
+        tenant_id: UUID,
+        client_id: UUID,
+        policy_version_id: UUID,
+    ) -> ExecutionPolicyVersion | None: ...
+
     async def get_effective(
         self,
         *,
@@ -163,6 +171,20 @@ class InMemoryExecutionPolicyRepository:
                 key=lambda item: item.version_number,
             )
         )
+
+    async def get_version(
+        self,
+        *,
+        tenant_id: UUID,
+        client_id: UUID,
+        policy_version_id: UUID,
+    ) -> ExecutionPolicyVersion | None:
+        version = self._versions.get(policy_version_id)
+        if version is None:
+            return None
+        if version.tenant_id != tenant_id or version.client_id != client_id:
+            return None
+        return version
 
     async def get_effective(
         self,
