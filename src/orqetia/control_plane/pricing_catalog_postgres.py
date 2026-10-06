@@ -291,3 +291,9 @@ class PostgresProviderPricingCatalogRepository(ProviderPricingCatalogRepository)
             version=version,
             assignment=assignment,
         )
+
+
+
+def decode_pricing_rules(value: object) -> tuple[PricingRule, ...]:
+    """Decode the canonical administrative provider-pricing JSON shape."""
+    return _rules_from_json(value)

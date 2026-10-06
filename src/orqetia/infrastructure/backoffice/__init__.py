@@ -1,5 +1,6 @@
 """Secure Backoffice web/BFF transport."""
 
+from .admin_console import BackofficeAdminServices
 from .app import (
     BackofficeOidcBroker,
     OidcAuthorizationStart,
@@ -9,6 +10,7 @@ from .app import (
 )
 
 __all__ = [
+    "BackofficeAdminServices",
     "BackofficeOidcBroker",
     "OidcAuthorizationStart",
     "OidcLoginRejected",

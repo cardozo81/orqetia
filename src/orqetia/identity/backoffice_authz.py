@@ -188,6 +188,8 @@ class BackofficeBindingRepository(Protocol):
 
     async def get(self, binding_id: UUID) -> BackofficeUserBinding | None: ...
 
+    async def list_all(self) -> tuple[BackofficeUserBinding, ...]: ...
+
     async def replace(
         self,
         binding: BackofficeUserBinding,
@@ -224,6 +226,14 @@ class InMemoryBackofficeBindingRepository:
 
     async def get(self, binding_id: UUID) -> BackofficeUserBinding | None:
         return self._items.get(binding_id)
+
+    async def list_all(self) -> tuple[BackofficeUserBinding, ...]:
+        return tuple(
+            sorted(
+                self._items.values(),
+                key=lambda item: (item.issuer, item.subject, str(item.binding_id)),
+            )
+        )
 
     async def replace(
         self,

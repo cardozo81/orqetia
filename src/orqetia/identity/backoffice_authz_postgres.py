@@ -86,6 +86,16 @@ class PostgresBackofficeBindingRepository:
             row = (await database.execute(statement)).mappings().one_or_none()
         return None if row is None else _from_row(row)
 
+    async def list_all(self) -> tuple[BackofficeUserBinding, ...]:
+        statement = sa.select(backoffice_user_bindings).order_by(
+            backoffice_user_bindings.c.issuer,
+            backoffice_user_bindings.c.subject,
+            backoffice_user_bindings.c.binding_id,
+        )
+        async with self._sessions() as database:
+            rows = (await database.execute(statement)).mappings().all()
+        return tuple(_from_row(row) for row in rows)
+
     async def replace(
         self,
         binding: BackofficeUserBinding,

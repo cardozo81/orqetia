@@ -40,5 +40,8 @@ jobs:
       - run: uv sync --locked --python 3.14
       - name: Apply migrations
         run: uv run --no-sync --python 3.14 alembic upgrade head
-      - name: Backoffice web security tests
-        run: uv run --no-sync --python 3.14 pytest -q tests/backoffice/test_security_shell.py
+      - name: Backoffice web directed tests
+        run: >-
+          uv run --no-sync --python 3.14 pytest -q
+          tests/backoffice/test_security_shell.py
+          tests/backoffice/test_admin_console.py

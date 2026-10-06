@@ -284,3 +284,14 @@ class PostgresProviderCatalogRepository(ProviderCatalogRepository):
                 )
 
         return EffectiveProviderCatalog(version=version, assignment=assignment)
+
+
+
+def decode_provider_catalog(value: object) -> tuple[ProviderSpec, ...]:
+    """Decode the canonical non-secret administrative provider catalog JSON shape."""
+    return _catalog_from_json(value)
+
+
+def decode_provider_endpoints(value: object) -> tuple[ProviderEndpointMetadata, ...]:
+    """Decode the canonical non-secret administrative provider endpoint JSON shape."""
+    return _endpoints_from_json(value)
