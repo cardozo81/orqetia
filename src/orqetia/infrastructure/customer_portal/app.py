@@ -14,6 +14,10 @@ from uuid import UUID, uuid7
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
+from orqetia.identity import (
+    ClientAccessCredentialService,
+    IdempotencyConflict,
+)
 from orqetia.identity.backoffice_authz import HumanAuthenticationContext
 from orqetia.identity.customer_authz import CustomerAuthorizationService
 from orqetia.identity.customer_web_sessions import (
@@ -84,6 +88,7 @@ def create_customer_portal_app(
     allowed_origin: str,
     enable_hsts: bool = False,
     execution: ClientExecutionRuntime | None = None,
+    credentials: ClientAccessCredentialService | None = None,
 ) -> FastAPI:
     origin = allowed_origin.rstrip("/")
     if not origin.startswith(("http://", "https://")):
@@ -194,6 +199,36 @@ def create_customer_portal_app(
             )
         return execution
 
+    def required_credentials() -> ClientAccessCredentialService:
+        if credentials is None:
+            raise CustomerPortalUnavailable(
+                "Client credential service is unavailable"
+            )
+        return credentials
+
+    def delegable_scopes(permissions: frozenset[str]) -> frozenset[str]:
+        output: set[str] = set()
+        if "sessions:read" in permissions:
+            output.add("sessions:read")
+        if "tasks:read" in permissions:
+            output.add("tasks:read")
+        if "tasks:write" in permissions:
+            output.update(
+                {
+                    "sessions:write",
+                    "tasks:write",
+                    "tasks:cancel",
+                    "tasks:target",
+                }
+            )
+        if "providers:read" in permissions:
+            output.add("catalog:read")
+        if "usage:read" in permissions:
+            output.add("usage:read")
+        if "estimates:write" in permissions:
+            output.add("estimates:write")
+        return frozenset(output)
+
     def ownership(principal) -> OwnershipScope:
         return OwnershipScope(
             tenant_id=principal.tenant_id,
@@ -287,6 +322,27 @@ def create_customer_portal_app(
     ) -> HTMLResponse:
         response = page("Forbidden", "<p>Permission denied.</p>")
         response.status_code = 403
+        return response
+
+    @app.exception_handler(IdempotencyConflict)
+    async def handle_idempotency_conflict(
+        _request: Request,
+        _exc: IdempotencyConflict,
+    ) -> HTMLResponse:
+        response = page(
+            "Conflict",
+            "<p>Idempotency key was reused with a different request.</p>",
+        )
+        response.status_code = 409
+        return response
+
+    @app.exception_handler(LookupError)
+    async def handle_not_found(
+        _request: Request,
+        _exc: LookupError,
+    ) -> HTMLResponse:
+        response = page("Not found", "<p>Resource not found.</p>")
+        response.status_code = 404
         return response
 
     @app.exception_handler(ValueError)
@@ -879,6 +935,209 @@ def create_customer_portal_app(
             "".join(rows),
             nav=navigation(current.principal.permissions),
         )
+
+    @app.get("/portal/credentials")
+    async def credentials_page(request: Request) -> HTMLResponse:
+        current = await authorized(request, "credentials:read")
+        service = required_credentials()
+        items = await service.list_owned(
+            tenant_id=current.principal.tenant_id,
+            client_id=current.principal.client_id,
+        )
+        rows = "".join(
+            "<tr><td>"
+            + escape(item.display_label)
+            + "</td><td>"
+            + escape(item.fingerprint)
+            + "</td><td>"
+            + escape(", ".join(item.scopes))
+            + "</td><td>"
+            + escape(item.status.value)
+            + "</td><td>"
+            + escape(str(item.key_version))
+            + "</td><td>"
+            + escape("" if item.expires_at is None else str(item.expires_at))
+            + "</td><td>"
+            + escape("" if item.last_used_at is None else str(item.last_used_at))
+            + "</td><td>"
+            + (
+                ""
+                if "credentials:write" not in current.principal.permissions
+                else (
+                    "<form method='post' action='/portal/credentials/"
+                    + escape(str(item.credential_id))
+                    + "/rotate'>"
+                    + csrf_field(request)
+                    + "<input type='hidden' name='idempotency_key' value='"
+                    + escape(str(uuid7()))
+                    + "'><button type='submit'>Rotate</button></form>"
+                    "<form method='post' action='/portal/credentials/"
+                    + escape(str(item.credential_id))
+                    + "/revoke'>"
+                    + csrf_field(request)
+                    + "<input type='hidden' name='idempotency_key' value='"
+                    + escape(str(uuid7()))
+                    + "'><button type='submit'>Revoke</button></form>"
+                )
+            )
+            + "</td></tr>"
+            for item in items
+        )
+        body = (
+            "<table><thead><tr><th>Label</th><th>Fingerprint</th>"
+            "<th>Scopes</th><th>Status</th><th>Version</th>"
+            "<th>Expires</th><th>Last used</th><th>Actions</th>"
+            "</tr></thead><tbody>"
+            + rows
+            + "</tbody></table>"
+        )
+        if "credentials:write" in current.principal.permissions:
+            allowed = ", ".join(
+                sorted(delegable_scopes(current.principal.permissions))
+            )
+            body += (
+                "<h2>Issue credential</h2>"
+                "<p>Allowed integration scopes: "
+                + escape(allowed)
+                + "</p><form method='post' action='/portal/credentials'>"
+                + csrf_field(request)
+                + "<input type='hidden' name='idempotency_key' value='"
+                + escape(str(uuid7()))
+                + "'><label>Label <input name='display_label' "
+                "maxlength='200' required></label>"
+                "<label>Scopes <input name='scopes' value='"
+                + escape(allowed)
+                + "' required></label>"
+                "<button type='submit'>Issue credential</button></form>"
+            )
+        return page(
+            "API Credentials",
+            body,
+            nav=navigation(current.principal.permissions),
+        )
+
+    def requested_scopes(
+        raw: str,
+        *,
+        allowed: frozenset[str],
+    ) -> tuple[str, ...]:
+        values = tuple(
+            sorted(
+                {
+                    item.strip()
+                    for item in raw.split(",")
+                    if item.strip()
+                }
+            )
+        )
+        if not values:
+            raise ValueError("at least one integration scope is required")
+        if set(values) - allowed:
+            raise PermissionError(
+                "requested integration scope exceeds customer authority"
+            )
+        return values
+
+    def one_time_secret_page(
+        *,
+        title: str,
+        result,
+        permissions: frozenset[str],
+    ) -> HTMLResponse:
+        secret = (
+            None
+            if result.secret is None
+            else result.secret.reveal_once()
+        )
+        body = (
+            "<p>Credential: "
+            + escape(result.credential.display_label)
+            + "</p><p>Fingerprint: "
+            + escape(result.credential.fingerprint)
+            + "</p>"
+        )
+        if secret is None:
+            body += (
+                "<p>The secret is not available on an idempotent replay. "
+                "Rotate the credential to obtain a new one-time secret.</p>"
+            )
+        else:
+            body += (
+                "<p>This secret is shown once. Store it securely now.</p>"
+                "<pre>"
+                + escape(secret)
+                + "</pre>"
+            )
+        body += "<p><a href='/portal/credentials'>Back to credentials</a></p>"
+        return page(
+            title,
+            body,
+            nav=navigation(permissions),
+        )
+
+    @app.post("/portal/credentials")
+    async def issue_credential(request: Request) -> HTMLResponse:
+        current, data = await authorized_mutation(
+            request,
+            "credentials:write",
+        )
+        allowed = delegable_scopes(current.principal.permissions)
+        result = await required_credentials().issue(
+            tenant_id=current.principal.tenant_id,
+            client_id=current.principal.client_id,
+            display_label=data.get("display_label", "").strip(),
+            scopes=requested_scopes(
+                data.get("scopes", ""),
+                allowed=allowed,
+            ),
+            idempotency_key=data.get("idempotency_key", ""),
+            occurred_at=datetime.now(UTC),
+        )
+        return one_time_secret_page(
+            title="Credential issued",
+            result=result,
+            permissions=current.principal.permissions,
+        )
+
+    @app.post("/portal/credentials/{credential_id}/rotate")
+    async def rotate_credential(
+        request: Request,
+        credential_id: UUID,
+    ) -> HTMLResponse:
+        current, data = await authorized_mutation(
+            request,
+            "credentials:write",
+        )
+        result = await required_credentials().rotate(
+            tenant_id=current.principal.tenant_id,
+            client_id=current.principal.client_id,
+            credential_id=credential_id,
+            idempotency_key=data.get("idempotency_key", ""),
+            occurred_at=datetime.now(UTC),
+        )
+        return one_time_secret_page(
+            title="Credential rotated",
+            result=result,
+            permissions=current.principal.permissions,
+        )
+
+    @app.post("/portal/credentials/{credential_id}/revoke")
+    async def revoke_credential(
+        request: Request,
+        credential_id: UUID,
+    ) -> Response:
+        current, data = await authorized_mutation(
+            request,
+            "credentials:write",
+        )
+        await required_credentials().revoke(
+            tenant_id=current.principal.tenant_id,
+            client_id=current.principal.client_id,
+            credential_id=credential_id,
+            idempotency_key=data.get("idempotency_key", ""),
+            occurred_at=datetime.now(UTC),
+        )
+        return RedirectResponse("/portal/credentials", status_code=303)
 
     @app.get("/portal/providers")
     async def providers_page(request: Request) -> HTMLResponse:
