@@ -1,0 +1,44 @@
+name: Backoffice web
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backoffice-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: orqetia_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d orqetia_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ORQETIA_ENVIRONMENT: test
+      ORQETIA_PROCESS_ROLE: api
+      ORQETIA_DATABASE_DSN: postgresql+psycopg://postgres@127.0.0.1:5432/orqetia_test
+      ORQETIA_SECRET_STORE_MODE: none
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+      - run: uv sync --locked --python 3.14
+      - name: Apply migrations
+        run: uv run --no-sync --python 3.14 alembic upgrade head
+      - name: Backoffice web security tests
+        run: uv run --no-sync --python 3.14 pytest -q tests/backoffice/test_security_shell.py

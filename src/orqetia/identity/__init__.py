@@ -69,7 +69,28 @@ __all__ = [
     "PostgresClientCredentialStore",
     "ROLE_MATRIX_VERSION",
     "StoredClientCredentialAuthenticator",
+    "AuthenticatedWebSession",
+    "BackofficeWebSession",
+    "BackofficeWebSessionService",
+    "BackofficeWebSessionStore",
+    "EstablishedWebSession",
+    "InMemoryBackofficeWebSessionStore",
+    "PostgresBackofficeWebSessionStore",
+    "WebSessionRejected",
     "backoffice_user_bindings",
+    "backoffice_web_sessions",
     "client_access_credentials",
     "client_credential_operations",
 ]
+
+from .web_session_postgres import PostgresBackofficeWebSessionStore
+from .web_session_tables import backoffice_web_sessions
+from .web_sessions import (
+    AuthenticatedWebSession,
+    BackofficeWebSession,
+    BackofficeWebSessionService,
+    BackofficeWebSessionStore,
+    EstablishedWebSession,
+    InMemoryBackofficeWebSessionStore,
+    WebSessionRejected,
+)
