@@ -88,6 +88,16 @@ class PostgresWorkQueue(WorkQueuePort):
     def __init__(self, session_factory: SessionFactory) -> None:
         self._sessions = session_factory
 
+    async def ready_depth(self, queue_name: QueueName) -> int:
+        statement = sa.select(sa.func.count()).select_from(work_items).where(
+            work_items.c.queue_name == queue_name.value,
+            work_items.c.state == WorkState.READY.value,
+            work_items.c.available_at <= sa.func.now(),
+        )
+        async with self._sessions() as session:
+            value = (await session.execute(statement)).scalar_one()
+        return int(value)
+
     async def enqueue(self, item: WorkItem) -> None:
         statement = (
             pg_insert(work_items)

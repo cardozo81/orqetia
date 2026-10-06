@@ -590,6 +590,19 @@ class ClientExecutionRuntime:
             raise ClientExecutionConflict("exchange evidence attempt mismatch")
         return evidence
 
+    async def submission_queue_depth(self) -> int:
+        probe = getattr(self._work_queue, "ready_depth", None)
+        if probe is None:
+            raise ClientExecutionRuntimeError(
+                "execution queue backpressure probe is unavailable"
+            )
+        depth = await probe(QueueName.EXECUTION)
+        if not isinstance(depth, int) or depth < 0:
+            raise ClientExecutionRuntimeError(
+                "execution queue backpressure probe returned invalid depth"
+            )
+        return depth
+
     async def list_providers(
         self,
         *,
