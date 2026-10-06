@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid7
@@ -12,6 +14,9 @@ from orqetia.control_plane.quotas import (
     QuotaPolicySnapshot,
     QuotaScope,
 )
+from orqetia.infrastructure.persistence import create_engine, create_session_factory
+from orqetia.settings import RuntimeSettings
+from orqetia.usage_accounting import PostgresQuotaEnforcer
 from orqetia.usage_accounting.quotas import (
     InMemoryQuotaEnforcer,
     QuotaReservationStatus,
@@ -273,3 +278,81 @@ def test_native_quota_and_scope_contracts() -> None:
             effective_from=NOW,
             period_seconds=60,
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    "ORQETIA_DATABASE_DSN" not in os.environ,
+    reason="PostgreSQL integration DSN is not configured",
+)
+async def test_postgres_quota_enforcer_is_atomic_and_replay_safe() -> None:
+    settings = RuntimeSettings()
+    engine = create_engine(settings)
+    factory = create_session_factory(engine)
+    tenant_id, client_id = uuid7(), uuid7()
+    policy = _policy(
+        tenant_id=tenant_id,
+        client_id=client_id,
+        limit="2",
+    )
+    quotas = PostgresQuotaEnforcer(factory)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                __import__("sqlalchemy").text(
+                    "TRUNCATE accounting.quota_reservations, "
+                    "accounting.quota_windows CASCADE"
+                )
+            )
+
+        first = await quotas.reserve(
+            policy=policy,
+            tenant_id=tenant_id,
+            client_id=client_id,
+            idempotency_key="postgres-1",
+            amount=Decimal("1"),
+            occurred_at=NOW,
+        )
+        replay = await quotas.reserve(
+            policy=policy,
+            tenant_id=tenant_id,
+            client_id=client_id,
+            idempotency_key="postgres-1",
+            amount=Decimal("1"),
+            occurred_at=NOW,
+        )
+        second = await quotas.reserve(
+            policy=policy,
+            tenant_id=tenant_id,
+            client_id=client_id,
+            idempotency_key="postgres-2",
+            amount=Decimal("1"),
+            occurred_at=NOW,
+        )
+        rejected = await quotas.reserve(
+            policy=policy,
+            tenant_id=tenant_id,
+            client_id=client_id,
+            idempotency_key="postgres-3",
+            amount=Decimal("1"),
+            occurred_at=NOW,
+        )
+
+        assert first.allowed and second.allowed
+        assert replay.reservation.reservation_id == first.reservation.reservation_id
+        assert not rejected.allowed
+
+        reconciled = await quotas.reconcile(
+            reservation_id=first.reservation.reservation_id,
+            actual_amount=Decimal("1"),
+            occurred_at=NOW + timedelta(seconds=1),
+        )
+        replay_reconcile = await quotas.reconcile(
+            reservation_id=first.reservation.reservation_id,
+            actual_amount=Decimal("1"),
+            occurred_at=NOW + timedelta(seconds=2),
+        )
+        assert reconciled.utilization.consumed == Decimal("1")
+        assert replay_reconcile.reservation.actual_amount == Decimal("1")
+    finally:
+        await engine.dispose()
