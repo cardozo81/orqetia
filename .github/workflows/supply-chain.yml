@@ -1,0 +1,68 @@
+name: Supply chain
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - pyproject.toml
+      - uv.lock
+      - scripts/generate_supply_chain_artifacts.py
+      - scripts/security_baseline_check.py
+      - docs/security/supply-chain-hardening.md
+      - tests/security/test_supply_chain.py
+      - .github/workflows/**
+  push:
+    branches: [main]
+    paths:
+      - pyproject.toml
+      - uv.lock
+      - scripts/generate_supply_chain_artifacts.py
+      - scripts/security_baseline_check.py
+      - docs/security/supply-chain-hardening.md
+      - tests/security/test_supply_chain.py
+      - .github/workflows/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supply-chain-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  artifacts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned uv bootstrap tool
+        run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+
+      - name: Verify lockfile
+        run: uv lock --check
+
+      - name: Install locked development environment
+        run: uv sync --locked --python 3.14
+
+      - name: Generate supply-chain artifacts twice
+        run: |
+          uv run --no-sync --python 3.14 python scripts/generate_supply_chain_artifacts.py generate \
+            --source-revision "${GITHUB_SHA}" \
+            --output-dir /tmp/orqetia-supply-chain-a
+          uv run --no-sync --python 3.14 python scripts/generate_supply_chain_artifacts.py generate \
+            --source-revision "${GITHUB_SHA}" \
+            --output-dir /tmp/orqetia-supply-chain-b
+          cmp /tmp/orqetia-supply-chain-a/orqetia.cdx.json /tmp/orqetia-supply-chain-b/orqetia.cdx.json
+          cmp /tmp/orqetia-supply-chain-a/orqetia.provenance.json /tmp/orqetia-supply-chain-b/orqetia.provenance.json
+          sha256sum /tmp/orqetia-supply-chain-a/orqetia.cdx.json
+          sha256sum /tmp/orqetia-supply-chain-a/orqetia.provenance.json
+
+      - name: Repository action and secret baseline
+        run: uv run --no-sync --python 3.14 python scripts/security_baseline_check.py
+
+      - name: Supply-chain artifact tests
+        run: uv run --no-sync --python 3.14 pytest -q tests/security/test_supply_chain.py
