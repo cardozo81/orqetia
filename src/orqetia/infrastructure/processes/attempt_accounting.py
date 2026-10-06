@@ -172,3 +172,17 @@ class AttemptAccountingObserver:
             recorded_at=attempt.terminal_at,
         )
         await self._ledger.append(entry)
+
+
+class CompositeCompletedAttemptObserver:
+    """Run idempotent completed-attempt projections before task continuation."""
+
+    def __init__(self, *observers: object) -> None:
+        self._observers = observers
+
+    async def record(self, attempt: ProviderAttempt) -> None:
+        for observer in self._observers:
+            record = getattr(observer, "record", None)
+            if not callable(record):
+                raise TypeError("completed attempt observer must define record")
+            await record(attempt)

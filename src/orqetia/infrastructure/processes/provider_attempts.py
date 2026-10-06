@@ -23,6 +23,7 @@ from orqetia.observability import (
 from orqetia.providers import (
     ProviderAdapter,
     ProviderAttemptRequest,
+    ProviderAttemptResult,
     ProviderTarget,
 )
 from orqetia.shared.messaging import (
@@ -48,6 +49,17 @@ Clock = Callable[[], datetime]
 
 class CompletedAttemptObserver(Protocol):
     async def record(self, attempt: ProviderAttempt) -> None: ...
+
+
+class ProviderAttemptGate(Protocol):
+    async def pre_dispatch(
+        self,
+        attempt: ProviderAttempt,
+    ) -> ProviderAttemptResult | None: ...
+
+    async def release(self, attempt: ProviderAttempt) -> None: ...
+
+    async def mark_ambiguous(self, attempt: ProviderAttempt) -> None: ...
 
 
 def _utc_now() -> datetime:
@@ -102,6 +114,7 @@ class ProviderAttemptHandler:
         telemetry: EventEmitter | None = None,
         continuation_queue: WorkQueuePort | None = None,
         completed_observer: CompletedAttemptObserver | None = None,
+        pre_dispatch_gate: ProviderAttemptGate | None = None,
     ) -> None:
         if infrastructure_retry_delay_seconds < 1:
             raise ValueError("infrastructure_retry_delay_seconds must be >= 1")
@@ -115,6 +128,7 @@ class ProviderAttemptHandler:
         self._telemetry = telemetry or JsonEventEmitter()
         self._continuation_queue = continuation_queue
         self._completed_observer = completed_observer
+        self._pre_dispatch_gate = pre_dispatch_gate
 
     async def __call__(self, lease: WorkLease) -> HandlerOutcome:
         if lease.tenant_id is None or lease.client_id is None:
@@ -152,20 +166,33 @@ class ProviderAttemptHandler:
             reasoning_profile=attempt.target.reasoning_profile,
         )
         adapter: ProviderAdapter | None = None
+        gated_result: ProviderAttemptResult | None = None
         if attempt.status is ProviderAttemptStatus.PREPARED:
-            try:
-                adapter = await self._resolve(attempt)
-            except Exception as exc:
-                error_class = (
-                    f"ADAPTER_RESOLUTION_{type(exc).__name__.upper()}"
-                )
-                self._emit_attempt(
-                    "provider.adapter_resolution_failed",
-                    lease,
-                    attempt,
-                    error_class=error_class,
-                )
-                return self._infrastructure_failure(error_class)
+            if self._pre_dispatch_gate is not None:
+                try:
+                    gated_result = await self._pre_dispatch_gate.pre_dispatch(
+                        attempt
+                    )
+                except Exception as exc:
+                    return self._infrastructure_failure(
+                        f"ATTEMPT_PREFLIGHT_{type(exc).__name__.upper()}"
+                    )
+            if gated_result is None:
+                try:
+                    adapter = await self._resolve(attempt)
+                except Exception as exc:
+                    if self._pre_dispatch_gate is not None:
+                        await self._pre_dispatch_gate.release(attempt)
+                    error_class = (
+                        f"ADAPTER_RESOLUTION_{type(exc).__name__.upper()}"
+                    )
+                    self._emit_attempt(
+                        "provider.adapter_resolution_failed",
+                        lease,
+                        attempt,
+                        error_class=error_class,
+                    )
+                    return self._infrastructure_failure(error_class)
 
         claim = await self._store.claim_dispatch(
             scope=scope,
@@ -186,6 +213,11 @@ class ProviderAttemptHandler:
                 DispatchAction.MARKED_AMBIGUOUS,
                 DispatchAction.CANCELLED_BY_TASK,
             }:
+                quota_outcome = await self._handle_terminal_quota_state(
+                    claim.attempt
+                )
+                if quota_outcome is not None:
+                    return quota_outcome
                 observed = await self._observe_completed(
                     claim.attempt,
                 )
@@ -198,6 +230,43 @@ class ProviderAttemptHandler:
                 if continuation is not None:
                     return continuation
             return HandlerOutcome.complete()
+
+        if gated_result is not None:
+            await self._store.complete_dispatch(
+                scope=scope,
+                attempt_id=attempt_id,
+                work_id=lease.work_id,
+                result=gated_result,
+                occurred_at=self._clock(),
+            )
+            completed = await self._store.get_owned(
+                scope=scope,
+                attempt_id=attempt_id,
+            )
+            if (
+                completed is None
+                or completed.status is not ProviderAttemptStatus.COMPLETED
+            ):
+                return self._infrastructure_failure(
+                    "GATED_ATTEMPT_NOT_DURABLE"
+                )
+            self._emit_attempt(
+                "provider.dispatch_blocked",
+                lease,
+                completed,
+                provider_outcome=gated_result.outcome.value,
+                error_class=gated_result.error_class,
+                attempt_status="COMPLETED",
+            )
+            observed = await self._observe_completed(completed)
+            if observed is not None:
+                return observed
+            continuation = await self._continue_task(lease, completed)
+            return (
+                HandlerOutcome.complete()
+                if continuation is None
+                else continuation
+            )
 
         if adapter is None:
             try:
@@ -263,6 +332,14 @@ class ProviderAttemptHandler:
                 occurred_at=self._clock(),
                 error_class=type(exc).__name__,
             )
+            if self._pre_dispatch_gate is not None:
+                try:
+                    await self._pre_dispatch_gate.mark_ambiguous(journal)
+                except Exception as quota_exc:
+                    return self._infrastructure_failure(
+                        f"ATTEMPT_QUOTA_AMBIGUOUS_"
+                        f"{type(quota_exc).__name__.upper()}"
+                    )
             continuation = await self._continue_task(lease, journal)
             return (
                 HandlerOutcome.complete()
@@ -306,6 +383,23 @@ class ProviderAttemptHandler:
             if continuation is None
             else continuation
         )
+
+    async def _handle_terminal_quota_state(
+        self,
+        attempt: ProviderAttempt,
+    ) -> HandlerOutcome | None:
+        if self._pre_dispatch_gate is None:
+            return None
+        try:
+            if attempt.status is ProviderAttemptStatus.AMBIGUOUS:
+                await self._pre_dispatch_gate.mark_ambiguous(attempt)
+            elif attempt.status is ProviderAttemptStatus.CANCELLED:
+                await self._pre_dispatch_gate.release(attempt)
+        except Exception as exc:
+            return self._infrastructure_failure(
+                f"ATTEMPT_QUOTA_FINALIZE_{type(exc).__name__.upper()}"
+            )
+        return None
 
     async def _observe_completed(
         self,

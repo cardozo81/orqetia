@@ -55,4 +55,7 @@ jobs:
       - name: Mypy
         run: uv run --no-sync --python 3.14 mypy
       - name: Quota contract tests
-        run: uv run --no-sync --python 3.14 pytest -q tests/usage_accounting/test_quotas.py
+        run: >-
+          uv run --no-sync --python 3.14 pytest -q
+          tests/usage_accounting/test_quotas.py
+          tests/usage_accounting/test_runtime_quota_integration.py

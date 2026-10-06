@@ -11,6 +11,7 @@ from orqetia.control_plane import (
     PostgresProviderCatalogRepository,
     PostgresProviderCredentialRepository,
     PostgresProviderPricingCatalogRepository,
+    PostgresQuotaPolicyRepository,
     ProviderAccountService,
     ProviderSecretStore,
 )
@@ -22,8 +23,12 @@ from orqetia.execution import (
 from orqetia.infrastructure.artifacts import PostgresClientArtifactStore
 from orqetia.infrastructure.messaging import PostgresWorkQueue
 from orqetia.usage_accounting.postgres import PostgresAccountingLedger
+from orqetia.usage_accounting.quota_postgres import PostgresQuotaEnforcer
 
-from .attempt_accounting import AttemptAccountingObserver
+from .attempt_accounting import (
+    AttemptAccountingObserver,
+    CompositeCompletedAttemptObserver,
+)
 from .orchestration_candidates import ControlPlaneOrchestrationCandidateResolver
 from .provider_attempts import (
     PROVIDER_ATTEMPT_OPERATION,
@@ -31,6 +36,7 @@ from .provider_attempts import (
     ProviderAttemptHandler,
 )
 from .runtime_adapters import DurableProviderAdapterResolver
+from .runtime_quotas import AttemptQuotaCoordinator
 from .task_orchestration import (
     TASK_ORCHESTRATION_OPERATION,
     TASK_ORCHESTRATION_OPERATION_VERSION,
@@ -80,6 +86,10 @@ def build_execution_handler_registry(
         ledger=PostgresAccountingLedger(session_factory),
         pricing_versions=pricing,
     )
+    attempt_quotas = AttemptQuotaCoordinator(
+        policies=PostgresQuotaPolicyRepository(session_factory),
+        quotas=PostgresQuotaEnforcer(session_factory),
+    )
     adapter_resolver = DurableProviderAdapterResolver(
         credentials=credential_repository,
         secrets=secret_store or UnavailableProviderSecretStore(),
@@ -103,7 +113,11 @@ def build_execution_handler_registry(
         store=attempts,
         resolve_attempt_adapter=adapter_resolver,
         continuation_queue=queue,
-        completed_observer=accounting,
+        completed_observer=CompositeCompletedAttemptObserver(
+            attempt_quotas,
+            accounting,
+        ),
+        pre_dispatch_gate=attempt_quotas,
     )
 
     registry = HandlerRegistry()

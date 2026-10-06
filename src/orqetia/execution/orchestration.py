@@ -270,6 +270,13 @@ _TERMINAL_PROVIDER_OUTCOMES = frozenset(
 )
 
 
+def _internal_client_quota(error_class: str | None) -> bool:
+    return bool(
+        error_class
+        and error_class.startswith("ORQETIA_CLIENT_QUOTA_")
+    )
+
+
 class CanonicalOrchestrationPolicyEngine:
     """Stateless canonical policy decisions over durable execution facts."""
 
@@ -376,7 +383,10 @@ class CanonicalOrchestrationPolicyEngine:
             if observation.response_reference is not None and observation.accepted_requirements:
                 last_progress_reference = observation.response_reference
 
-            if observation.outcome in _TERMINAL_PROVIDER_OUTCOMES:
+            if (
+                observation.outcome in _TERMINAL_PROVIDER_OUTCOMES
+                and not _internal_client_quota(observation.error_class)
+            ):
                 quarantines.append(observation.target)
 
             if observation.outcome is ProviderOutcome.SUCCESS:

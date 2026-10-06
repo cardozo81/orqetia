@@ -2,6 +2,7 @@
 
 from .attempt_accounting import (
     AttemptAccountingObserver,
+    CompositeCompletedAttemptObserver,
     PricingCatalogVersionLookup,
     provider_usage_to_technical,
 )
@@ -13,6 +14,12 @@ from .provider_attempts import (
     build_provider_attempt_work_item,
 )
 from .runtime_adapters import DurableProviderAdapterResolver
+from .runtime_quotas import (
+    AttemptQuotaCoordinator,
+    RuntimeQuotaStore,
+    UsageReservationEstimator,
+    is_internal_quota_error,
+)
 from .task_orchestration import (
     TASK_ORCHESTRATION_OPERATION,
     TASK_ORCHESTRATION_OPERATION_VERSION,
@@ -43,9 +50,12 @@ __all__ = [
     "TASK_ORCHESTRATION_OPERATION",
     "TASK_ORCHESTRATION_OPERATION_VERSION",
     "AttemptAccountingObserver",
+    "AttemptQuotaCoordinator",
+    "CompositeCompletedAttemptObserver",
     "ControlPlaneOrchestrationCandidateResolver",
     "DurableProviderAdapterResolver",
     "PricingCatalogVersionLookup",
+    "RuntimeQuotaStore",
     "HandlerDisposition",
     "HandlerOutcome",
     "HandlerRegistry",
@@ -56,10 +66,12 @@ __all__ = [
     "TaskOrchestrationHandler",
     "UnavailableProviderSecretStore",
     "WorkerProcess",
+    "UsageReservationEstimator",
     "build_execution_handler_registry",
     "build_provider_attempt_work_item",
     "build_task_orchestration_work_item",
     "install_signal_handlers",
+    "is_internal_quota_error",
     "provider_attempt_id",
     "provider_usage_to_technical",
     "provider_dispatch_work_id",
