@@ -10,8 +10,27 @@ from orqetia.control_plane import (
     ExecutionPolicyAdminService,
     InMemoryExecutionPolicyRepository,
 )
+from orqetia.tenancy import (
+    InMemoryTenantClientRepository,
+    InMemoryTenancyAuditSink,
+    TenancyAdminService,
+)
 
 NOW = datetime(2026, 10, 5, 23, 40, tzinfo=UTC)
+
+
+async def _owner() -> tuple[TenancyAdminService, object, object]:
+    service = TenancyAdminService(
+        repository=InMemoryTenantClientRepository(),
+        audit=InMemoryTenancyAuditSink(),
+    )
+    tenant = await service.create_tenant(display_name="Tenant", occurred_at=NOW)
+    client = await service.create_client(
+        tenant_id=tenant.tenant_id,
+        display_name="Client",
+        occurred_at=NOW,
+    )
+    return service, tenant, client
 
 
 def _targets() -> tuple[AuthorizedExecutionTarget, ...]:
@@ -23,9 +42,10 @@ def _targets() -> tuple[AuthorizedExecutionTarget, ...]:
 
 @pytest.mark.asyncio
 async def test_publish_creates_immutable_versions_and_moves_assignment() -> None:
-    tenant_id, client_id = uuid7(), uuid7()
+    owner, tenant, client = await _owner()
+    tenant_id, client_id = tenant.tenant_id, client.client_id
     repository = InMemoryExecutionPolicyRepository()
-    service = ExecutionPolicyAdminService(repository)
+    service = ExecutionPolicyAdminService(repository, owner_resolver=owner)
 
     first = await service.publish_and_activate(
         tenant_id=tenant_id,
@@ -66,9 +86,10 @@ async def test_publish_creates_immutable_versions_and_moves_assignment() -> None
 
 @pytest.mark.asyncio
 async def test_assignment_version_conflict_fails_closed() -> None:
-    tenant_id, client_id = uuid7(), uuid7()
+    owner, tenant, client = await _owner()
+    tenant_id, client_id = tenant.tenant_id, client.client_id
     repository = InMemoryExecutionPolicyRepository()
-    service = ExecutionPolicyAdminService(repository)
+    service = ExecutionPolicyAdminService(repository, owner_resolver=owner)
     effective = await service.publish_and_activate(
         tenant_id=tenant_id,
         client_id=client_id,
@@ -146,9 +167,65 @@ def test_policy_rejects_duplicate_targets_and_invalid_limits() -> None:
 
 @pytest.mark.asyncio
 async def test_owner_has_no_implicit_policy_fallback() -> None:
-    service = ExecutionPolicyAdminService(InMemoryExecutionPolicyRepository())
+    owner, tenant, client = await _owner()
+    service = ExecutionPolicyAdminService(
+        InMemoryExecutionPolicyRepository(),
+        owner_resolver=owner,
+    )
     with pytest.raises(LookupError, match="no effective"):
         await service.resolve_effective(
-            tenant_id=uuid7(),
-            client_id=uuid7(),
+            tenant_id=tenant.tenant_id,
+            client_id=client.client_id,
         )
+
+
+
+@pytest.mark.asyncio
+async def test_policy_owner_must_be_active_and_match_tenant() -> None:
+    owner, tenant, client = await _owner()
+    service = ExecutionPolicyAdminService(
+        InMemoryExecutionPolicyRepository(),
+        owner_resolver=owner,
+    )
+    with pytest.raises(PermissionError, match="ownership mismatch"):
+        await service.publish_and_activate(
+            tenant_id=uuid7(),
+            client_id=client.client_id,
+            max_cycles=2,
+            max_attempts=4,
+            cycle_delay_seconds=0,
+            retry_after_cap_seconds=60,
+            authorized_targets=(_targets()[0],),
+            occurred_at=NOW,
+        )
+
+
+@pytest.mark.asyncio
+async def test_effective_policy_materializes_canonical_execution_contracts() -> None:
+    owner, tenant, client = await _owner()
+    service = ExecutionPolicyAdminService(
+        InMemoryExecutionPolicyRepository(),
+        owner_resolver=owner,
+    )
+    effective = await service.publish_and_activate(
+        tenant_id=tenant.tenant_id,
+        client_id=client.client_id,
+        max_cycles=4,
+        max_attempts=7,
+        cycle_delay_seconds=3,
+        retry_after_cap_seconds=90,
+        authorized_targets=_targets(),
+        occurred_at=NOW,
+    )
+    policy = effective.version.orchestration_policy()
+    snapshot = effective.version.session_policy_snapshot()
+    assert policy.max_cycles == 4
+    assert policy.max_attempts == 7
+    assert snapshot.effective_policy_version_id == effective.version.policy_version_id
+    assert {
+        (target.provider_id, target.model_id, target.reasoning_profile)
+        for target in snapshot.authorized_targets
+    } == {
+        ("openai", "gpt-x", "medium"),
+        ("anthropic", "claude-x", "standard"),
+    }

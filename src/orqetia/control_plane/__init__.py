@@ -8,6 +8,7 @@ from .execution_policies import (
     ExecutionPolicyRepository,
     ExecutionPolicyVersion,
     InMemoryExecutionPolicyRepository,
+    PolicyOwnerResolver,
 )
 from .execution_policy_postgres import PostgresExecutionPolicyRepository
 from .execution_policy_tables import (
@@ -73,6 +74,7 @@ __all__ = [
     "InMemoryCredentialAuditSink",
     "InMemoryExternalCapacityRepository",
     "InMemoryExecutionPolicyRepository",
+    "PolicyOwnerResolver",
     "InMemoryProviderAccountRepository",
     "InMemoryProviderCredentialRepository",
     "InMemoryProviderSecretStore",

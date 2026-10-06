@@ -30,6 +30,10 @@ rank only within that envelope.
 
 ## Resolution
 
+Before publish or resolution, Control Plane validates the exact tenant/client pair
+through the Identity & Tenancy active-owner contract from #136. A disabled or
+cross-tenant client fails closed.
+
 The Control Plane resolver returns the effective version for one exact tenant/client.
 There is no implicit global/default fallback in this baseline; absence of an assignment
 fails closed.
@@ -47,3 +51,11 @@ administrator's assignment.
 
 The issue is validated through isolated execution-policy administration tests and the
 Alembic migration chain. Provider calls are not involved.
+
+
+## Canonical execution bridge
+
+An immutable policy version materializes the existing canonical
+`OrchestrationPolicy` and `SessionPolicySnapshot` types. This is a translation
+boundary only: AUTO ranking and EXPLICIT_TARGET behavior remain owned by #8/#80 and
+are not reimplemented by the administrative service.

@@ -5,6 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
+
+from orqetia.execution import (
+    ExecutionTargetSnapshot,
+    OrchestrationPolicy,
+    SessionPolicySnapshot,
+)
 from uuid import UUID, uuid7
 
 
@@ -57,6 +63,27 @@ class ExecutionPolicyVersion:
             raise ValueError("authorized_targets cannot contain duplicates")
         _aware(self.created_at, "created_at")
 
+    def orchestration_policy(self) -> OrchestrationPolicy:
+        return OrchestrationPolicy(
+            max_cycles=self.max_cycles,
+            max_attempts=self.max_attempts,
+            cycle_delay_seconds=self.cycle_delay_seconds,
+            retry_after_cap_seconds=self.retry_after_cap_seconds,
+        )
+
+    def session_policy_snapshot(self) -> SessionPolicySnapshot:
+        return SessionPolicySnapshot(
+            effective_policy_version_id=self.policy_version_id,
+            authorized_targets=tuple(
+                ExecutionTargetSnapshot(
+                    provider_id=item.provider_id,
+                    model_id=item.model_id,
+                    reasoning_profile=item.reasoning_profile,
+                )
+                for item in self.authorized_targets
+            ),
+        )
+
 
 @dataclass(frozen=True)
 class ClientPolicyAssignment:
@@ -76,6 +103,15 @@ class ClientPolicyAssignment:
 class EffectiveExecutionPolicy:
     version: ExecutionPolicyVersion
     assignment: ClientPolicyAssignment
+
+
+class PolicyOwnerResolver(Protocol):
+    async def resolve_active_owner(
+        self,
+        *,
+        tenant_id: UUID,
+        client_id: UUID,
+    ) -> object: ...
 
 
 class ExecutionPolicyRepository(Protocol):
@@ -182,8 +218,14 @@ class InMemoryExecutionPolicyRepository:
 
 
 class ExecutionPolicyAdminService:
-    def __init__(self, repository: ExecutionPolicyRepository) -> None:
+    def __init__(
+        self,
+        repository: ExecutionPolicyRepository,
+        *,
+        owner_resolver: PolicyOwnerResolver,
+    ) -> None:
         self._repository = repository
+        self._owner_resolver = owner_resolver
 
     async def publish_and_activate(
         self,
@@ -198,6 +240,10 @@ class ExecutionPolicyAdminService:
         occurred_at: datetime,
     ) -> EffectiveExecutionPolicy:
         _aware(occurred_at, "occurred_at")
+        await self._owner_resolver.resolve_active_owner(
+            tenant_id=tenant_id,
+            client_id=client_id,
+        )
         current = await self._repository.get_effective(
             tenant_id=tenant_id,
             client_id=client_id,
@@ -246,6 +292,10 @@ class ExecutionPolicyAdminService:
         tenant_id: UUID,
         client_id: UUID,
     ) -> EffectiveExecutionPolicy:
+        await self._owner_resolver.resolve_active_owner(
+            tenant_id=tenant_id,
+            client_id=client_id,
+        )
         effective = await self._repository.get_effective(
             tenant_id=tenant_id,
             client_id=client_id,
