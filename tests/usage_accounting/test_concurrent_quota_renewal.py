@@ -182,10 +182,15 @@ async def test_expired_reservation_does_not_duplicate_when_capacity_was_realloca
         clock=lambda: now[0],
     )
     first = _task(ownership=ownership)
-    second = _task(ownership=ownership)
 
     assert await coordinator.preflight(first)
     now[0] = NOW + timedelta(seconds=4)
+    second = replace(
+        _task(ownership=ownership),
+        created_at=now[0],
+        updated_at=now[0],
+        started_at=now[0],
+    )
     assert await coordinator.preflight(second)
 
     allowed, delay = await coordinator.renew_active(first)
