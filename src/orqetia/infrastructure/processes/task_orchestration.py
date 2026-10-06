@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -151,7 +152,7 @@ class TaskOrchestrationHandler:
         credentials: ProviderCredentialSelector,
         work_queue: WorkQueuePort,
         engine: CanonicalOrchestrationPolicyEngine | None = None,
-        clock=_utc_now,
+        clock: Callable[[], datetime] = _utc_now,
     ) -> None:
         self._sessions = sessions
         self._tasks = tasks

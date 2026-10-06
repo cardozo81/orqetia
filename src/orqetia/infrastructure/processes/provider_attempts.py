@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid7
 
@@ -36,7 +36,7 @@ from .worker import HandlerOutcome
 PROVIDER_ATTEMPT_OPERATION = "provider.attempt.dispatch"
 PROVIDER_ATTEMPT_OPERATION_VERSION = 1
 
-AdapterResolver = Callable[[ProviderTarget], ProviderAdapter]
+AdapterResolver = Callable[[ProviderAttempt], ProviderAdapter | Awaitable[ProviderAdapter]]
 Clock = Callable[[], datetime]
 
 
@@ -163,7 +163,12 @@ class ProviderAttemptHandler:
             return HandlerOutcome.complete()
 
         try:
-            adapter = self._resolve_adapter(target)
+            resolved_adapter = self._resolve_adapter(claim.attempt)
+            adapter = (
+                await resolved_adapter
+                if isinstance(resolved_adapter, Awaitable)
+                else resolved_adapter
+            )
         except Exception as exc:
             error_class = f"ADAPTER_RESOLUTION_{type(exc).__name__.upper()}"
             self._emit_attempt(
