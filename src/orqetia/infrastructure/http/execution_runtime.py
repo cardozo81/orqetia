@@ -16,6 +16,10 @@ from orqetia.control_plane import (
 )
 from orqetia.execution import (
     ClientApiIdempotencyJournal,
+    ClientExchangeEvidence,
+    ClientExchangeEvidenceReader,
+    ClientRequestArtifactWriter,
+    ClientResultArtifactReader,
     ExecutionMode,
     ExecutionSession,
     ExecutionSessionStore,
@@ -25,6 +29,7 @@ from orqetia.execution import (
     OwnershipScope,
     ProviderAttempt,
     RequestedTargetSnapshot,
+    SanitizedEvidenceRecord,
     SessionStatus,
     TaskPayloadReferences,
     TaskStatus,
