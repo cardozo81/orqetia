@@ -144,6 +144,12 @@ class ProviderCredentialRepository(Protocol):
 
     async def get(self, credential_id: UUID) -> ProviderCredentialMetadata | None: ...
 
+    async def list_active(
+        self,
+        *,
+        provider_account_id: UUID,
+    ) -> tuple[ProviderCredentialMetadata, ...]: ...
+
     async def replace(
         self,
         metadata: ProviderCredentialMetadata,
@@ -202,6 +208,23 @@ class InMemoryProviderCredentialRepository:
 
     async def get(self, credential_id: UUID) -> ProviderCredentialMetadata | None:
         return self._items.get(credential_id)
+
+    async def list_active(
+        self,
+        *,
+        provider_account_id: UUID,
+    ) -> tuple[ProviderCredentialMetadata, ...]:
+        return tuple(
+            sorted(
+                (
+                    item
+                    for item in self._items.values()
+                    if item.provider_account_id == provider_account_id
+                    and item.status is ProviderCredentialStatus.ACTIVE
+                ),
+                key=lambda item: (item.created_at, str(item.credential_id)),
+            )
+        )
 
     async def replace(
         self,
