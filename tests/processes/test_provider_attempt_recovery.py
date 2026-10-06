@@ -9,6 +9,13 @@ from uuid import uuid7
 
 import sqlalchemy as sa
 
+from orqetia.control_plane import (
+    InMemoryQuotaPolicyRepository,
+    QuotaEnforcementMode,
+    QuotaMetric,
+    QuotaPolicySnapshot,
+    QuotaScope,
+)
 from orqetia.execution import (
     ExecutionMode,
     ExecutionSession,
@@ -31,6 +38,7 @@ from orqetia.infrastructure.processes import (
     PROVIDER_ATTEMPT_OPERATION,
     PROVIDER_ATTEMPT_OPERATION_VERSION,
     HandlerDisposition,
+    AttemptQuotaCoordinator,
     HandlerRegistry,
     ProviderAttemptHandler,
     WorkerProcess,
@@ -48,6 +56,7 @@ from orqetia.providers import (
 )
 from orqetia.settings import RuntimeSettings
 from orqetia.shared.messaging import QueueName
+from orqetia.usage_accounting.quotas import InMemoryQuotaEnforcer
 
 
 class ProviderAttemptRecoveryIntegrationTests(unittest.TestCase):
@@ -82,6 +91,9 @@ class ProviderAttemptRecoveryIntegrationTests(unittest.TestCase):
 
     def test_delayed_work_does_not_execute_early(self) -> None:
         asyncio.run(self._test_delayed_work())
+
+    def test_hard_provider_request_quota_blocks_provider_call(self) -> None:
+        asyncio.run(self._test_hard_provider_request_quota())
 
     async def _resources(self):
         settings = RuntimeSettings()
@@ -533,6 +545,81 @@ class ProviderAttemptRecoveryIntegrationTests(unittest.TestCase):
             )
             assert persisted is not None
             self.assertIs(persisted.status, ProviderAttemptStatus.PREPARED)
+        finally:
+            await engine.dispose()
+
+    async def _test_hard_provider_request_quota(self) -> None:
+        (
+            engine,
+            _factory,
+            queue,
+            _task_store,
+            attempt_store,
+            _task,
+            attempt,
+            provider,
+            _handler,
+        ) = await self._prepared()
+        try:
+            policies = InMemoryQuotaPolicyRepository()
+            await policies.append(
+                QuotaPolicySnapshot(
+                    policy_id=uuid7(),
+                    version=1,
+                    scope=QuotaScope.CLIENT,
+                    tenant_id=attempt.ownership.tenant_id,
+                    client_id=attempt.ownership.client_id,
+                    metric=QuotaMetric.PROVIDER_REQUESTS,
+                    limit=Decimal("0"),
+                    enforcement=QuotaEnforcementMode.HARD,
+                    effective_from=datetime.now(UTC) - timedelta(minutes=1),
+                    period_seconds=60,
+                    provider_id=attempt.target.provider_id,
+                )
+            )
+            coordinator = AttemptQuotaCoordinator(
+                policies=policies,
+                quotas=InMemoryQuotaEnforcer(),
+            )
+            handler = ProviderAttemptHandler(
+                store=attempt_store,
+                resolve_adapter=lambda _target: provider,
+                pre_dispatch_gate=coordinator,
+                completed_observer=coordinator,
+            )
+            item = build_provider_attempt_work_item(
+                attempt,
+                available_at=datetime.now(UTC) - timedelta(seconds=1),
+            )
+            await queue.enqueue(item)
+            lease = (
+                await queue.claim(
+                    queue_name=QueueName.EXECUTION,
+                    lease_owner="worker-quota",
+                    lease_seconds=30,
+                    limit=1,
+                )
+            )[0]
+
+            outcome = await handler(lease)
+            self.assertIs(outcome.disposition, HandlerDisposition.COMPLETE)
+            self.assertEqual(len(provider.invocations), 0)
+            self.assertTrue(await queue.complete(lease))
+
+            persisted = await attempt_store.get_owned(
+                scope=attempt.ownership,
+                attempt_id=attempt.attempt_id,
+            )
+            assert persisted is not None
+            self.assertIs(persisted.status, ProviderAttemptStatus.COMPLETED)
+            self.assertEqual(
+                persisted.provider_outcome,
+                ProviderOutcome.QUOTA_EXHAUSTED.value,
+            )
+            self.assertEqual(
+                persisted.error_class,
+                "ORQETIA_CLIENT_QUOTA_HARD_LIMIT_EXCEEDED",
+            )
         finally:
             await engine.dispose()
 
