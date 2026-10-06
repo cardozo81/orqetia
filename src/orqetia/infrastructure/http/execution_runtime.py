@@ -29,10 +29,12 @@ from orqetia.execution import (
     OwnershipScope,
     ProviderAttempt,
     RequestedTargetSnapshot,
-    SanitizedEvidenceRecord as SanitizedEvidenceRecord,
     SessionStatus,
     TaskPayloadReferences,
     TaskStatus,
+)
+from orqetia.execution import (
+    SanitizedEvidenceRecord as SanitizedEvidenceRecord,
 )
 from orqetia.shared.messaging import (
     DataClassification,

@@ -285,13 +285,11 @@ class PostgresQuotaEnforcer:
             if current is None:
                 raise LookupError("quota reservation not found")
             window_key = cast(str, current["window_key"])
-            window_row = (
-                await database.execute(
-                    sa.select(quota_windows)
-                    .where(quota_windows.c.window_key == window_key)
-                    .with_for_update()
-                )
-            ).mappings().one()
+            await database.execute(
+                sa.select(quota_windows)
+                .where(quota_windows.c.window_key == window_key)
+                .with_for_update()
+            )
             row = (
                 await database.execute(
                     sa.select(quota_reservations)

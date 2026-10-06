@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import os
-
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid7
 
 import pytest
+import sqlalchemy as sa
 
 from orqetia.control_plane.quotas import (
     QuotaEnforcementMode,
@@ -16,7 +16,7 @@ from orqetia.control_plane.quotas import (
 )
 from orqetia.infrastructure.persistence import create_engine, create_session_factory
 from orqetia.settings import RuntimeSettings
-from orqetia.usage_accounting import PostgresQuotaEnforcer
+from orqetia.usage_accounting.quota_postgres import PostgresQuotaEnforcer
 from orqetia.usage_accounting.quotas import (
     InMemoryQuotaEnforcer,
     QuotaReservationStatus,
@@ -299,7 +299,7 @@ async def test_postgres_quota_enforcer_is_atomic_and_replay_safe() -> None:
     try:
         async with engine.begin() as connection:
             await connection.execute(
-                __import__("sqlalchemy").text(
+                sa.text(
                     "TRUNCATE accounting.quota_reservations, "
                     "accounting.quota_windows CASCADE"
                 )

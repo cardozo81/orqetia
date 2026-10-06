@@ -17,7 +17,6 @@ from .domain import (
 )
 from .ledger import AccountingLedger, AccountingService, InMemoryAccountingLedger
 from .postgres import PostgresAccountingLedger
-from .quota_postgres import PostgresQuotaEnforcer
 from .pricing import (
     ContextTier,
     PricingCatalog,
@@ -56,7 +55,6 @@ __all__ = [
     "MonetaryAmount",
     "NativeUsageQuantity",
     "PostgresAccountingLedger",
-    "PostgresQuotaEnforcer",
     "PricingCatalog",
     "QuotaDecision",
     "QuotaEnforcer",
