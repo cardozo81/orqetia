@@ -67,6 +67,22 @@ from .provider_credentials import (
     SecretReference,
     SecretValue,
 )
+from .pricing_catalog_postgres import PostgresProviderPricingCatalogRepository
+from .pricing_catalog_tables import (
+    provider_pricing_assignment,
+    provider_pricing_catalog_versions,
+)
+from .pricing_catalogs import (
+    EffectiveProviderPricingCatalog,
+    InMemoryProviderPricingAuditSink,
+    InMemoryProviderPricingCatalogRepository,
+    ProviderPricingAdminService,
+    ProviderPricingAssignment,
+    ProviderPricingAuditEvent,
+    ProviderPricingAuditSink,
+    ProviderPricingCatalogRepository,
+    ProviderPricingCatalogVersion,
+)
 from .quota_admin import (
     InMemoryQuotaPolicyRepository,
     QuotaOwnerResolver,
@@ -108,6 +124,7 @@ __all__ = [
     "PostgresProviderAccountRepository",
     "PostgresProviderCatalogRepository",
     "PostgresProviderCredentialRepository",
+    "PostgresProviderPricingCatalogRepository",
     "ProviderAccount",
     "ProviderAccountRepository",
     "ProviderAccountService",
@@ -128,6 +145,15 @@ __all__ = [
     "ProviderCredentialService",
     "ProviderCredentialSelection",
     "ProviderCredentialStatus",
+    "EffectiveProviderPricingCatalog",
+    "InMemoryProviderPricingAuditSink",
+    "InMemoryProviderPricingCatalogRepository",
+    "ProviderPricingAdminService",
+    "ProviderPricingAssignment",
+    "ProviderPricingAuditEvent",
+    "ProviderPricingAuditSink",
+    "ProviderPricingCatalogRepository",
+    "ProviderPricingCatalogVersion",
     "ProviderSecretStore",
     "InMemoryQuotaPolicyRepository",
     "PostgresQuotaPolicyRepository",
@@ -148,5 +174,7 @@ __all__ = [
     "provider_catalog_versions",
     "provider_capacity_snapshots",
     "provider_credentials",
+    "provider_pricing_assignment",
+    "provider_pricing_catalog_versions",
     "quota_policies",
 ]
