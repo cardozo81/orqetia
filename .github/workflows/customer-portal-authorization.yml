@@ -50,3 +50,4 @@ jobs:
           tests/portal/test_credentials.py
           tests/portal/test_usage_estimates.py
           tests/portal/test_activity_docs.py
+          tests/portal/test_composition.py

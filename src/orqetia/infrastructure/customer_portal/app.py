@@ -12,7 +12,7 @@ from urllib.parse import parse_qs
 from uuid import UUID, uuid7
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from orqetia.audit import CustomerActivityStore, activity_event
 from orqetia.estimation import (
@@ -104,6 +104,7 @@ def create_customer_portal_app(
     usage: ClientUsageReportService | None = None,
     estimation: EstimateService | None = None,
     activity: CustomerActivityStore | None = None,
+    client_openapi_document: dict[str, object] | None = None,
 ) -> FastAPI:
     origin = allowed_origin.rstrip("/")
     if not origin.startswith(("http://", "https://")):
@@ -492,6 +493,18 @@ def create_customer_portal_app(
         response = page("Not found", "<p>Retained artifact unavailable.</p>")
         response.status_code = 404
         return response
+
+    @app.get("/openapi.json", include_in_schema=False)
+    async def client_openapi() -> JSONResponse:
+        if client_openapi_document is None:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "code": "OPENAPI_UNAVAILABLE",
+                    "message": "Canonical Client API contract is unavailable.",
+                },
+            )
+        return JSONResponse(content=client_openapi_document)
 
     @app.get("/portal/login")
     async def login() -> Response:
