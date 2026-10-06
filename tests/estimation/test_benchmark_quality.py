@@ -5,13 +5,16 @@ from decimal import Decimal
 from uuid import uuid7
 
 from orqetia.estimation import (
+    BenchmarkBuilder,
     BenchmarkCalibrationSample,
     BenchmarkConfidence,
     BenchmarkFeatureKey,
     BenchmarkMetrics,
+    BenchmarkPolicy,
     BenchmarkQualityGate,
     BenchmarkQualityPolicy,
     BenchmarkRebuildReason,
+    BenchmarkSample,
     BenchmarkSnapshot,
     BenchmarkUnavailableReason,
     ReferenceScope,
@@ -218,3 +221,71 @@ def test_methodology_and_confidence_are_serving_thresholds() -> None:
     assert not assessment.servable
     assert BenchmarkRebuildReason.METHODOLOGY in assessment.reasons
     assert BenchmarkRebuildReason.LOW_CONFIDENCE in assessment.reasons
+
+
+
+def test_rebuild_creates_new_immutable_version_provenance() -> None:
+    tenant_id = uuid7()
+    client_id = uuid7()
+    previous = BenchmarkSnapshot(
+        snapshot_id=uuid7(),
+        scope=ReferenceScope.CLIENT_ONLY,
+        feature_key=KEY,
+        methodology_version="quality-v1",
+        benchmark_version="quality-v1:previous",
+        as_of=NOW - timedelta(days=8),
+        sample_count=20,
+        public_sample_size=20,
+        distinct_client_count=1,
+        public_cohort_size=1,
+        confidence=BenchmarkConfidence.MEDIUM,
+        metrics=BenchmarkMetrics(
+            median_input_tokens=Decimal("60"),
+            median_output_tokens=Decimal("40"),
+            median_cached_input_tokens=Decimal("0"),
+            median_reasoning_tokens=Decimal("10"),
+            median_total_tokens=Decimal("100"),
+            p90_output_tokens=50,
+            p90_total_tokens=120,
+        ),
+        tenant_id=tenant_id,
+        client_id=client_id,
+    )
+    samples = tuple(
+        BenchmarkSample(
+            tenant_id=tenant_id,
+            client_id=client_id,
+            feature_key=KEY,
+            input_tokens=70,
+            output_tokens=50,
+            cached_input_tokens=0,
+            reasoning_tokens=10,
+            total_tokens=120,
+            occurred_at=NOW - timedelta(minutes=index),
+        )
+        for index in range(20)
+    )
+    rebuilt = BenchmarkBuilder(
+        BenchmarkPolicy(
+            methodology_version="quality-v2",
+            minimum_client_samples=10,
+        )
+    ).build(
+        scope=ReferenceScope.CLIENT_ONLY,
+        samples=samples,
+        feature_key=KEY,
+        as_of=NOW,
+        tenant_id=tenant_id,
+        client_id=client_id,
+    ).snapshot
+
+    assert rebuilt is not None
+    assert rebuilt.snapshot_id != previous.snapshot_id
+    assert rebuilt.benchmark_version != previous.benchmark_version
+    assert rebuilt.methodology_version == "quality-v2"
+    assert rebuilt.as_of == NOW
+    assert rebuilt.metrics.median_total_tokens == Decimal("120")
+
+    assert previous.methodology_version == "quality-v1"
+    assert previous.benchmark_version == "quality-v1:previous"
+    assert previous.as_of == NOW - timedelta(days=8)
