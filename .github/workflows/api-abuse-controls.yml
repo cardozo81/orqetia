@@ -1,0 +1,53 @@
+name: API abuse controls
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - src/orqetia/infrastructure/http/abuse.py
+      - src/orqetia/infrastructure/http/app.py
+      - src/orqetia/infrastructure/http/execution_runtime.py
+      - src/orqetia/infrastructure/messaging/postgres.py
+      - docs/security/api-abuse-controls.md
+      - tests/api/test_abuse_controls.py
+      - tests/api/test_client_execution_runtime.py
+      - .github/workflows/api-abuse-controls.yml
+  push:
+    branches: [main]
+    paths:
+      - src/orqetia/infrastructure/http/abuse.py
+      - src/orqetia/infrastructure/http/app.py
+      - src/orqetia/infrastructure/http/execution_runtime.py
+      - src/orqetia/infrastructure/messaging/postgres.py
+      - docs/security/api-abuse-controls.md
+      - tests/api/test_abuse_controls.py
+      - tests/api/test_client_execution_runtime.py
+      - .github/workflows/api-abuse-controls.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-abuse-controls-main
+  cancel-in-progress: true
+
+jobs:
+  abuse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ORQETIA_ENVIRONMENT: test
+      ORQETIA_PROCESS_ROLE: api
+      ORQETIA_DATABASE_DSN: postgresql+psycopg://localhost/orqetia_test
+      ORQETIA_SECRET_STORE_MODE: none
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+      - run: uv sync --locked --python 3.14
+      - name: Isolated abuse controls
+        run: >-
+          uv run --no-sync --python 3.14 pytest -q
+          tests/api/test_abuse_controls.py
+          tests/api/test_client_execution_runtime.py::test_task_submission_rejects_when_execution_queue_is_saturated
