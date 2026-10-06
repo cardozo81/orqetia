@@ -36,7 +36,13 @@ from .provider_attempts import (
     ProviderAttemptHandler,
 )
 from .runtime_adapters import DurableProviderAdapterResolver
-from .runtime_quotas import AttemptQuotaCoordinator, TaskQuotaCoordinator
+from .runtime_quotas import (
+    CONCURRENT_TASK_QUOTA_HEARTBEAT_OPERATION,
+    CONCURRENT_TASK_QUOTA_HEARTBEAT_OPERATION_VERSION,
+    AttemptQuotaCoordinator,
+    ConcurrentTaskQuotaHeartbeatHandler,
+    TaskQuotaCoordinator,
+)
 from .task_orchestration import (
     TASK_ORCHESTRATION_OPERATION,
     TASK_ORCHESTRATION_OPERATION_VERSION,
@@ -91,6 +97,7 @@ def build_execution_handler_registry(
     task_quotas = TaskQuotaCoordinator(
         policies=quota_policies,
         quotas=quota_enforcer,
+        work_queue=queue,
     )
     attempt_quotas = AttemptQuotaCoordinator(
         policies=quota_policies,
@@ -126,6 +133,10 @@ def build_execution_handler_registry(
         ),
         pre_dispatch_gate=attempt_quotas,
     )
+    quota_heartbeat_handler = ConcurrentTaskQuotaHeartbeatHandler(
+        tasks=tasks,
+        quotas=task_quotas,
+    )
 
     registry = HandlerRegistry()
     registry.register(
@@ -137,5 +148,10 @@ def build_execution_handler_registry(
         PROVIDER_ATTEMPT_OPERATION,
         PROVIDER_ATTEMPT_OPERATION_VERSION,
         attempt_handler,
+    )
+    registry.register(
+        CONCURRENT_TASK_QUOTA_HEARTBEAT_OPERATION,
+        CONCURRENT_TASK_QUOTA_HEARTBEAT_OPERATION_VERSION,
+        quota_heartbeat_handler,
     )
     return registry
