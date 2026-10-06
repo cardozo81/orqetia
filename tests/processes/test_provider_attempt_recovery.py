@@ -37,8 +37,8 @@ from orqetia.infrastructure.persistence import create_engine, create_session_fac
 from orqetia.infrastructure.processes import (
     PROVIDER_ATTEMPT_OPERATION,
     PROVIDER_ATTEMPT_OPERATION_VERSION,
-    HandlerDisposition,
     AttemptQuotaCoordinator,
+    HandlerDisposition,
     HandlerRegistry,
     ProviderAttemptHandler,
     WorkerProcess,
