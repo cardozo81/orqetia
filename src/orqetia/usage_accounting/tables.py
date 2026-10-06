@@ -16,6 +16,8 @@ accounting_ledger = sa.Table(
     sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
     sa.Column("client_id", UUID(as_uuid=True), nullable=False),
     sa.Column("client_credential_id", UUID(as_uuid=True), nullable=True),
+    sa.Column("provider_account_id", UUID(as_uuid=True), nullable=True),
+    sa.Column("provider_credential_id", UUID(as_uuid=True), nullable=True),
     sa.Column("session_id", UUID(as_uuid=True), nullable=True),
     sa.Column("task_id", UUID(as_uuid=True), nullable=True),
     sa.Column("attempt_id", UUID(as_uuid=True), nullable=False),
