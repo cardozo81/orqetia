@@ -6,6 +6,7 @@ import json
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
 
@@ -90,7 +91,7 @@ class EstimateResult:
     estimation_method: str
     methodology_version: str
     benchmark_version: str
-    as_of: object
+    as_of: datetime
     sample_size: int
     cohort_size: int
     confidence: str
@@ -317,7 +318,16 @@ def _result_from_snapshot(
     reasoning_tokens = max(0, round(snapshot.metrics.median_reasoning_tokens))
     cached_tokens = min(cached_tokens, input_tokens)
     total_tokens = input_tokens + output_tokens
-    metadata = snapshot.client_metadata()
+    sample_size = (
+        snapshot.sample_count
+        if snapshot.scope is ReferenceScope.CLIENT_ONLY
+        else snapshot.public_sample_size
+    )
+    cohort_size = (
+        1
+        if snapshot.scope is ReferenceScope.CLIENT_ONLY
+        else snapshot.public_cohort_size
+    )
     return EstimateResult(
         usage=EstimatedTechnicalUsage(
             input_tokens=input_tokens,
@@ -334,8 +344,8 @@ def _result_from_snapshot(
         methodology_version=snapshot.methodology_version,
         benchmark_version=snapshot.benchmark_version,
         as_of=snapshot.as_of,
-        sample_size=int(metadata["sample_size"]),
-        cohort_size=int(metadata["cohort_size"]),
+        sample_size=sample_size,
+        cohort_size=cohort_size,
         confidence=snapshot.confidence.value,
         fallback_available=fallback_available,
         limitations=limitations,
