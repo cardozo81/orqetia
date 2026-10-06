@@ -1,14 +1,21 @@
 """Execution bounded-context contracts and PostgreSQL adapters."""
 
-from .attempt_postgres import PostgresProviderAttemptStore
-from .client_api_idempotency import (
-    ClientApiIdempotencyConflict,
-    ClientApiIdempotencyJournal,
-    ClientApiIdempotencyReservation,
-    InMemoryClientApiIdempotencyJournal,
+from .artifact_tables import (
+    artifact_metadata,
+    client_artifacts,
+    client_exchange_evidence,
 )
-from .client_api_postgres import PostgresClientApiIdempotencyJournal
-from .client_api_tables import client_api_idempotency
+from .artifacts import (
+    ClientArtifactRetentionPort,
+    ClientExchangeEvidence,
+    ClientExchangeEvidenceReader,
+    ClientExchangeEvidenceWriter,
+    ClientRequestArtifactWriter,
+    ClientResultArtifactReader,
+    ClientResultArtifactWriter,
+    SanitizedEvidenceRecord,
+)
+from .attempt_postgres import PostgresProviderAttemptStore
 from .attempt_tables import attempt_metadata, provider_attempts
 from .attempts import (
     DispatchAction,
@@ -17,6 +24,14 @@ from .attempts import (
     ProviderAttemptStatus,
     ProviderAttemptStore,
 )
+from .client_api_idempotency import (
+    ClientApiIdempotencyConflict,
+    ClientApiIdempotencyJournal,
+    ClientApiIdempotencyReservation,
+    InMemoryClientApiIdempotencyJournal,
+)
+from .client_api_postgres import PostgresClientApiIdempotencyJournal
+from .client_api_tables import client_api_idempotency
 from .orchestration import (
     AttemptObservation,
     AttemptObservationStatus,
@@ -70,15 +85,22 @@ __all__ = [
     "ClientApiIdempotencyConflict",
     "ClientApiIdempotencyJournal",
     "ClientApiIdempotencyReservation",
+    "ClientArtifactRetentionPort",
+    "ClientExchangeEvidence",
+    "ClientExchangeEvidenceReader",
+    "ClientExchangeEvidenceWriter",
+    "ClientRequestArtifactWriter",
+    "ClientResultArtifactReader",
+    "ClientResultArtifactWriter",
     "DispatchAction",
     "DispatchClaim",
     "ExecutionMode",
-    "InMemoryClientApiIdempotencyJournal",
     "ExecutionSession",
     "ExecutionSessionStore",
     "ExecutionTargetSnapshot",
     "ExecutionTask",
     "ExecutionTaskStore",
+    "InMemoryClientApiIdempotencyJournal",
     "OrchestrationCandidate",
     "OrchestrationCyclePlan",
     "OrchestrationDecision",
@@ -95,6 +117,7 @@ __all__ = [
     "QuarantineState",
     "RequestedTargetSnapshot",
     "RequirementProgress",
+    "SanitizedEvidenceRecord",
     "SessionPolicySnapshot",
     "SessionStatus",
     "TargetHealth",
@@ -104,8 +127,11 @@ __all__ = [
     "TaskReasonEnvelope",
     "TaskStatus",
     "VALID_TRANSITIONS",
+    "artifact_metadata",
     "attempt_metadata",
     "client_api_idempotency",
+    "client_artifacts",
+    "client_exchange_evidence",
     "execution_metadata",
     "execution_sessions",
     "provider_attempts",
