@@ -582,7 +582,17 @@
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
           }
-        }
+        },
+        "description": "Provider-free technical estimate. Omission of execution means AUTO. CLIENT_ONLY/GLOBAL_PUBLIC follow governed benchmark isolation; no monetary provider data is returned.",
+        "x-orqetia-no-provider-call": true,
+        "x-orqetia-conditional-scopes": [
+          {
+            "when": "execution.mode == EXPLICIT_TARGET",
+            "required": [
+              "tasks:target"
+            ]
+          }
+        ]
       }
     },
     "/v1/providers": {
@@ -1382,15 +1392,52 @@
             "type": "object",
             "additionalProperties": true
           },
-          "target": {
+          "reference_scope": {
+            "type": "string",
+            "enum": [
+              "CLIENT_ONLY",
+              "GLOBAL_PUBLIC"
+            ],
+            "default": "CLIENT_ONLY"
+          },
+          "execution": {
             "oneOf": [
               {
-                "$ref": "#/components/schemas/Target"
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mode"
+                ],
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "AUTO",
+                    "default": "AUTO"
+                  }
+                }
               },
               {
-                "type": "null"
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mode",
+                  "target"
+                ],
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "EXPLICIT_TARGET"
+                  },
+                  "target": {
+                    "$ref": "#/components/schemas/Target"
+                  }
+                }
               }
-            ]
+            ],
+            "discriminator": {
+              "propertyName": "mode"
+            },
+            "description": "Optional. Omission is equivalent to AUTO."
           }
         }
       },
@@ -1399,15 +1446,39 @@
         "additionalProperties": false,
         "required": [
           "estimated_input_tokens",
+          "requested_execution_mode",
+          "effective_execution_mode",
+          "effective_target",
+          "reference_scope",
           "estimation_method",
-          "as_of"
+          "methodology_version",
+          "benchmark_version",
+          "as_of",
+          "sample_size",
+          "cohort_size",
+          "confidence",
+          "limitations"
         ],
         "properties": {
           "estimated_input_tokens": {
             "type": "integer",
             "minimum": 0
           },
+          "estimated_cached_input_tokens": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
           "estimated_output_tokens": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "estimated_reasoning_tokens": {
             "type": [
               "integer",
               "null"
@@ -1421,12 +1492,86 @@
             ],
             "minimum": 0
           },
+          "requested_execution_mode": {
+            "type": "string",
+            "enum": [
+              "AUTO",
+              "EXPLICIT_TARGET"
+            ]
+          },
+          "effective_execution_mode": {
+            "type": "string",
+            "enum": [
+              "AUTO",
+              "EXPLICIT_TARGET"
+            ]
+          },
+          "effective_target": {
+            "$ref": "#/components/schemas/Target"
+          },
+          "reference_scope": {
+            "type": "string",
+            "enum": [
+              "CLIENT_ONLY",
+              "GLOBAL_PUBLIC"
+            ]
+          },
           "estimation_method": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "methodology_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "benchmark_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
           },
           "as_of": {
             "type": "string",
             "format": "date-time"
+          },
+          "sample_size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cohort_size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ]
+          },
+          "fallback_available": {
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "CLIENT_ONLY",
+                  "GLOBAL_PUBLIC"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limitations": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "maxLength": 300
+            }
           }
         }
       },
