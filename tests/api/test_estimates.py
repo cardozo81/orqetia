@@ -4,14 +4,16 @@ import asyncio
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import httpx
 
 from orqetia.estimation import (
+    EstimatedTechnicalUsage,
     EstimateResult,
+    EstimateSpec,
     EstimateSubject,
     EstimateTarget,
-    EstimatedTechnicalUsage,
 )
 from orqetia.identity.authentication import AuthenticatedPrincipal
 from orqetia.infrastructure.http import create_app
@@ -39,7 +41,12 @@ class FakeAuthenticator:
 
 
 class FakeEstimationService:
-    async def estimate(self, *, subject, spec):
+    async def estimate(
+        self,
+        *,
+        subject: EstimateSubject,
+        spec: EstimateSpec,
+    ) -> EstimateResult:
         assert subject == EstimateSubject("tenant-1", "client-1")
         target = spec.target or EstimateTarget("openai", "gpt-auto", "medium")
         return EstimateResult(
@@ -66,7 +73,7 @@ class FakeEstimationService:
         )
 
 
-async def _post(app, body):
+async def _post(app: Any, body: dict[str, object]) -> httpx.Response:
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         return await client.post(
