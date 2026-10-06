@@ -35,6 +35,7 @@ from orqetia.identity.authentication import (
     BearerAuthenticator,
 )
 from orqetia.infrastructure.health import ReadinessProbe
+from orqetia.read_models import ClientUsageReportService
 
 from .models import (
     CredentialCreateRequest,
@@ -49,6 +50,7 @@ from .models import (
     ExplicitExecution,
     SessionCreateRequest,
     TaskCreateRequest,
+    UsagePageResponse,
 )
 
 _CORRELATION_ID = re.compile(r"^[A-Za-z0-9._:-]{1,200}$")
@@ -80,6 +82,7 @@ def create_app(
     shutdown_callback: Callable[[], Awaitable[None]] | None = None,
     estimation_service: EstimateService | None = None,
     client_credential_service: ClientAccessCredentialService | None = None,
+    client_usage_service: ClientUsageReportService | None = None,
 ) -> FastAPI:
     """Build the client API shell around the versioned canonical OpenAPI document."""
 
@@ -599,15 +602,39 @@ def create_app(
             content={"status": "ready", "checks": {"database": "ready"}},
         )
 
-    @app.get("/v1/usage", response_model=None)
+    @app.get("/v1/usage", response_model=UsagePageResponse)
     async def get_usage(
-        _principal: Annotated[AuthenticatedPrincipal, Depends(require_scopes("usage:read"))],
-        _cursor: Annotated[str | None, Query(alias="cursor", max_length=500)] = None,
-        _limit: Annotated[int, Query(alias="limit", ge=1, le=100)] = 50,
-        _from: Annotated[datetime | None, Query(alias="from")] = None,
-        _to: Annotated[datetime | None, Query(alias="to")] = None,
-    ) -> None:
-        del _cursor, _limit, _from, _to
-        not_implemented()
+        principal: Annotated[
+            AuthenticatedPrincipal,
+            Depends(require_scopes("usage:read")),
+        ],
+        cursor: Annotated[str | None, Query(alias="cursor", max_length=500)] = None,
+        limit: Annotated[int, Query(alias="limit", ge=1, le=100)] = 50,
+        period_from: Annotated[datetime | None, Query(alias="from")] = None,
+        period_to: Annotated[datetime | None, Query(alias="to")] = None,
+    ) -> UsagePageResponse:
+        if client_usage_service is None:
+            raise ApiError(
+                503,
+                "USAGE_REPORTING_UNAVAILABLE",
+                "Usage reporting service is not configured.",
+            )
+        tenant_id, client_id = principal_owner(principal)
+        try:
+            page = await client_usage_service.read(
+                tenant_id=tenant_id,
+                client_id=client_id,
+                period_from=period_from,
+                period_to=period_to,
+                cursor=cursor,
+                limit=limit,
+            )
+        except ValueError as exc:
+            raise ApiError(
+                400,
+                "INVALID_REPORT_QUERY",
+                "Usage report query is invalid.",
+            ) from exc
+        return UsagePageResponse.model_validate(page.client_payload())
 
     return app

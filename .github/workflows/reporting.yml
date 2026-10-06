@@ -41,4 +41,7 @@ jobs:
       - name: Apply migrations
         run: uv run --no-sync --python 3.14 alembic upgrade head
       - name: Reporting tests
-        run: uv run --no-sync --python 3.14 pytest -q tests/read_models/test_reporting.py
+        run: >-
+          uv run --no-sync --python 3.14 pytest -q
+          tests/read_models/test_reporting.py
+          tests/api/test_usage_reporting.py

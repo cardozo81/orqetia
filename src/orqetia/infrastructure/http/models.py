@@ -142,3 +142,30 @@ class CredentialIssueResponse(StrictModel):
 
 class CredentialListResponse(StrictModel):
     items: list[CredentialMetadataView]
+
+
+
+class NativeUsageView(StrictModel):
+    unit: str = Field(min_length=1, max_length=100)
+    quantity: float = Field(ge=0)
+
+
+class TechnicalUsageView(StrictModel):
+    input_tokens: int | None = Field(default=None, ge=0)
+    cached_input_tokens: int | None = Field(default=None, ge=0)
+    output_tokens: int | None = Field(default=None, ge=0)
+    reasoning_tokens: int | None = Field(default=None, ge=0)
+    total_tokens: int | None = Field(default=None, ge=0)
+    native_usage: list[NativeUsageView] = Field(default_factory=list)
+
+
+class UsageItemView(StrictModel):
+    period_start: datetime
+    period_end: datetime
+    usage: TechnicalUsageView
+
+
+class UsagePageResponse(StrictModel):
+    items: list[UsageItemView]
+    next_cursor: str | None = None
+    as_of: datetime | None = None
