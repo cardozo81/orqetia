@@ -64,12 +64,23 @@ def _snapshot(target: EstimateTarget, scope: ReferenceScope) -> BenchmarkSnapsho
 
 
 class FakeTargets:
-    async def ranked_auto_targets(self, *, subject, operation):
+    async def ranked_auto_targets(
+        self,
+        *,
+        subject: EstimateSubject,
+        operation: str,
+    ) -> tuple[EstimateTarget, ...]:
         assert subject == SUBJECT
         assert operation == "TASK_EXECUTION"
         return (TARGET_A, TARGET_B)
 
-    async def is_authorized(self, *, subject, operation, target):
+    async def is_authorized(
+        self,
+        *,
+        subject: EstimateSubject,
+        operation: str,
+        target: EstimateTarget,
+    ) -> bool:
         assert subject == SUBJECT
         assert operation == "TASK_EXECUTION"
         return target == TARGET_B
@@ -79,7 +90,13 @@ class FakeBenchmarks:
     def __init__(self, available_target: EstimateTarget) -> None:
         self.available_target = available_target
 
-    async def lookup(self, *, subject, target, scope):
+    async def lookup(
+        self,
+        *,
+        subject: EstimateSubject,
+        target: EstimateTarget,
+        scope: ReferenceScope,
+    ) -> BenchmarkBuildResult:
         assert subject == SUBJECT
         if target != self.available_target:
             return BenchmarkBuildResult(
