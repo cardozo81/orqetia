@@ -3,14 +3,14 @@
 from .admin import (
     ActiveOwner,
     AdministrativeStatus,
-    InMemoryTenantClientRepository,
     InMemoryTenancyAuditSink,
+    InMemoryTenantClientRepository,
     ServiceClientRecord,
-    TenantClientRepository,
-    TenantRecord,
     TenancyAdminService,
     TenancyAuditEvent,
     TenancyAuditSink,
+    TenantClientRepository,
+    TenantRecord,
 )
 from .postgres import PostgresTenantClientRepository
 from .tables import service_clients, tenants

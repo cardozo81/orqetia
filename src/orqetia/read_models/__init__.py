@@ -27,8 +27,8 @@ from .intelligence import (
 from .pagination import CursorPage, decode_cursor, encode_cursor, paginate
 from .reporting import (
     BackofficeReportAccess,
-    BackofficeReportPage,
     BackofficeReportingService,
+    BackofficeReportPage,
     ClientUsageBucket,
     ClientUsagePage,
     ClientUsageReportService,

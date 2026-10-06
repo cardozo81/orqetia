@@ -6,7 +6,7 @@ import base64
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Protocol
 from uuid import NAMESPACE_URL, UUID, uuid5, uuid7
 
@@ -29,7 +29,6 @@ from orqetia.execution import (
     OwnershipScope,
     ProviderAttempt,
     RequestedTargetSnapshot,
-    SanitizedEvidenceRecord,
     SessionStatus,
     TaskPayloadReferences,
     TaskStatus,

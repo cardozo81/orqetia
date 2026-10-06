@@ -420,11 +420,23 @@ def create_app(
         if isinstance(exc, ClientExecutionNotFound):
             return ApiError(404, "NOT_FOUND", "Requested execution resource was not found.")
         if isinstance(exc, (ClientExecutionForbidden, PermissionError)):
-            return ApiError(403, "FORBIDDEN", "Requested execution operation is not authorized.")
+            return ApiError(
+                403,
+                "FORBIDDEN",
+                "Requested execution operation is not authorized.",
+            )
         if isinstance(exc, ClientExecutionArtifactUnavailable):
-            return ApiError(404, "ARTIFACT_NOT_RETAINED", "Requested retained artifact is unavailable.")
+            return ApiError(
+                404,
+                "ARTIFACT_NOT_RETAINED",
+                "Requested retained artifact is unavailable.",
+            )
         if isinstance(exc, ClientExecutionConflict):
-            return ApiError(409, "EXECUTION_STATE_CONFLICT", "Execution state does not permit this operation.")
+            return ApiError(
+                409,
+                "EXECUTION_STATE_CONFLICT",
+                "Execution state does not permit this operation.",
+            )
         if isinstance(exc, LookupError):
             return ApiError(404, "NOT_FOUND", "Required execution configuration was not found.")
         if isinstance(exc, ValueError):

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from html import escape
-import json
 from typing import Protocol
 from urllib.parse import parse_qs
 from uuid import UUID, uuid7
@@ -660,10 +660,24 @@ def create_backoffice_app(
             + csrf_field(request)
             + "<label>Tenant ID <input name='tenant_id' required></label>"
             + "<label>Client ID <input name='client_id' required></label>"
-            + "<label>Max cycles <input name='max_cycles' type='number' min='1' required></label>"
-            + "<label>Max attempts <input name='max_attempts' type='number' min='1' required></label>"
-            + "<label>Cycle delay seconds <input name='cycle_delay_seconds' type='number' min='0' value='0'></label>"
-            + "<label>Retry-After cap seconds <input name='retry_after_cap_seconds' type='number' min='0' max='300' value='300'></label>"
+            + (
+                "<label>Max cycles <input name='max_cycles' type='number' "
+                "min='1' required></label>"
+            )
+            + (
+                "<label>Max attempts <input name='max_attempts' type='number' "
+                "min='1' required></label>"
+            )
+            + (
+                "<label>Cycle delay seconds "
+                "<input name='cycle_delay_seconds' type='number' min='0' "
+                "value='0'></label>"
+            )
+            + (
+                "<label>Retry-After cap seconds "
+                "<input name='retry_after_cap_seconds' type='number' min='0' "
+                "max='300' value='300'></label>"
+            )
             + "<label>Targets (provider|model|reasoning per line)"
             + "<textarea name='targets' required></textarea></label>"
             + "<button>Publish & activate</button></form>"
@@ -865,12 +879,18 @@ def create_backoffice_app(
             + csrf_field(request)
             + "<label>Provider ID <input name='provider_id' required></label>"
             + "<label>Account ID <input name='provider_account_id' required></label>"
-            + "<label>Secret <input type='password' autocomplete='new-password' name='secret' required></label>"
+            + (
+                "<label>Secret <input type='password' autocomplete='new-password' "
+                "name='secret' required></label>"
+            )
             + "<button>Create credential</button></form>"
             + "<form method='post' action='/backoffice/providers/credentials/rotate'>"
             + csrf_field(request)
             + "<label>Credential ID <input name='credential_id' required></label>"
-            + "<label>New secret <input type='password' autocomplete='new-password' name='secret' required></label>"
+            + (
+                "<label>New secret <input type='password' "
+                "autocomplete='new-password' name='secret' required></label>"
+            )
             + "<button>Rotate credential</button></form>"
             + "<form method='post' action='/backoffice/providers/credentials/revoke'>"
             + csrf_field(request)
@@ -885,7 +905,10 @@ def create_backoffice_app(
             + csrf_field(request)
             + "<label>Account ID <input name='provider_account_id' required></label>"
             + "<label>Native unit <input name='native_unit' required></label>"
-            + "<select name='source'><option>PROVIDER_API</option><option>PROVIDER_CONSOLE</option></select>"
+            + (
+                "<select name='source'><option>PROVIDER_API</option>"
+                "<option>PROVIDER_CONSOLE</option></select>"
+            )
             + "<label>Source reference <input name='source_reference' required></label>"
             + "<label>Remaining <input name='remaining'></label>"
             + "<label>Limit <input name='limit'></label>"
@@ -1006,7 +1029,10 @@ def create_backoffice_app(
         _session, data = await authorized_mutation(request, "providers:admin")
         raw_catalog = data.get("catalog_json", "")
         raw_endpoints = data.get("endpoints_json", "[]")
-        if len(raw_catalog.encode("utf-8")) > 200_000 or len(raw_endpoints.encode("utf-8")) > 100_000:
+        if (
+            len(raw_catalog.encode("utf-8")) > 200_000
+            or len(raw_endpoints.encode("utf-8")) > 100_000
+        ):
             raise ValueError("provider catalog form is too large")
         providers = decode_provider_catalog(json.loads(raw_catalog))
         endpoints = decode_provider_endpoints(json.loads(raw_endpoints or "[]"))
@@ -1239,7 +1265,11 @@ def create_backoffice_app(
             + escape(str(result.source_row_count))
             + "</p>"
             + "<form method='get' action='/backoffice/intelligence'>"
-            + "<label>Tenant ID <input name='tenant_id' value='" + escape(tenant_id) + "'></label>"
+            + (
+                "<label>Tenant ID <input name='tenant_id' value='"
+                + escape(tenant_id)
+                + "'></label>"
+            )
             + "<label>Client ID <input name='client_id' value='" + escape(client_id) + "'></label>"
             + "<label>Provider <input name='provider_id' value='" + escape(provider_id) + "'></label>"
             + "<label>Model <input name='model_id' value='" + escape(model_id) + "'></label>"
