@@ -185,3 +185,9 @@ sa.Index(
     "ix_provider_attempts_dispatch_work",
     provider_attempts.c.dispatch_work_id,
 )
+
+sa.Index(
+    "ix_provider_attempts_account_credential",
+    provider_attempts.c.provider_account_id,
+    provider_attempts.c.provider_credential_id,
+)
