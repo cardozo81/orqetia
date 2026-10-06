@@ -37,7 +37,11 @@ from .worker import HandlerOutcome
 PROVIDER_ATTEMPT_OPERATION = "provider.attempt.dispatch"
 PROVIDER_ATTEMPT_OPERATION_VERSION = 1
 
-AdapterResolver = Callable[[ProviderAttempt], ProviderAdapter | Awaitable[ProviderAdapter]]
+AdapterResolver = Callable[[ProviderTarget], ProviderAdapter | Awaitable[ProviderAdapter]]
+AttemptAdapterResolver = Callable[
+    [ProviderAttempt],
+    ProviderAdapter | Awaitable[ProviderAdapter],
+]
 Clock = Callable[[], datetime]
 
 
@@ -87,6 +91,7 @@ class ProviderAttemptHandler:
         *,
         store: ProviderAttemptStore,
         resolve_adapter: AdapterResolver,
+        resolve_attempt_adapter: AttemptAdapterResolver | None = None,
         infrastructure_retry_delay_seconds: int = 1,
         clock: Clock = _utc_now,
         telemetry: EventEmitter | None = None,
@@ -96,6 +101,7 @@ class ProviderAttemptHandler:
             raise ValueError("infrastructure_retry_delay_seconds must be >= 1")
         self._store = store
         self._resolve_adapter = resolve_adapter
+        self._resolve_attempt_adapter = resolve_attempt_adapter
         self._infrastructure_retry_delay = infrastructure_retry_delay_seconds
         self._clock = clock
         self._telemetry = telemetry or JsonEventEmitter()
@@ -280,7 +286,16 @@ class ProviderAttemptHandler:
         self,
         attempt: ProviderAttempt,
     ) -> ProviderAdapter:
-        resolved = self._resolve_adapter(attempt)
+        if self._resolve_attempt_adapter is not None:
+            resolved = self._resolve_attempt_adapter(attempt)
+        else:
+            resolved = self._resolve_adapter(
+                ProviderTarget(
+                    provider_id=attempt.target.provider_id,
+                    model_id=attempt.target.model_id,
+                    reasoning_profile=attempt.target.reasoning_profile,
+                )
+            )
         if isinstance(resolved, Awaitable):
             return await resolved
         return resolved
