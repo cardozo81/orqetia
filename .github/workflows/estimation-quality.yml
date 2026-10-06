@@ -1,0 +1,45 @@
+name: Estimation quality
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - src/orqetia/estimation/benchmarks.py
+      - src/orqetia/estimation/__init__.py
+      - docs/architecture/adr-0043-estimation-quality-drift.md
+      - tests/estimation/test_benchmark_quality.py
+      - .github/workflows/estimation-quality.yml
+  push:
+    branches: [main]
+    paths:
+      - src/orqetia/estimation/benchmarks.py
+      - src/orqetia/estimation/__init__.py
+      - docs/architecture/adr-0043-estimation-quality-drift.md
+      - tests/estimation/test_benchmark_quality.py
+      - .github/workflows/estimation-quality.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: estimation-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned uv bootstrap tool
+        run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+
+      - name: Install locked test environment
+        run: uv sync --locked --python 3.14
+
+      - name: Deterministic benchmark quality tests
+        run: uv run --no-sync --python 3.14 pytest -q tests/estimation/test_benchmark_quality.py

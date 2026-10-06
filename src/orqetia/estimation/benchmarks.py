@@ -31,6 +31,11 @@ class BenchmarkUnavailableReason(StrEnum):
     INSUFFICIENT_CLIENT_HISTORY = "INSUFFICIENT_CLIENT_HISTORY"
     INSUFFICIENT_GLOBAL_SAMPLES = "INSUFFICIENT_GLOBAL_SAMPLES"
     INSUFFICIENT_GLOBAL_COHORT = "INSUFFICIENT_GLOBAL_COHORT"
+    STALE_BENCHMARK = "STALE_BENCHMARK"
+    DRIFT_THRESHOLD_EXCEEDED = "DRIFT_THRESHOLD_EXCEEDED"
+    CALIBRATION_THRESHOLD_EXCEEDED = "CALIBRATION_THRESHOLD_EXCEEDED"
+    LOW_CONFIDENCE = "LOW_CONFIDENCE"
+    METHODOLOGY_VERSION_MISMATCH = "METHODOLOGY_VERSION_MISMATCH"
 
 
 @dataclass(frozen=True)
@@ -200,6 +205,242 @@ class BenchmarkBuildResult:
     @property
     def available(self) -> bool:
         return self.snapshot is not None
+
+
+class BenchmarkRebuildReason(StrEnum):
+    STALE = "STALE"
+    DRIFT = "DRIFT"
+    ACCURACY = "ACCURACY"
+    BIAS = "BIAS"
+    LOW_CONFIDENCE = "LOW_CONFIDENCE"
+    METHODOLOGY = "METHODOLOGY"
+
+
+_CONFIDENCE_RANK = {
+    BenchmarkConfidence.LOW: 0,
+    BenchmarkConfidence.MEDIUM: 1,
+    BenchmarkConfidence.HIGH: 2,
+}
+
+
+@dataclass(frozen=True)
+class BenchmarkCalibrationSample:
+    benchmark_version: str
+    estimated_total_tokens: int
+    observed_total_tokens: int
+    occurred_at: datetime
+
+    def __post_init__(self) -> None:
+        if not self.benchmark_version.strip() or len(self.benchmark_version) > 200:
+            raise ValueError("benchmark_version must contain 1..200 characters")
+        if self.estimated_total_tokens < 0 or self.observed_total_tokens < 0:
+            raise ValueError("calibration token counts cannot be negative")
+        _require_aware(self.occurred_at, "occurred_at")
+
+
+@dataclass(frozen=True)
+class BenchmarkAccuracyMetrics:
+    sample_count: int
+    median_absolute_error_ratio: Decimal
+    p90_absolute_error_ratio: Decimal
+    bias_ratio: Decimal
+
+    def __post_init__(self) -> None:
+        if self.sample_count < 1:
+            raise ValueError("accuracy sample_count must be positive")
+        if self.median_absolute_error_ratio < 0:
+            raise ValueError("median_absolute_error_ratio cannot be negative")
+        if self.p90_absolute_error_ratio < 0:
+            raise ValueError("p90_absolute_error_ratio cannot be negative")
+
+
+@dataclass(frozen=True)
+class BenchmarkQualityPolicy:
+    methodology_version: str
+    minimum_calibration_samples: int = 20
+    minimum_serving_confidence: BenchmarkConfidence = BenchmarkConfidence.MEDIUM
+    maximum_snapshot_age_days: int = 7
+    maximum_median_absolute_error_ratio: Decimal = Decimal("0.25")
+    maximum_p90_absolute_error_ratio: Decimal = Decimal("0.50")
+    maximum_absolute_bias_ratio: Decimal = Decimal("0.20")
+    maximum_drift_ratio: Decimal = Decimal("0.30")
+
+    def __post_init__(self) -> None:
+        if not self.methodology_version.strip() or len(self.methodology_version) > 100:
+            raise ValueError("methodology_version must contain 1..100 characters")
+        if self.minimum_calibration_samples < 1:
+            raise ValueError("minimum_calibration_samples must be positive")
+        if self.maximum_snapshot_age_days < 1:
+            raise ValueError("maximum_snapshot_age_days must be positive")
+        for field, value in (
+            (
+                "maximum_median_absolute_error_ratio",
+                self.maximum_median_absolute_error_ratio,
+            ),
+            (
+                "maximum_p90_absolute_error_ratio",
+                self.maximum_p90_absolute_error_ratio,
+            ),
+            ("maximum_absolute_bias_ratio", self.maximum_absolute_bias_ratio),
+            ("maximum_drift_ratio", self.maximum_drift_ratio),
+        ):
+            if value < 0:
+                raise ValueError(f"{field} cannot be negative")
+
+
+@dataclass(frozen=True)
+class BenchmarkQualityAssessment:
+    snapshot_id: UUID
+    benchmark_version: str
+    methodology_version: str
+    assessed_at: datetime
+    servable: bool
+    rebuild_required: bool
+    reasons: tuple[BenchmarkRebuildReason, ...]
+    limitations: tuple[str, ...]
+    accuracy: BenchmarkAccuracyMetrics | None
+    drift_score: Decimal | None
+    previous_benchmark_version: str | None
+    fallback_available: ReferenceScope | None
+
+    def __post_init__(self) -> None:
+        _require_aware(self.assessed_at, "assessed_at")
+        if self.servable == self.rebuild_required:
+            raise ValueError("servable and rebuild_required must be opposites")
+
+
+class BenchmarkQualityGate:
+    def __init__(self, policy: BenchmarkQualityPolicy) -> None:
+        self._policy = policy
+
+    def assess(
+        self,
+        *,
+        snapshot: BenchmarkSnapshot,
+        assessed_at: datetime,
+        calibration_samples: tuple[BenchmarkCalibrationSample, ...] = (),
+        previous: BenchmarkSnapshot | None = None,
+    ) -> BenchmarkQualityAssessment:
+        _require_aware(assessed_at, "assessed_at")
+        if assessed_at < snapshot.as_of:
+            raise ValueError("assessed_at cannot precede snapshot as_of")
+
+        reasons: list[BenchmarkRebuildReason] = []
+        limitations: list[str] = []
+
+        if snapshot.methodology_version != self._policy.methodology_version:
+            reasons.append(BenchmarkRebuildReason.METHODOLOGY)
+            limitations.append("methodology_version_mismatch")
+
+        maximum_age = timedelta(days=self._policy.maximum_snapshot_age_days)
+        if assessed_at - snapshot.as_of > maximum_age:
+            reasons.append(BenchmarkRebuildReason.STALE)
+            limitations.append("benchmark_snapshot_stale")
+
+        if (
+            _CONFIDENCE_RANK[snapshot.confidence]
+            < _CONFIDENCE_RANK[self._policy.minimum_serving_confidence]
+        ):
+            reasons.append(BenchmarkRebuildReason.LOW_CONFIDENCE)
+            limitations.append("benchmark_confidence_below_serving_threshold")
+
+        drift_score: Decimal | None = None
+        previous_version: str | None = None
+        if previous is not None:
+            if previous.scope is not snapshot.scope:
+                raise ValueError("drift comparison requires same scope")
+            if previous.feature_key != snapshot.feature_key:
+                raise ValueError("drift comparison requires same feature key")
+            if previous.as_of > snapshot.as_of:
+                raise ValueError("previous snapshot cannot be newer than current")
+            previous_version = previous.benchmark_version
+            baseline = previous.metrics.median_total_tokens
+            delta = abs(snapshot.metrics.median_total_tokens - baseline)
+            drift_score = delta / max(baseline, Decimal("1"))
+            if drift_score > self._policy.maximum_drift_ratio:
+                reasons.append(BenchmarkRebuildReason.DRIFT)
+                limitations.append("benchmark_drift_threshold_exceeded")
+
+        owned_calibration = tuple(
+            item
+            for item in calibration_samples
+            if item.benchmark_version == snapshot.benchmark_version
+            and snapshot.as_of <= item.occurred_at <= assessed_at
+        )
+        accuracy: BenchmarkAccuracyMetrics | None = None
+        if len(owned_calibration) < self._policy.minimum_calibration_samples:
+            limitations.append("insufficient_calibration_samples")
+        else:
+            accuracy = _accuracy_metrics(owned_calibration)
+            if (
+                accuracy.median_absolute_error_ratio
+                > self._policy.maximum_median_absolute_error_ratio
+                or accuracy.p90_absolute_error_ratio
+                > self._policy.maximum_p90_absolute_error_ratio
+            ):
+                reasons.append(BenchmarkRebuildReason.ACCURACY)
+                limitations.append("benchmark_accuracy_threshold_exceeded")
+            if (
+                abs(accuracy.bias_ratio)
+                > self._policy.maximum_absolute_bias_ratio
+            ):
+                reasons.append(BenchmarkRebuildReason.BIAS)
+                limitations.append("benchmark_bias_threshold_exceeded")
+
+        unique_reasons = tuple(dict.fromkeys(reasons))
+        rebuild_required = bool(unique_reasons)
+        fallback = (
+            ReferenceScope.GLOBAL_PUBLIC
+            if rebuild_required and snapshot.scope is ReferenceScope.CLIENT_ONLY
+            else None
+        )
+        if fallback is not None:
+            limitations.append("no_implicit_cross_scope_fallback")
+
+        return BenchmarkQualityAssessment(
+            snapshot_id=snapshot.snapshot_id,
+            benchmark_version=snapshot.benchmark_version,
+            methodology_version=snapshot.methodology_version,
+            assessed_at=assessed_at,
+            servable=not rebuild_required,
+            rebuild_required=rebuild_required,
+            reasons=unique_reasons,
+            limitations=tuple(dict.fromkeys(limitations)),
+            accuracy=accuracy,
+            drift_score=drift_score,
+            previous_benchmark_version=previous_version,
+            fallback_available=fallback,
+        )
+
+    def guard(
+        self,
+        *,
+        snapshot: BenchmarkSnapshot,
+        assessed_at: datetime,
+        calibration_samples: tuple[BenchmarkCalibrationSample, ...] = (),
+        previous: BenchmarkSnapshot | None = None,
+    ) -> BenchmarkBuildResult:
+        assessment = self.assess(
+            snapshot=snapshot,
+            assessed_at=assessed_at,
+            calibration_samples=calibration_samples,
+            previous=previous,
+        )
+        if assessment.servable:
+            return BenchmarkBuildResult(
+                requested_scope=snapshot.scope,
+                snapshot=snapshot,
+                limitations=assessment.limitations,
+            )
+
+        reason = _unavailable_reason(assessment.reasons)
+        return BenchmarkBuildResult(
+            requested_scope=snapshot.scope,
+            snapshot=None,
+            reason=reason,
+            fallback_available=assessment.fallback_available,
+            limitations=assessment.limitations,
+        )
 
 
 class BenchmarkBuilder:
@@ -404,3 +645,48 @@ def _percentile90(values: tuple[int, ...]) -> int:
     ordered = sorted(values)
     index = max(0, (9 * len(ordered) + 9) // 10 - 1)
     return ordered[min(index, len(ordered) - 1)]
+
+
+
+def _accuracy_metrics(
+    samples: tuple[BenchmarkCalibrationSample, ...],
+) -> BenchmarkAccuracyMetrics:
+    ratios = tuple(
+        Decimal(abs(item.estimated_total_tokens - item.observed_total_tokens))
+        / Decimal(max(item.observed_total_tokens, 1))
+        for item in samples
+    )
+    estimated_total = sum(item.estimated_total_tokens for item in samples)
+    observed_total = sum(item.observed_total_tokens for item in samples)
+    bias = Decimal(estimated_total - observed_total) / Decimal(
+        max(observed_total, 1)
+    )
+    return BenchmarkAccuracyMetrics(
+        sample_count=len(samples),
+        median_absolute_error_ratio=Decimal(median(ratios)),
+        p90_absolute_error_ratio=_decimal_percentile90(ratios),
+        bias_ratio=bias,
+    )
+
+
+def _decimal_percentile90(values: tuple[Decimal, ...]) -> Decimal:
+    ordered = sorted(values)
+    index = max(0, (9 * len(ordered) + 9) // 10 - 1)
+    return ordered[min(index, len(ordered) - 1)]
+
+
+def _unavailable_reason(
+    reasons: tuple[BenchmarkRebuildReason, ...],
+) -> BenchmarkUnavailableReason:
+    if BenchmarkRebuildReason.STALE in reasons:
+        return BenchmarkUnavailableReason.STALE_BENCHMARK
+    if BenchmarkRebuildReason.METHODOLOGY in reasons:
+        return BenchmarkUnavailableReason.METHODOLOGY_VERSION_MISMATCH
+    if BenchmarkRebuildReason.DRIFT in reasons:
+        return BenchmarkUnavailableReason.DRIFT_THRESHOLD_EXCEEDED
+    if (
+        BenchmarkRebuildReason.ACCURACY in reasons
+        or BenchmarkRebuildReason.BIAS in reasons
+    ):
+        return BenchmarkUnavailableReason.CALIBRATION_THRESHOLD_EXCEEDED
+    return BenchmarkUnavailableReason.LOW_CONFIDENCE

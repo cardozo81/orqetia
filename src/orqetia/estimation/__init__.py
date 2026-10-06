@@ -2,11 +2,17 @@
 
 from .benchmarks import (
     BenchmarkBuilder,
+    BenchmarkAccuracyMetrics,
     BenchmarkBuildResult,
+    BenchmarkCalibrationSample,
     BenchmarkConfidence,
     BenchmarkFeatureKey,
     BenchmarkMetrics,
     BenchmarkPolicy,
+    BenchmarkQualityAssessment,
+    BenchmarkQualityGate,
+    BenchmarkQualityPolicy,
+    BenchmarkRebuildReason,
     BenchmarkSample,
     BenchmarkSnapshot,
     BenchmarkUnavailableReason,
@@ -33,12 +39,18 @@ from .store import BenchmarkSnapshotStore, PostgresBenchmarkSnapshotStore
 from .tables import benchmark_snapshots
 
 __all__ = [
+    "BenchmarkAccuracyMetrics",
     "BenchmarkBuildResult",
     "BenchmarkBuilder",
+    "BenchmarkCalibrationSample",
     "BenchmarkConfidence",
     "BenchmarkFeatureKey",
     "BenchmarkMetrics",
     "BenchmarkPolicy",
+    "BenchmarkQualityAssessment",
+    "BenchmarkQualityGate",
+    "BenchmarkQualityPolicy",
+    "BenchmarkRebuildReason",
     "BenchmarkSample",
     "BenchmarkSnapshot",
     "BenchmarkSnapshotStore",
