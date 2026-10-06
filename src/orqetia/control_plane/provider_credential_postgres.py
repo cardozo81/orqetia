@@ -6,6 +6,7 @@ from typing import cast
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.engine import RowMapping
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .provider_credential_tables import provider_credentials
@@ -37,7 +38,7 @@ def _values(metadata: ProviderCredentialMetadata) -> dict[str, object]:
     }
 
 
-def _from_row(row: sa.RowMapping) -> ProviderCredentialMetadata:
+def _from_row(row: RowMapping) -> ProviderCredentialMetadata:
     return ProviderCredentialMetadata(
         credential_id=cast(UUID, row["credential_id"]),
         provider_id=cast(str, row["provider_id"]),
