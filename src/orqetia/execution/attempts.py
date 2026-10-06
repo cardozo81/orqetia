@@ -8,7 +8,11 @@ from enum import StrEnum
 from typing import Protocol
 from uuid import UUID
 
-from orqetia.providers import ProviderAttemptResult
+from orqetia.providers import (
+    ProviderAttemptResult,
+    ProviderCostMetadata,
+    ProviderUsage,
+)
 
 from .sessions import ExecutionTargetSnapshot, OwnershipScope
 
@@ -68,6 +72,8 @@ class ProviderAttempt:
     error_class: str | None = None
     retry_after_seconds: int | None = None
     latency_ms: int | None = None
+    usage: ProviderUsage | None = None
+    cost: ProviderCostMetadata | None = None
     dispatch_started_at: datetime | None = None
     terminal_at: datetime | None = None
     version: int = 1
@@ -115,6 +121,10 @@ class ProviderAttempt:
             raise ValueError("retry_after_seconds cannot be negative")
         if self.latency_ms is not None and self.latency_ms < 0:
             raise ValueError("latency_ms cannot be negative")
+        if self.status is not ProviderAttemptStatus.COMPLETED and (
+            self.usage is not None or self.cost is not None
+        ):
+            raise ValueError("provider result snapshots require COMPLETED status")
         if set(self.accepted_requirements) & set(self.missing_requirements):
             raise ValueError("accepted and missing requirements must be disjoint")
 

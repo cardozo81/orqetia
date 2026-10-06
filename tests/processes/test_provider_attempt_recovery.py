@@ -4,6 +4,7 @@ import asyncio
 import os
 import unittest
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from uuid import uuid7
 
 import sqlalchemy as sa
@@ -37,8 +38,10 @@ from orqetia.infrastructure.processes import (
 )
 from orqetia.providers import (
     DeterministicTestProvider,
+    ProviderCostMetadata,
     ProviderOutcome,
     ProviderTarget,
+    ProviderUsage,
     SimulatorFixture,
     SimulatorScenario,
     SimulatorStep,
@@ -169,6 +172,18 @@ class ProviderAttemptRecoveryIntegrationTests(unittest.TestCase):
             assert persisted is not None
             self.assertIs(persisted.status, ProviderAttemptStatus.COMPLETED)
             self.assertEqual(persisted.provider_outcome, ProviderOutcome.SUCCESS.value)
+            self.assertEqual(
+                persisted.usage,
+                ProviderUsage(input_tokens=3, output_tokens=2),
+            )
+            self.assertEqual(
+                persisted.cost,
+                ProviderCostMetadata(
+                    amount=Decimal("0.01"),
+                    comparison_group="CURRENCY:USD",
+                    currency="USD",
+                ),
+            )
 
             async with engine.connect() as connection:
                 state = (
@@ -679,6 +694,15 @@ class ProviderAttemptRecoveryIntegrationTests(unittest.TestCase):
                         expected_cycle=attempt.cycle,
                         expected_attempt_index=attempt.attempt_index,
                         expected_target=target,
+                        usage=ProviderUsage(
+                            input_tokens=3,
+                            output_tokens=2,
+                        ),
+                        cost=ProviderCostMetadata(
+                            amount=Decimal("0.01"),
+                            comparison_group="CURRENCY:USD",
+                            currency="USD",
+                        ),
                     ),
                 ),
             )

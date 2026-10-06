@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import cast
 from uuid import UUID
 
@@ -10,7 +11,12 @@ import sqlalchemy as sa
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from orqetia.providers import ProviderAttemptResult
+from orqetia.providers import (
+    NativeUsage,
+    ProviderAttemptResult,
+    ProviderCostMetadata,
+    ProviderUsage,
+)
 
 from .attempt_tables import provider_attempts
 from .attempts import (
@@ -62,6 +68,72 @@ def _string_tuple(value: object, field: str) -> tuple[str, ...]:
     return tuple(str(item) for item in value)
 
 
+def _usage_json(usage: ProviderUsage) -> dict[str, object]:
+    return {
+        "input_tokens": usage.input_tokens,
+        "output_tokens": usage.output_tokens,
+        "native": [
+            {
+                "name": item.name,
+                "value": str(item.value),
+                "unit": item.unit,
+            }
+            for item in usage.native
+        ],
+    }
+
+
+def _usage_from_json(value: object) -> ProviderUsage | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError("persisted provider usage must be an object")
+    native_raw = value.get("native", [])
+    if not isinstance(native_raw, list):
+        raise ValueError("persisted provider native usage must be an array")
+    native: list[NativeUsage] = []
+    for item in native_raw:
+        if not isinstance(item, dict):
+            raise ValueError("persisted provider native usage item must be an object")
+        native.append(
+            NativeUsage(
+                name=str(item["name"]),
+                value=Decimal(str(item["value"])),
+                unit=str(item["unit"]),
+            )
+        )
+    return ProviderUsage(
+        input_tokens=int(value.get("input_tokens", 0)),
+        output_tokens=int(value.get("output_tokens", 0)),
+        native=tuple(native),
+    )
+
+
+def _cost_json(cost: ProviderCostMetadata) -> dict[str, object]:
+    return {
+        "amount": None if cost.amount is None else str(cost.amount),
+        "comparison_group": cost.comparison_group,
+        "currency": cost.currency,
+        "native_unit": cost.native_unit,
+    }
+
+
+def _cost_from_json(value: object) -> ProviderCostMetadata | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError("persisted provider cost must be an object")
+    amount = value.get("amount")
+    currency = value.get("currency")
+    native_unit = value.get("native_unit")
+    return ProviderCostMetadata(
+        amount=None if amount is None else Decimal(str(amount)),
+        comparison_group=str(value["comparison_group"]),
+        currency=None if currency is None else str(currency),
+        native_unit=None if native_unit is None else str(native_unit),
+    )
+
+
 def _attempt_from_row(row: RowMapping) -> ProviderAttempt:
     return ProviderAttempt(
         attempt_id=cast(UUID, row["attempt_id"]),
@@ -98,6 +170,8 @@ def _attempt_from_row(row: RowMapping) -> ProviderAttempt:
         error_class=cast(str | None, row["error_class"]),
         retry_after_seconds=cast(int | None, row["retry_after_seconds"]),
         latency_ms=cast(int | None, row["latency_ms"]),
+        usage=_usage_from_json(row["usage_snapshot"]),
+        cost=_cost_from_json(row["cost_snapshot"]),
         created_at=cast(datetime, row["created_at"]),
         updated_at=cast(datetime, row["updated_at"]),
         dispatch_started_at=cast(datetime | None, row["dispatch_started_at"]),
@@ -375,6 +449,10 @@ class PostgresProviderAttemptStore:
                 error_class=result.error_class,
                 retry_after_seconds=result.retry_after_seconds,
                 latency_ms=result.simulated_latency_ms,
+                usage_snapshot=_usage_json(result.usage),
+                cost_snapshot=(
+                    None if result.cost is None else _cost_json(result.cost)
+                ),
                 updated_at=occurred_at,
                 terminal_at=occurred_at,
                 version=provider_attempts.c.version + 1,

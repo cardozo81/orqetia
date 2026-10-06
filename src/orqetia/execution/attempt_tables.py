@@ -46,6 +46,8 @@ provider_attempts = sa.Table(
     sa.Column("error_class", sa.Text(), nullable=True),
     sa.Column("retry_after_seconds", sa.Integer(), nullable=True),
     sa.Column("latency_ms", sa.Integer(), nullable=True),
+    sa.Column("usage_snapshot", JSONB(), nullable=True),
+    sa.Column("cost_snapshot", JSONB(), nullable=True),
     sa.Column(
         "created_at",
         sa.DateTime(timezone=True),
