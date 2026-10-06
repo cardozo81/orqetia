@@ -1,5 +1,19 @@
 """Control Plane contracts for provider, policy and administrative configuration."""
 
+from .execution_policies import (
+    AuthorizedExecutionTarget,
+    ClientPolicyAssignment,
+    EffectiveExecutionPolicy,
+    ExecutionPolicyAdminService,
+    ExecutionPolicyRepository,
+    ExecutionPolicyVersion,
+    InMemoryExecutionPolicyRepository,
+)
+from .execution_policy_postgres import PostgresExecutionPolicyRepository
+from .execution_policy_tables import (
+    client_policy_assignments,
+    execution_policy_versions,
+)
 from .provider_account_postgres import (
     PostgresExternalCapacityRepository,
     PostgresProviderAccountRepository,
@@ -44,7 +58,13 @@ from .quotas import (
 )
 
 __all__ = [
+    "AuthorizedExecutionTarget",
+    "ClientPolicyAssignment",
     "CredentialAuditEvent",
+    "EffectiveExecutionPolicy",
+    "ExecutionPolicyAdminService",
+    "ExecutionPolicyRepository",
+    "ExecutionPolicyVersion",
     "CredentialAuditSink",
     "CredentialPreflightResult",
     "ExternalCapacityRepository",
@@ -52,10 +72,12 @@ __all__ = [
     "ExternalCapacitySource",
     "InMemoryCredentialAuditSink",
     "InMemoryExternalCapacityRepository",
+    "InMemoryExecutionPolicyRepository",
     "InMemoryProviderAccountRepository",
     "InMemoryProviderCredentialRepository",
     "InMemoryProviderSecretStore",
     "PostgresExternalCapacityRepository",
+    "PostgresExecutionPolicyRepository",
     "PostgresProviderAccountRepository",
     "PostgresProviderCredentialRepository",
     "ProviderAccount",
@@ -75,6 +97,8 @@ __all__ = [
     "QuotaScope",
     "SecretReference",
     "SecretValue",
+    "client_policy_assignments",
+    "execution_policy_versions",
     "provider_accounts",
     "provider_capacity_snapshots",
     "provider_credentials",
