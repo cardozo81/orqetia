@@ -512,6 +512,38 @@ class CanonicalOrchestrationPolicyTests(unittest.TestCase):
         self.assertEqual(decision.next_target, self.expensive)
         self.assertEqual(decision.terminal_quarantine_targets, (self.cheap,))
 
+    def test_internal_client_quota_does_not_quarantine_provider(self) -> None:
+        task = self._task(requirements=("VALID_JSON",))
+        session = self._session()
+        plan = self._plan(
+            task=task,
+            session=session,
+            candidates=(
+                self._candidate(self.cheap, amount="0.01"),
+                self._candidate(self.expensive, amount="0.20"),
+            ),
+        )
+        observation = AttemptObservation(
+            attempt_id=uuid7(),
+            target=self.cheap,
+            status=AttemptObservationStatus.COMPLETED,
+            outcome=ProviderOutcome.QUOTA_EXHAUSTED,
+            accepted_requirements=(),
+            missing_requirements=("VALID_JSON",),
+            error_class="ORQETIA_CLIENT_QUOTA_HARD_LIMIT_EXCEEDED",
+        )
+
+        decision = self.engine.evaluate_cycle(
+            plan=plan,
+            policy=self.policy,
+            observations=(observation,),
+            attempts_used_before_cycle=0,
+        )
+
+        self.assertEqual(decision.disposition, OrchestrationDisposition.DISPATCH)
+        self.assertEqual(decision.next_target, self.expensive)
+        self.assertEqual(decision.terminal_quarantine_targets, ())
+
     def test_session_health_and_quarantine_filter_candidates(self) -> None:
         task = self._task()
         session = self._session(

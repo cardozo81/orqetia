@@ -69,4 +69,10 @@ jobs:
             tests.processes.test_provider_attempt_recovery \
             tests.processes.test_task_orchestration_worker \
             tests.processes.test_worker_composition \
+            tests.execution.test_orchestration_policy \
             -v
+
+      - name: Runtime quota integration tests
+        run: >-
+          uv run --no-sync --python 3.14 pytest -q
+          tests/usage_accounting/test_runtime_quota_integration.py
