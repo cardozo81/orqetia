@@ -1,0 +1,100 @@
+name: Schema compatibility
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - contracts/openapi/**
+      - contracts/execution/**
+      - contracts/compatibility/**
+      - scripts/schema_compatibility_check.py
+      - docs/architecture/adr-0042-schema-evolution-v1.md
+      - docs/api/client-api-v1-manual.md
+      - tests/contracts/test_schema_compatibility.py
+      - .github/workflows/schema-compatibility.yml
+  push:
+    branches: [main]
+    paths:
+      - contracts/openapi/**
+      - contracts/execution/**
+      - contracts/compatibility/**
+      - scripts/schema_compatibility_check.py
+      - docs/architecture/adr-0042-schema-evolution-v1.md
+      - docs/api/client-api-v1-manual.md
+      - tests/contracts/test_schema_compatibility.py
+      - .github/workflows/schema-compatibility.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: schema-compatibility-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Install pinned uv bootstrap tool
+        run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+
+      - name: Install locked test environment
+        run: uv sync --locked --python 3.14
+
+      - name: Compatibility fixtures
+        run: uv run --no-sync --python 3.14 pytest -q tests/contracts/test_schema_compatibility.py
+
+      - name: Compare public contracts with base revision
+        shell: bash
+        run: |
+          if [[ -z "${BASE_SHA}" || "${BASE_SHA}" =~ ^0+$ ]]; then
+            echo "No usable base revision; fixture gate only."
+            exit 0
+          fi
+          if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "${BASE_SHA}"
+          fi
+
+          approvals="contracts/compatibility/approved-breaking-changes.json"
+          compare_contract() {
+            local contract="$1"
+            local kind="$2"
+            local path="$3"
+            if ! git cat-file -e "${BASE_SHA}:${path}" 2>/dev/null; then
+              echo "New contract: ${path}"
+              return 0
+            fi
+            local old="/tmp/orqetia-schema-base/${path}"
+            mkdir -p "$(dirname "${old}")"
+            git show "${BASE_SHA}:${path}" > "${old}"
+            uv run --no-sync --python 3.14 python scripts/schema_compatibility_check.py check \
+              --kind "${kind}" \
+              --old "${old}" \
+              --new "${path}" \
+              --contract "${contract}" \
+              --approvals "${approvals}"
+          }
+
+          compare_contract "client-openapi-v1" "openapi" \
+            "contracts/openapi/orqetia-v1.openapi.json"
+          compare_contract "task-execution-selection" "json-schema" \
+            "contracts/execution/task-execution-selection.schema.json"
+
+          if ! git diff --quiet "${BASE_SHA}" HEAD -- \
+            contracts/openapi/orqetia-v1.openapi.json \
+            contracts/execution/task-execution-selection.schema.json; then
+            if git diff --quiet "${BASE_SHA}" HEAD -- \
+              docs/api/client-api-v1-manual.md; then
+              echo "Public contract changed without synchronizing #27 manual."
+              exit 1
+            fi
+          fi

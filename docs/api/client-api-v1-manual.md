@@ -642,7 +642,11 @@ Mudança pública deve atualizar, no mesmo change set:
 3. este manual;
 4. o teste de parity do manual.
 
-Breaking behavior não deve ser introduzido silenciosamente em v1. Estratégia
+Breaking behavior não deve ser introduzido silenciosamente em v1. A política e
+o gate de classificação estão em
+`docs/architecture/adr-0042-schema-evolution-v1.md` (#155). Mudanças breaking
+exigem fingerprint/aprovação explícita; mudanças públicas no OpenAPI ou no
+ExecutionSelection devem atualizar este manual no mesmo change set. Estratégia
 formal de GA/deprecation faz parte do lifecycle de release, não de uma UI local.
 
 ## 13. Validação sem provider pago
