@@ -436,6 +436,155 @@ class PostgresQuotaEnforcer:
                 row=released,
             )
 
+    async def renew(
+        self,
+        *,
+        policy: QuotaPolicySnapshot,
+        reservation_id: UUID,
+        tenant_id: UUID,
+        client_id: UUID,
+        occurred_at: datetime,
+    ) -> QuotaDecision:
+        _aware(occurred_at)
+        if policy.metric is not QuotaMetric.CONCURRENT_TASKS:
+            raise ValueError("only CONCURRENT_TASKS reservations can be renewed")
+
+        async with self._sessions.begin() as database:
+            current = (
+                await database.execute(
+                    sa.select(quota_reservations).where(
+                        quota_reservations.c.reservation_id == reservation_id
+                    )
+                )
+            ).mappings().one_or_none()
+            if current is None:
+                raise LookupError("quota reservation not found")
+
+            window_key = cast(str, current["window_key"])
+            window_row = (
+                await database.execute(
+                    sa.select(quota_windows)
+                    .where(quota_windows.c.window_key == window_key)
+                    .with_for_update()
+                )
+            ).mappings().one()
+            row = (
+                await database.execute(
+                    sa.select(quota_reservations)
+                    .where(quota_reservations.c.reservation_id == reservation_id)
+                    .with_for_update()
+                )
+            ).mappings().one()
+
+            expected = (
+                policy.policy_id,
+                policy.version,
+                tenant_id,
+                client_id,
+                policy.metric.value,
+                policy.provider_id,
+                policy.native_unit,
+            )
+            actual = (
+                row["policy_id"],
+                row["policy_version"],
+                row["tenant_id"],
+                row["client_id"],
+                row["metric"],
+                row["provider_id"],
+                row["native_unit"],
+            )
+            if actual != expected:
+                raise ValueError("quota renewal identity conflict")
+
+            await self._expire(
+                database=database,
+                window_key=window_key,
+                occurred_at=occurred_at,
+            )
+            row = (
+                await database.execute(
+                    sa.select(quota_reservations)
+                    .where(quota_reservations.c.reservation_id == reservation_id)
+                    .with_for_update()
+                )
+            ).mappings().one()
+            status = QuotaReservationStatus(cast(str, row["status"]))
+            reason = "RENEWED"
+
+            if status is QuotaReservationStatus.EXPIRED:
+                before = await self._utilization(
+                    database=database,
+                    policy_id=policy.policy_id,
+                    policy_version=policy.version,
+                    metric=policy.metric,
+                    limit=policy.limit,
+                    burst=policy.burst,
+                    window=_window_from_row(window_row),
+                    consumed=Decimal(window_row["consumed_amount"]),
+                )
+                projected = before.total_committed + Decimal(
+                    row["reserved_amount"]
+                )
+                overage = projected > policy.capacity
+                if (
+                    policy.enforcement is QuotaEnforcementMode.HARD
+                    and overage
+                ):
+                    reservation = await self._hydrate_reservation(
+                        database=database,
+                        row=row,
+                    )
+                    return QuotaDecision(
+                        allowed=False,
+                        reservation=reservation,
+                        utilization=before,
+                        reason_code="RENEWAL_LIMIT_EXCEEDED",
+                    )
+                reason = (
+                    "SOFT_RENEWAL_OVERAGE"
+                    if overage
+                    else "RENEWED_AFTER_EXPIRY"
+                )
+            elif status is not QuotaReservationStatus.RESERVED:
+                raise ValueError(
+                    "quota reservation cannot be renewed from current status"
+                )
+
+            row = (
+                await database.execute(
+                    sa.update(quota_reservations)
+                    .where(quota_reservations.c.reservation_id == reservation_id)
+                    .values(
+                        status=QuotaReservationStatus.RESERVED.value,
+                        expires_at=occurred_at
+                        + timedelta(seconds=policy.reservation_ttl_seconds),
+                        reason_code=reason,
+                    )
+                    .returning(*quota_reservations.c)
+                )
+            ).mappings().one()
+            reservation = await self._hydrate_reservation(
+                database=database,
+                row=row,
+            )
+            utilization = await self._utilization(
+                database=database,
+                policy_id=policy.policy_id,
+                policy_version=policy.version,
+                metric=policy.metric,
+                limit=policy.limit,
+                burst=policy.burst,
+                window=_window_from_row(window_row),
+                consumed=Decimal(window_row["consumed_amount"]),
+            )
+            return QuotaDecision(
+                allowed=True,
+                reservation=reservation,
+                utilization=utilization,
+                reason_code=reason,
+            )
+
     async def list_by_idempotency_key(
         self,
         *,
