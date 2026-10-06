@@ -77,6 +77,26 @@ class PostgresProviderCredentialRepository:
             row = (await database.execute(statement)).mappings().one_or_none()
         return None if row is None else _from_row(row)
 
+    async def list_active(
+        self,
+        *,
+        provider_account_id: UUID,
+    ) -> tuple[ProviderCredentialMetadata, ...]:
+        statement = (
+            sa.select(provider_credentials)
+            .where(
+                provider_credentials.c.provider_account_id == provider_account_id,
+                provider_credentials.c.status == ProviderCredentialStatus.ACTIVE.value,
+            )
+            .order_by(
+                provider_credentials.c.created_at,
+                provider_credentials.c.credential_id,
+            )
+        )
+        async with self._sessions() as database:
+            rows = (await database.execute(statement)).mappings().all()
+        return tuple(_from_row(row) for row in rows)
+
     async def replace(
         self,
         metadata: ProviderCredentialMetadata,
