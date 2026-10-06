@@ -75,7 +75,11 @@ async def _policy(
             limit=Decimal(limit),
             enforcement=enforcement,
             effective_from=NOW - timedelta(minutes=1),
-            period_seconds=60,
+            period_seconds=(
+                None
+                if metric is QuotaMetric.CONCURRENT_TASKS
+                else 60
+            ),
             provider_id=provider_id,
             native_unit=native_unit,
         )
@@ -182,3 +186,118 @@ async def test_soft_token_quota_reconciles_observed_usage() -> None:
     )
     assert len(reservations) == 1
     assert reservations[0].actual_amount == Decimal("7")
+
+
+@pytest.mark.asyncio
+async def test_task_quota_is_consumed_once_across_replay() -> None:
+    ownership = OwnershipScope(uuid7(), uuid7())
+    policies = InMemoryQuotaPolicyRepository()
+    quotas = InMemoryQuotaEnforcer()
+    await _policy(
+        policies,
+        ownership=ownership,
+        metric=QuotaMetric.TASKS,
+        limit="1",
+        enforcement=QuotaEnforcementMode.HARD,
+    )
+    from orqetia.execution import (
+        ExecutionMode,
+        ExecutionTask,
+        TaskPayloadReferences,
+        TaskStatus,
+    )
+    from orqetia.infrastructure.processes.runtime_quotas import (
+        TaskQuotaCoordinator,
+    )
+
+    task = ExecutionTask(
+        task_id=uuid7(),
+        session_id=uuid7(),
+        ownership=ownership,
+        operation="TASK_EXECUTION",
+        status=TaskStatus.RUNNING,
+        effective_policy_version_id=uuid7(),
+        requested_execution_mode=ExecutionMode.AUTO,
+        requirements=("VALID_JSON",),
+        accepted_requirements=(),
+        missing_requirements=("VALID_JSON",),
+        payloads=TaskPayloadReferences(
+            input_reference="payload://quota/task",
+            input_fingerprint="b" * 64,
+        ),
+        created_at=NOW,
+        updated_at=NOW,
+        started_at=NOW,
+    )
+    coordinator = TaskQuotaCoordinator(
+        policies=policies,
+        quotas=quotas,
+        clock=lambda: NOW,
+    )
+    assert await coordinator.preflight(task)
+    assert await coordinator.preflight(task)
+
+    reservations = await quotas.list_by_idempotency_key(
+        tenant_id=ownership.tenant_id,
+        client_id=ownership.client_id,
+        idempotency_key=f"task:{task.task_id}",
+    )
+    assert len(reservations) == 1
+    assert reservations[0].actual_amount == Decimal("1")
+
+
+@pytest.mark.asyncio
+async def test_concurrent_task_quota_releases_on_terminal_cleanup() -> None:
+    ownership = OwnershipScope(uuid7(), uuid7())
+    policies = InMemoryQuotaPolicyRepository()
+    quotas = InMemoryQuotaEnforcer()
+    await _policy(
+        policies,
+        ownership=ownership,
+        metric=QuotaMetric.CONCURRENT_TASKS,
+        limit="1",
+        enforcement=QuotaEnforcementMode.HARD,
+    )
+    from orqetia.execution import (
+        ExecutionMode,
+        ExecutionTask,
+        TaskPayloadReferences,
+        TaskStatus,
+    )
+    from orqetia.infrastructure.processes.runtime_quotas import (
+        TaskQuotaCoordinator,
+    )
+
+    def task_for(task_id):
+        return ExecutionTask(
+            task_id=task_id,
+            session_id=uuid7(),
+            ownership=ownership,
+            operation="TASK_EXECUTION",
+            status=TaskStatus.RUNNING,
+            effective_policy_version_id=uuid7(),
+            requested_execution_mode=ExecutionMode.AUTO,
+            requirements=("VALID_JSON",),
+            accepted_requirements=(),
+            missing_requirements=("VALID_JSON",),
+            payloads=TaskPayloadReferences(
+                input_reference=f"payload://quota/{task_id}",
+                input_fingerprint="c" * 64,
+            ),
+            created_at=NOW,
+            updated_at=NOW,
+            started_at=NOW,
+        )
+
+    coordinator = TaskQuotaCoordinator(
+        policies=policies,
+        quotas=quotas,
+        clock=lambda: NOW + timedelta(seconds=1),
+    )
+    first = task_for(uuid7())
+    blocked = task_for(uuid7())
+    assert await coordinator.preflight(first)
+    assert not await coordinator.preflight(blocked)
+    await coordinator.release(first)
+    replacement = task_for(uuid7())
+    assert await coordinator.preflight(replacement)

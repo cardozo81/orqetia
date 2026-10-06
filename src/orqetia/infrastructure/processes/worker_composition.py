@@ -36,7 +36,7 @@ from .provider_attempts import (
     ProviderAttemptHandler,
 )
 from .runtime_adapters import DurableProviderAdapterResolver
-from .runtime_quotas import AttemptQuotaCoordinator
+from .runtime_quotas import AttemptQuotaCoordinator, TaskQuotaCoordinator
 from .task_orchestration import (
     TASK_ORCHESTRATION_OPERATION,
     TASK_ORCHESTRATION_OPERATION_VERSION,
@@ -86,9 +86,15 @@ def build_execution_handler_registry(
         ledger=PostgresAccountingLedger(session_factory),
         pricing_versions=pricing,
     )
+    quota_policies = PostgresQuotaPolicyRepository(session_factory)
+    quota_enforcer = PostgresQuotaEnforcer(session_factory)
+    task_quotas = TaskQuotaCoordinator(
+        policies=quota_policies,
+        quotas=quota_enforcer,
+    )
     attempt_quotas = AttemptQuotaCoordinator(
-        policies=PostgresQuotaPolicyRepository(session_factory),
-        quotas=PostgresQuotaEnforcer(session_factory),
+        policies=quota_policies,
+        quotas=quota_enforcer,
     )
     adapter_resolver = DurableProviderAdapterResolver(
         credentials=credential_repository,
@@ -108,6 +114,7 @@ def build_execution_handler_registry(
         credentials=account_service,
         work_queue=queue,
         pricing_catalogs=pricing,
+        task_quotas=task_quotas,
     )
     attempt_handler = ProviderAttemptHandler(
         store=attempts,

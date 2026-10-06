@@ -17,6 +17,7 @@ from .runtime_adapters import DurableProviderAdapterResolver
 from .runtime_quotas import (
     AttemptQuotaCoordinator,
     RuntimeQuotaStore,
+    TaskQuotaCoordinator,
     UsageReservationEstimator,
     is_internal_quota_error,
 )
@@ -56,6 +57,7 @@ __all__ = [
     "DurableProviderAdapterResolver",
     "PricingCatalogVersionLookup",
     "RuntimeQuotaStore",
+    "TaskQuotaCoordinator",
     "HandlerDisposition",
     "HandlerOutcome",
     "HandlerRegistry",

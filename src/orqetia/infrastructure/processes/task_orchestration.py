@@ -129,6 +129,12 @@ class OrchestrationCandidateResolver(Protocol):
     ) -> tuple[OrchestrationCandidate, ...]: ...
 
 
+class TaskQuotaGate(Protocol):
+    async def preflight(self, task: ExecutionTask) -> bool: ...
+
+    async def release(self, task: ExecutionTask) -> None: ...
+
+
 class ProviderCredentialSelector(Protocol):
     async def select_credential(
         self,
@@ -153,6 +159,7 @@ class TaskOrchestrationHandler:
         credentials: ProviderCredentialSelector,
         work_queue: WorkQueuePort,
         pricing_catalogs: ProviderPricingCatalogRepository | None = None,
+        task_quotas: TaskQuotaGate | None = None,
         engine: CanonicalOrchestrationPolicyEngine | None = None,
         clock: Callable[[], datetime] = _utc_now,
     ) -> None:
@@ -164,6 +171,7 @@ class TaskOrchestrationHandler:
         self._credentials = credentials
         self._queue = work_queue
         self._pricing_catalogs = pricing_catalogs
+        self._task_quotas = task_quotas
         self._engine = engine or CanonicalOrchestrationPolicyEngine()
         self._clock = clock
 
@@ -176,11 +184,28 @@ class TaskOrchestrationHandler:
         if task is None:
             return self._retry("TASK_NOT_FOUND")
         if task.status.terminal:
-            return HandlerOutcome.complete()
+            quota_release = await self._release_task_quota(task)
+            return quota_release or HandlerOutcome.complete()
 
         task = await self._ensure_running(task)
         if task is None:
             return self._retry("TASK_STATE_CONFLICT")
+
+        if self._task_quotas is not None:
+            try:
+                quota_allowed = await self._task_quotas.preflight(task)
+            except Exception as exc:
+                return self._retry(
+                    f"TASK_QUOTA_{type(exc).__name__.upper()}"
+                )
+            if not quota_allowed:
+                await self._terminalize(
+                    task,
+                    status=TaskStatus.UNAVAILABLE,
+                    reason_code="ORQETIA_QUOTA_EXHAUSTED",
+                    result_reference=task.result_reference,
+                )
+                return HandlerOutcome.complete()
 
         attempts = await self._attempts.list_for_task(
             scope=scope,
@@ -691,6 +716,11 @@ class TaskOrchestrationHandler:
             reason=TaskReasonEnvelope(reason_code=reason_code),
         )
         if changed:
+            quota_release = await self._release_task_quota(task)
+            if quota_release is not None:
+                raise RuntimeError(
+                    f"task quota release failed: {quota_release.error_class}"
+                )
             return
         current = await self._tasks.get_owned(
             scope=task.ownership,
@@ -699,6 +729,11 @@ class TaskOrchestrationHandler:
         if current is None or not current.status.terminal:
             raise RuntimeError(
                 "task terminal transition version conflict"
+            )
+        quota_release = await self._release_task_quota(current)
+        if quota_release is not None:
+            raise RuntimeError(
+                f"task quota release failed: {quota_release.error_class}"
             )
 
     @staticmethod
@@ -728,6 +763,20 @@ class TaskOrchestrationHandler:
                 recorded.result_reference_snapshot
             ),
         )
+
+    async def _release_task_quota(
+        self,
+        task: ExecutionTask,
+    ) -> HandlerOutcome | None:
+        if self._task_quotas is None:
+            return None
+        try:
+            await self._task_quotas.release(task)
+        except Exception as exc:
+            return self._retry(
+                f"TASK_QUOTA_RELEASE_{type(exc).__name__.upper()}"
+            )
+        return None
 
     def _retry(self, error_class: str) -> HandlerOutcome:
         return HandlerOutcome.requeue_infrastructure(

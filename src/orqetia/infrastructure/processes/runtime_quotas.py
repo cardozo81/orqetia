@@ -19,7 +19,11 @@ from orqetia.control_plane import (
     QuotaPolicyRepository,
     QuotaPolicySnapshot,
 )
-from orqetia.execution import ProviderAttempt, ProviderAttemptStatus
+from orqetia.execution import (
+    ExecutionTask,
+    ProviderAttempt,
+    ProviderAttemptStatus,
+)
 from orqetia.providers import (
     OutputKind,
     ProviderAttemptResult,
@@ -35,6 +39,13 @@ from orqetia.usage_accounting.quotas import (
 
 from .attempt_accounting import provider_usage_to_technical
 
+_TASK_QUOTA_METRICS = frozenset(
+    {
+        QuotaMetric.REQUESTS,
+        QuotaMetric.TASKS,
+        QuotaMetric.CONCURRENT_TASKS,
+    }
+)
 _ATTEMPT_QUOTA_METRICS = frozenset(
     {
         QuotaMetric.PROVIDER_REQUESTS,
@@ -69,6 +80,113 @@ class UsageReservationEstimator(Protocol):
         native_unit: str | None,
     ) -> Decimal | None:
         """Return a safe pre-dispatch reservation amount, or None if unavailable."""
+
+
+class TaskQuotaCoordinator:
+    """Enforce deterministic task-level quotas once per durable task identity."""
+
+    def __init__(
+        self,
+        *,
+        policies: QuotaPolicyRepository,
+        quotas: RuntimeQuotaStore,
+        clock: Clock = _utc_now,
+    ) -> None:
+        self._policies = policies
+        self._quotas = quotas
+        self._clock = clock
+
+    async def preflight(self, task: ExecutionTask) -> bool:
+        occurred_at = task.started_at or task.created_at
+        policies = await self._applicable_policies(
+            task,
+            occurred_at=occurred_at,
+        )
+        held: list[QuotaReservation] = []
+        for policy in policies:
+            decision = await self._quotas.reserve(
+                policy=policy,
+                tenant_id=task.ownership.tenant_id,
+                client_id=task.ownership.client_id,
+                idempotency_key=self._idempotency_key(task),
+                amount=Decimal("1"),
+                occurred_at=occurred_at,
+            )
+            if not decision.allowed:
+                await self._release_many(held)
+                return False
+            held.append(decision.reservation)
+
+        for reservation in held:
+            if reservation.metric not in {
+                QuotaMetric.REQUESTS,
+                QuotaMetric.TASKS,
+            }:
+                continue
+            await self._quotas.reconcile(
+                reservation_id=reservation.reservation_id,
+                actual_amount=Decimal("1"),
+                occurred_at=occurred_at,
+            )
+        return True
+
+    async def release(self, task: ExecutionTask) -> None:
+        reservations = await self._quotas.list_by_idempotency_key(
+            tenant_id=task.ownership.tenant_id,
+            client_id=task.ownership.client_id,
+            idempotency_key=self._idempotency_key(task),
+        )
+        await self._release_many(
+            [
+                item
+                for item in reservations
+                if item.metric is QuotaMetric.CONCURRENT_TASKS
+                and item.status
+                in {
+                    QuotaReservationStatus.RESERVED,
+                    QuotaReservationStatus.EXPIRED,
+                }
+            ]
+        )
+
+    async def _applicable_policies(
+        self,
+        task: ExecutionTask,
+        *,
+        occurred_at: datetime,
+    ) -> tuple[QuotaPolicySnapshot, ...]:
+        policies = await _effective_subject_policies(
+            repository=self._policies,
+            tenant_id=task.ownership.tenant_id,
+            client_id=task.ownership.client_id,
+            occurred_at=occurred_at,
+        )
+        return tuple(
+            policy
+            for policy in policies
+            if policy.metric in _TASK_QUOTA_METRICS
+            and policy.provider_id is None
+            and policy.native_unit is None
+        )
+
+    async def _release_many(
+        self,
+        reservations: list[QuotaReservation],
+    ) -> None:
+        for reservation in reservations:
+            if reservation.status not in {
+                QuotaReservationStatus.RESERVED,
+                QuotaReservationStatus.EXPIRED,
+            }:
+                continue
+            await self._quotas.release(
+                reservation_id=reservation.reservation_id,
+                occurred_at=self._clock(),
+            )
+
+    @staticmethod
+    def _idempotency_key(task: ExecutionTask) -> str:
+        return f"task:{task.task_id}"
 
 
 class AttemptQuotaCoordinator:
@@ -182,54 +300,19 @@ class AttemptQuotaCoordinator:
         *,
         occurred_at: datetime,
     ) -> tuple[QuotaPolicySnapshot, ...]:
-        tenant = await self._policies.list_for_subject(
-            tenant_id=attempt.ownership.tenant_id,
-            client_id=None,
-        )
-        client = await self._policies.list_for_subject(
+        policies = await _effective_subject_policies(
+            repository=self._policies,
             tenant_id=attempt.ownership.tenant_id,
             client_id=attempt.ownership.client_id,
+            occurred_at=occurred_at,
         )
-        effective: dict[tuple[object, ...], QuotaPolicySnapshot] = {}
-        for policy in (*tenant, *client):
-            if policy.metric not in _ATTEMPT_QUOTA_METRICS:
-                continue
-            if not policy.active_at(occurred_at):
-                continue
-            if (
-                policy.provider_id is not None
-                and policy.provider_id != attempt.target.provider_id
-            ):
-                continue
-            key = (
-                policy.scope,
-                policy.tenant_id,
-                policy.client_id,
-                policy.metric,
-                policy.provider_id,
-                policy.native_unit,
-            )
-            current = effective.get(key)
-            if current is None or (
-                policy.effective_from,
-                policy.version,
-                str(policy.policy_id),
-            ) > (
-                current.effective_from,
-                current.version,
-                str(current.policy_id),
-            ):
-                effective[key] = policy
         return tuple(
-            sorted(
-                effective.values(),
-                key=lambda policy: (
-                    policy.scope.value,
-                    policy.metric.value,
-                    policy.provider_id or "",
-                    policy.native_unit or "",
-                    str(policy.policy_id),
-                ),
+            policy
+            for policy in policies
+            if policy.metric in _ATTEMPT_QUOTA_METRICS
+            and (
+                policy.provider_id is None
+                or policy.provider_id == attempt.target.provider_id
             )
         )
 
@@ -328,4 +411,56 @@ def is_internal_quota_error(error_class: str | None) -> bool:
     return bool(
         error_class
         and error_class.startswith(_INTERNAL_QUOTA_ERROR_PREFIX)
+    )
+
+
+async def _effective_subject_policies(
+    *,
+    repository: QuotaPolicyRepository,
+    tenant_id: UUID,
+    client_id: UUID,
+    occurred_at: datetime,
+) -> tuple[QuotaPolicySnapshot, ...]:
+    tenant = await repository.list_for_subject(
+        tenant_id=tenant_id,
+        client_id=None,
+    )
+    client = await repository.list_for_subject(
+        tenant_id=tenant_id,
+        client_id=client_id,
+    )
+    effective: dict[tuple[object, ...], QuotaPolicySnapshot] = {}
+    for policy in (*tenant, *client):
+        if not policy.active_at(occurred_at):
+            continue
+        key = (
+            policy.scope,
+            policy.tenant_id,
+            policy.client_id,
+            policy.metric,
+            policy.provider_id,
+            policy.native_unit,
+        )
+        current = effective.get(key)
+        if current is None or (
+            policy.effective_from,
+            policy.version,
+            str(policy.policy_id),
+        ) > (
+            current.effective_from,
+            current.version,
+            str(current.policy_id),
+        ):
+            effective[key] = policy
+    return tuple(
+        sorted(
+            effective.values(),
+            key=lambda policy: (
+                policy.scope.value,
+                policy.metric.value,
+                policy.provider_id or "",
+                policy.native_unit or "",
+                str(policy.policy_id),
+            ),
+        )
     )
