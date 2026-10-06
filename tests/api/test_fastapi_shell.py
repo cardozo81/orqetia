@@ -160,6 +160,7 @@ class FastApiShellTests(unittest.TestCase):
                         "target": {"provider": "OPENAI"},
                     },
                 },
+                idempotency_key="explicit-scope-check",
             )
         )
         self.assertEqual(response.status_code, 403)
