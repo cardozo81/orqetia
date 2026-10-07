@@ -23,13 +23,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from orqetia.identity import HumanAuthenticationContext
 from orqetia.infrastructure.backoffice import (
-    BackofficeOidcBroker,
     OidcAuthorizationStart,
     OidcLoginRejected,
 )
 from orqetia.infrastructure.customer_portal.app import (
     CustomerPortalOidcAuthorizationStart,
-    CustomerPortalOidcBroker,
     CustomerPortalOidcRejected,
 )
 
@@ -250,7 +248,7 @@ class _LocalBrokerBase:
         )
 
 
-class LocalBackofficeOidcBroker(_LocalBrokerBase, BackofficeOidcBroker):
+class LocalBackofficeOidcBroker(_LocalBrokerBase):
     async def begin_login(self) -> OidcAuthorizationStart:
         authorization_url, transaction = self._start()
         return OidcAuthorizationStart(
@@ -275,10 +273,7 @@ class LocalBackofficeOidcBroker(_LocalBrokerBase, BackofficeOidcBroker):
             raise OidcLoginRejected(str(error)) from error
 
 
-class LocalCustomerPortalOidcBroker(
-    _LocalBrokerBase,
-    CustomerPortalOidcBroker,
-):
+class LocalCustomerPortalOidcBroker(_LocalBrokerBase):
     async def begin_login(self) -> CustomerPortalOidcAuthorizationStart:
         authorization_url, transaction = self._start()
         return CustomerPortalOidcAuthorizationStart(
