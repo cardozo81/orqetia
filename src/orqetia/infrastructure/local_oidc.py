@@ -14,6 +14,7 @@ import json
 import secrets
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from datetime import UTC, datetime
 from html import escape
 from urllib.parse import urlencode
@@ -32,6 +33,9 @@ from orqetia.infrastructure.customer_portal.app import (
 )
 
 LOCAL_OIDC_ISSUER = "https://orqetia.local/dev-idp"
+LOCAL_OIDC_SIGNING_KEY_PATH = Path(
+    "/var/lib/orqetia/bootstrap/local-oidc-signing.key"
+)
 _LOCAL_ENVIRONMENTS = frozenset({"local", "test"})
 _TOKEN_TTL_SECONDS = 300
 
@@ -70,6 +74,23 @@ LOCAL_OIDC_PROFILES = (
         display_name="Client Admin",
     ),
 )
+
+
+def load_local_oidc_signing_key(explicit: str | None = None) -> str:
+    """Load the LOCAL/TEST signing key without exposing it in logs or Git."""
+
+    if explicit is not None and explicit.strip():
+        value = explicit.strip()
+    else:
+        try:
+            value = LOCAL_OIDC_SIGNING_KEY_PATH.read_text(encoding="utf-8").strip()
+        except FileNotFoundError as error:
+            raise RuntimeError(
+                "local OIDC signing key is unavailable; run local bootstrap first"
+            ) from error
+    if len(value.encode("utf-8")) < 32:
+        raise RuntimeError("local OIDC signing key must contain at least 32 bytes")
+    return value
 
 
 def _guard_environment(environment: str) -> str:
