@@ -23,7 +23,10 @@ ENV PATH="/app/.venv/bin:${PATH}" \
 WORKDIR /app
 
 RUN groupadd --gid 10001 orqetia \
-    && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin orqetia
+    && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin orqetia \
+    && mkdir -p /var/lib/orqetia \
+    && chown -R 10001:10001 /var/lib/orqetia \
+    && chmod 700 /var/lib/orqetia
 
 COPY --from=builder --chown=10001:10001 /app/.venv /app/.venv
 COPY --chown=10001:10001 alembic.ini ./
