@@ -170,7 +170,7 @@ class PostgresExecutionPolicyRepository:
                 )
             )
             if expected_assignment_version is None:
-                statement = (
+                insert_statement = (
                     insert(client_policy_assignments)
                     .values(
                         tenant_id=assignment.tenant_id,
@@ -187,8 +187,11 @@ class PostgresExecutionPolicyRepository:
                     )
                     .returning(client_policy_assignments.c.assignment_version)
                 )
+                changed = (
+                    await database.execute(insert_statement)
+                ).scalar_one_or_none()
             else:
-                statement = (
+                update_statement = (
                     sa.update(client_policy_assignments)
                     .where(
                         client_policy_assignments.c.tenant_id
@@ -205,7 +208,9 @@ class PostgresExecutionPolicyRepository:
                     )
                     .returning(client_policy_assignments.c.assignment_version)
                 )
-            changed = (await database.execute(statement)).scalar_one_or_none()
+                changed = (
+                    await database.execute(update_statement)
+                ).scalar_one_or_none()
             if changed is None:
                 raise ValueError("policy assignment version conflict")
         return EffectiveExecutionPolicy(version=version, assignment=assignment)

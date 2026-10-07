@@ -299,7 +299,7 @@ class ExecutionPolicyAdminService:
             tenant_id=tenant_id,
             client_id=client_id,
             policy_version_id=policy.policy_version_id,
-            assignment_version=1 if current is None else expected + 1,
+            assignment_version=1 if expected is None else expected + 1,
             assigned_at=occurred_at,
         )
         return await self._repository.publish_and_activate(

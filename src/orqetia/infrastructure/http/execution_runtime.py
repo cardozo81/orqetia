@@ -36,6 +36,7 @@ from orqetia.execution import (
 from orqetia.execution import (
     SanitizedEvidenceRecord as SanitizedEvidenceRecord,
 )
+from orqetia.providers import PublicProviderTargetMetadata
 from orqetia.shared.messaging import (
     DataClassification,
     QueueName,
@@ -609,23 +610,18 @@ class ClientExecutionRuntime:
         scope: OwnershipScope,
     ) -> tuple[ClientProviderView, ...]:
         metadata = await self._public_metadata(scope)
-        grouped: dict[str, dict[str, object]] = {}
+        grouped: dict[str, tuple[str, set[str]]] = {}
         for item in metadata:
             value = grouped.setdefault(
                 item.provider_id,
-                {
-                    "provider_name": item.display_name,
-                    "capabilities": set(),
-                },
+                (item.display_name, set()),
             )
-            capabilities = value["capabilities"]
-            assert isinstance(capabilities, set)
-            capabilities.update(capability.value for capability in item.capabilities)
+            value[1].update(capability.value for capability in item.capabilities)
         return tuple(
             ClientProviderView(
                 provider_id=provider_id,
-                provider_name=str(value["provider_name"]),
-                capabilities=tuple(sorted(value["capabilities"])),
+                provider_name=value[0],
+                capabilities=tuple(sorted(value[1])),
             )
             for provider_id, value in sorted(grouped.items())
         )
@@ -637,31 +633,21 @@ class ClientExecutionRuntime:
         provider_id: str | None = None,
     ) -> tuple[ClientModelView, ...]:
         metadata = await self._public_metadata(scope)
-        grouped: dict[tuple[str, str], dict[str, object]] = {}
+        grouped: dict[tuple[str, str], tuple[set[str], set[str]]] = {}
         for item in metadata:
             if provider_id is not None and item.provider_id != provider_id:
                 continue
             key = (item.provider_id, item.model_id)
-            value = grouped.setdefault(
-                key,
-                {
-                    "capabilities": set(),
-                    "reasoning_profiles": set(),
-                },
-            )
-            capabilities = value["capabilities"]
-            profiles = value["reasoning_profiles"]
-            assert isinstance(capabilities, set)
-            assert isinstance(profiles, set)
-            capabilities.update(capability.value for capability in item.capabilities)
-            profiles.add(item.reasoning_profile)
+            value = grouped.setdefault(key, (set(), set()))
+            value[0].update(capability.value for capability in item.capabilities)
+            value[1].add(item.reasoning_profile)
         return tuple(
             ClientModelView(
                 provider_id=provider,
                 model_id=model,
                 model_name=model,
-                capabilities=tuple(sorted(value["capabilities"])),
-                reasoning_profiles=tuple(sorted(value["reasoning_profiles"])),
+                capabilities=tuple(sorted(value[0])),
+                reasoning_profiles=tuple(sorted(value[1])),
             )
             for (provider, model), value in sorted(grouped.items())
         )
@@ -682,7 +668,10 @@ class ClientExecutionRuntime:
             provider_id,
         )
 
-    async def _public_metadata(self, scope: OwnershipScope):
+    async def _public_metadata(
+        self,
+        scope: OwnershipScope,
+    ) -> tuple[PublicProviderTargetMetadata, ...]:
         effective_policy = await self._policies.resolve_effective(
             tenant_id=scope.tenant_id,
             client_id=scope.client_id,

@@ -202,7 +202,7 @@ class PostgresClientArtifactStore:
             raise ValueError("instructions must be a string when present")
         return ProviderInvocationPayload(
             input_text=input_text,
-            instructions=cast(str | None, instructions),
+            instructions=instructions,
             structured_output=_structured_output(materialized),
         )
 
@@ -499,11 +499,14 @@ class PostgresClientArtifactStore:
             ),
         )
         async with self._sessions.begin() as database:
-            evidence_result = await database.execute(evidence_delete)
-            artifact_result = await database.execute(artifact_delete)
-        return max(0, evidence_result.rowcount or 0) + max(
-            0,
-            artifact_result.rowcount or 0,
+            evidence_result = await database.execute(
+                evidence_delete.returning(sa.literal(1))
+            )
+            artifact_result = await database.execute(
+                artifact_delete.returning(sa.literal(1))
+            )
+        return len(evidence_result.scalars().all()) + len(
+            artifact_result.scalars().all()
         )
 
     async def purge_owned_all(
@@ -520,11 +523,14 @@ class PostgresClientArtifactStore:
             client_artifacts.c.client_id == scope.client_id,
         )
         async with self._sessions.begin() as database:
-            evidence_result = await database.execute(evidence_delete)
-            artifact_result = await database.execute(artifact_delete)
-        return max(0, evidence_result.rowcount or 0) + max(
-            0,
-            artifact_result.rowcount or 0,
+            evidence_result = await database.execute(
+                evidence_delete.returning(sa.literal(1))
+            )
+            artifact_result = await database.execute(
+                artifact_delete.returning(sa.literal(1))
+            )
+        return len(evidence_result.scalars().all()) + len(
+            artifact_result.scalars().all()
         )
 
     async def delete_owned_before(

@@ -88,6 +88,7 @@ from .models import (
     TaskCreateRequest,
     TaskResultView,
     TaskView,
+    TechnicalUsageView,
     UsagePageResponse,
 )
 
@@ -522,7 +523,7 @@ def create_app(
             status=attempt.status.value,
             cycle=attempt.cycle,
             attempt_index=attempt.attempt_index,
-            usage={},
+            usage=TechnicalUsageView(),
             started_at=attempt.dispatch_started_at or attempt.created_at,
             finished_at=attempt.terminal_at,
         )

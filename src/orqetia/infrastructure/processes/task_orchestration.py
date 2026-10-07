@@ -335,12 +335,13 @@ class TaskOrchestrationHandler:
                 target_status=TaskStatus.QUEUED,
                 occurred_at=self._clock(),
             )
-            current = await self._tasks.get_owned(
+            reloaded = await self._tasks.get_owned(
                 scope=current.ownership,
                 task_id=current.task_id,
             )
-            if current is None:
+            if reloaded is None:
                 return None
+            current = reloaded
         if current.status is TaskStatus.QUEUED:
             changed = await self._tasks.transition(
                 scope=current.ownership,
@@ -349,12 +350,13 @@ class TaskOrchestrationHandler:
                 target_status=TaskStatus.RUNNING,
                 occurred_at=self._clock(),
             )
-            current = await self._tasks.get_owned(
+            reloaded = await self._tasks.get_owned(
                 scope=current.ownership,
                 task_id=current.task_id,
             )
-            if current is None:
+            if reloaded is None:
                 return None
+            current = reloaded
             if not changed and current.status is not TaskStatus.RUNNING:
                 return None
         return current
