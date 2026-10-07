@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi.responses import JSONResponse
@@ -11,7 +12,11 @@ from orqetia.infrastructure.customer_portal.composition import (
     build_customer_portal_app,
 )
 from orqetia.infrastructure.health import DatabaseReadinessProbe
-from orqetia.infrastructure.local_oidc import (\n    LocalCustomerPortalOidcBroker,\n    load_local_oidc_signing_key,\n)
+from orqetia.infrastructure.local_oidc import (
+    LocalCustomerPortalOidcBroker,
+    load_local_oidc_signing_key,
+)
+from orqetia.infrastructure.local_reporting import build_local_estimates
 from orqetia.infrastructure.persistence import create_engine, create_session_factory
 from orqetia.settings import Environment, ProcessRole, RuntimeSettings
 
@@ -31,8 +36,6 @@ if settings.environment not in {Environment.LOCAL, Environment.TEST}:
     raise RuntimeError("this Portal composition is restricted to LOCAL/TEST")
 if settings.public_base_url is None:
     raise RuntimeError("Portal local composition requires public_base_url")
-if settings.local_oidc_signing_key is None:
-    raise RuntimeError("Portal local composition requires local OIDC signing key")
 
 origin = str(settings.public_base_url).rstrip("/")
 engine = create_engine(settings)
@@ -40,7 +43,11 @@ session_factory = create_session_factory(engine)
 readiness = DatabaseReadinessProbe(engine)
 oidc = LocalCustomerPortalOidcBroker(
     environment=settings.environment.value,
-    signing_key=load_local_oidc_signing_key(\n        None\n        if settings.local_oidc_signing_key is None\n        else settings.local_oidc_signing_key.get_secret_value()\n    ),
+    signing_key=load_local_oidc_signing_key(
+        None
+        if settings.local_oidc_signing_key is None
+        else settings.local_oidc_signing_key.get_secret_value()
+    ),
     audience="portal",
     callback_url=f"{origin}/portal/callback",
     idp_public_url=f"{origin}/dev-idp",
@@ -51,6 +58,7 @@ app = build_customer_portal_app(
     oidc=oidc,
     allowed_origin=origin,
     client_openapi_document=_OPENAPI,
+    estimation=build_local_estimates(session_factory, environment=settings.environment.value),
     enable_hsts=False,
 )
 
@@ -75,4 +83,12 @@ async def health_ready() -> JSONResponse:
     )
 
 
-app.add_event_handler("shutdown", engine.dispose)
+@asynccontextmanager
+async def lifespan(_app):
+    try:
+        yield
+    finally:
+        await engine.dispose()
+
+
+app.router.lifespan_context = lifespan

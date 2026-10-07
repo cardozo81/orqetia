@@ -14,6 +14,7 @@ from orqetia.infrastructure.http import create_app
 from orqetia.infrastructure.http.composition import (
     build_client_api_runtime_services,
 )
+from orqetia.infrastructure.local_reporting import build_local_estimates
 from orqetia.infrastructure.persistence import create_engine, create_session_factory
 from orqetia.settings import Environment, ProcessRole, RuntimeSettings
 
@@ -42,6 +43,10 @@ app = create_app(
     client_credential_service=runtime.credentials,
     client_usage_service=runtime.usage,
     execution_runtime=runtime.execution,
+    estimation_service=(
+        build_local_estimates(session_factory, environment=settings.environment.value)
+        if settings.environment in {Environment.LOCAL, Environment.TEST} else None
+    ),
     availability_controller=OperationalAvailabilityController(
         process_role="api",
         maintenance_mode=MaintenanceMode(settings.maintenance_mode),

@@ -4,6 +4,7 @@ x-runtime-environment: &runtime-environment
   ORQETIA_ENVIRONMENT: local
   ORQETIA_DATABASE_DSN: "postgresql+psycopg://orqetia:synthetic-local-only@postgres:5432/orqetia"
   ORQETIA_SECRET_STORE_MODE: local
+  ORQETIA_PUBLIC_BASE_URL: "https://localhost:8443"
   ORQETIA_WORKER_CONCURRENCY: "4"
   ORQETIA_WORK_LEASE_SECONDS: "60"
   ORQETIA_QUEUE_POLL_INTERVAL_SECONDS: "1"
@@ -18,15 +19,22 @@ x-runtime-service: &runtime-service
     postgres:
       condition: service_healthy
   init: true
+  restart: unless-stopped
   read_only: true
   tmpfs:
     - /tmp:rw,noexec,nosuid,size=64m
   networks:
     - runtime
+  logging:
+    driver: json-file
+    options:
+      max-size: "5m"
+      max-file: "2"
 
 services:
   postgres:
     image: postgres:18
+    restart: unless-stopped
     environment:
       POSTGRES_USER: orqetia
       POSTGRES_PASSWORD: synthetic-local-only
@@ -43,24 +51,32 @@ services:
       - postgres_data:/var/lib/postgresql
     networks:
       - runtime
+      - edge
 
   api:
     <<: *runtime-service
+    networks: [runtime, edge]
     depends_on:
       postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      bootstrap:
+        condition: service_completed_successfully
     environment:
       <<: *runtime-environment
       ORQETIA_PROCESS_ROLE: api
-      ORQETIA_DEBUG: "true"
-      ORQETIA_PUBLIC_BASE_URL: "http://127.0.0.1:8000"
-      ORQETIA_CORS_ALLOWED_ORIGINS: '["http://localhost:3000"]'
+      ORQETIA_DEBUG: "false"
+      ORQETIA_CORS_ALLOWED_ORIGINS: '["https://localhost:8443"]'
       ORQETIA_TRUSTED_PROXY_CIDRS: '["127.0.0.1/32","::1/128"]'
     ports:
       - "127.0.0.1:8000:8000"
-    command: ["uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]
+    command: ["uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers", "--no-access-log"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   worker:
     <<: *runtime-service
@@ -69,10 +85,19 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      bootstrap:
+        condition: service_completed_successfully
     environment:
       <<: *runtime-environment
       ORQETIA_PROCESS_ROLE: worker
     command: ["python", "-m", "apps.worker.main"]
+    healthcheck: &process-health
+      test: ["CMD", "python", "-m", "apps.process_health"]
+      interval: 15s
+      timeout: 8s
+      retries: 4
+    volumes:
+      - local_data:/var/lib/orqetia:ro
 
   scheduler:
     <<: *runtime-service
@@ -85,17 +110,119 @@ services:
       <<: *runtime-environment
       ORQETIA_PROCESS_ROLE: scheduler
     command: ["python", "-m", "apps.scheduler.main"]
+    healthcheck: *process-health
 
   migrate:
     <<: *runtime-service
+    restart: "no"
     environment:
       <<: *runtime-environment
       ORQETIA_PROCESS_ROLE: worker
     command: ["alembic", "upgrade", "head"]
 
+  bootstrap:
+    <<: *runtime-service
+    restart: "no"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *runtime-environment
+      ORQETIA_PROCESS_ROLE: bootstrap
+    volumes:
+      - local_data:/var/lib/orqetia
+    command: ["python", "-m", "apps.bootstrap.main"]
+
+  backoffice:
+    <<: *runtime-service
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    environment:
+      <<: *runtime-environment
+      ORQETIA_PROCESS_ROLE: backoffice
+    volumes:
+      - local_data:/var/lib/orqetia
+      - oidc_state:/var/lib/orqetia/oidc-used
+    command: ["uvicorn", "apps.backoffice.main:app", "--host", "0.0.0.0", "--port", "8100", "--no-proxy-headers", "--no-access-log"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  portal:
+    <<: *runtime-service
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    environment:
+      <<: *runtime-environment
+      ORQETIA_PROCESS_ROLE: portal
+    volumes:
+      - local_data:/var/lib/orqetia:ro
+      - oidc_state:/var/lib/orqetia/oidc-used
+    command: ["uvicorn", "apps.portal.main:app", "--host", "0.0.0.0", "--port", "8200", "--no-proxy-headers", "--no-access-log"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8200/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  local-idp:
+    <<: *runtime-service
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    environment:
+      <<: *runtime-environment
+      ORQETIA_PROCESS_ROLE: local_idp
+    volumes:
+      - local_data:/var/lib/orqetia:ro
+    command: ["uvicorn", "apps.local_oidc.main:app", "--host", "0.0.0.0", "--port", "9000", "--no-proxy-headers", "--no-access-log"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health/live', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+    ports:
+      - "127.0.0.1:8443:8443"
+    depends_on:
+      api:
+        condition: service_healthy
+      backoffice:
+        condition: service_healthy
+      portal:
+        condition: service_healthy
+      local-idp:
+        condition: service_healthy
+    volumes:
+      - ./deploy/local/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - runtime
+      - edge
+
 volumes:
   postgres_data:
+  local_data:
+  oidc_state:
+  caddy_data:
+  caddy_config:
 
 networks:
+  edge:
+    driver: bridge
   runtime:
     driver: bridge
+    internal: true

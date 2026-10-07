@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from scripts.verify_compose_config import validate_compose
+from scripts.verify_compose_config import RUNTIME_SERVICES, validate_compose
 
 
 def valid_config() -> dict[str, object]:
@@ -10,10 +10,13 @@ def valid_config() -> dict[str, object]:
         "environment": {
             "ORQETIA_DATABASE_DSN": "postgresql+psycopg://orqetia@postgres:5432/orqetia",
             "ORQETIA_SECRET_STORE_MODE": "local",
+            "ORQETIA_ENVIRONMENT": "local",
         }
     }
     return {
         "services": {
+            **{name: dict(runtime) for name in RUNTIME_SERVICES},
+            "gateway": {"ports": [{"host_ip": "127.0.0.1", "target": 8443}]},
             "api": {
                 **runtime,
                 "ports": [{"host_ip": "127.0.0.1", "published": "8000", "target": 8000}],

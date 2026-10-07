@@ -39,24 +39,31 @@ class ControlPlaneOrchestrationCandidateResolver:
         session: ExecutionSession,
         occurred_at: datetime,
     ) -> tuple[OrchestrationCandidate, ...]:
+        return await self.resolve_authorized(
+            authorized_targets=session.policy.authorized_targets,
+            mode=(RegistryEligibilityMode.AUTO
+                  if task.requested_execution_mode is ExecutionMode.AUTO
+                  else RegistryEligibilityMode.EXPLICIT_TARGET),
+            occurred_at=occurred_at,
+        )
+
+    async def resolve_authorized(
+        self, *, authorized_targets: tuple[ExecutionTargetSnapshot, ...],
+        mode: RegistryEligibilityMode, occurred_at: datetime,
+    ) -> tuple[OrchestrationCandidate, ...]:
         catalog = await self._catalogs.get_effective()
         if catalog is None:
             return ()
         pricing = await self._pricing.get_effective()
 
-        mode = (
-            RegistryEligibilityMode.AUTO
-            if task.requested_execution_mode is ExecutionMode.AUTO
-            else RegistryEligibilityMode.EXPLICIT_TARGET
-        )
         resolved = catalog.registry.eligible_targets(
             mode=mode,
             required_capabilities=(),
-            authorized_targets=session.policy.authorized_targets,
+            authorized_targets=authorized_targets,
         )
         policy_rank = {
             target: index
-            for index, target in enumerate(session.policy.authorized_targets)
+            for index, target in enumerate(authorized_targets)
         }
 
         raw: list[
@@ -109,7 +116,7 @@ class ControlPlaneOrchestrationCandidateResolver:
                 continue
             current = group_rank.get(group)
             group_rank[group] = rank if current is None else min(current, rank)
-        unpriced_rank = len(session.policy.authorized_targets) + len(group_rank)
+        unpriced_rank = len(authorized_targets) + len(group_rank)
 
         return tuple(
             OrchestrationCandidate(

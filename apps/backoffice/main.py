@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi.responses import JSONResponse
 
 from orqetia.infrastructure.backoffice.composition import build_backoffice_app
 from orqetia.infrastructure.health import DatabaseReadinessProbe
-from orqetia.infrastructure.local_oidc import (\n    LocalBackofficeOidcBroker,\n    load_local_oidc_signing_key,\n)
+from orqetia.infrastructure.local_oidc import (
+    LocalBackofficeOidcBroker,
+    load_local_oidc_signing_key,
+)
 from orqetia.infrastructure.local_secrets import LocalFileProviderSecretStore
 from orqetia.infrastructure.persistence import create_engine, create_session_factory
 from orqetia.settings import (
@@ -31,8 +35,6 @@ if settings.environment not in {Environment.LOCAL, Environment.TEST}:
     )
 if settings.public_base_url is None:
     raise RuntimeError("Backoffice local composition requires public_base_url")
-if settings.local_oidc_signing_key is None:
-    raise RuntimeError("Backoffice local composition requires local OIDC signing key")
 if settings.secret_store_mode is not SecretStoreMode.LOCAL:
     raise RuntimeError(
         "Backoffice local composition requires ORQETIA_SECRET_STORE_MODE=local"
@@ -48,7 +50,11 @@ secret_store = LocalFileProviderSecretStore(
 )
 oidc = LocalBackofficeOidcBroker(
     environment=settings.environment.value,
-    signing_key=load_local_oidc_signing_key(\n        None\n        if settings.local_oidc_signing_key is None\n        else settings.local_oidc_signing_key.get_secret_value()\n    ),
+    signing_key=load_local_oidc_signing_key(
+        None
+        if settings.local_oidc_signing_key is None
+        else settings.local_oidc_signing_key.get_secret_value()
+    ),
     audience="backoffice",
     callback_url=f"{origin}/backoffice/callback",
     idp_public_url=f"{origin}/dev-idp",
@@ -84,4 +90,12 @@ async def health_ready() -> JSONResponse:
     )
 
 
-app.add_event_handler("shutdown", engine.dispose)
+@asynccontextmanager
+async def lifespan(_app):
+    try:
+        yield
+    finally:
+        await engine.dispose()
+
+
+app.router.lifespan_context = lifespan

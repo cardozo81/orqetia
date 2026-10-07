@@ -5,11 +5,14 @@ from __future__ import annotations
 import json
 import os
 import secrets
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from orqetia.control_plane import (
     AuthorizedExecutionTarget,
@@ -25,6 +28,7 @@ from orqetia.control_plane import (
     ProviderCatalogAdminService,
     ProviderCredentialService,
     ProviderPricingAdminService,
+    ProviderSecretStore,
     QuotaEnforcementMode,
     QuotaMetric,
     QuotaPolicyAdminService,
@@ -38,6 +42,8 @@ from orqetia.identity import (
     ClientAccessCredentialService,
     ClientCredentialStatus,
     CustomerAuthorizationService,
+    CustomerIdentity,
+    CustomerMembership,
     CustomerRole,
     PostgresBackofficeBindingRepository,
     PostgresClientCredentialStore,
@@ -46,7 +52,9 @@ from orqetia.identity import (
 )
 from orqetia.infrastructure.local_audit import LocalJsonlAuditSink
 from orqetia.infrastructure.local_oidc import (
+    LOCAL_LOGIN_TOKENS_PATH,
     LOCAL_OIDC_ISSUER,
+    LOCAL_OIDC_PROFILES,
     LOCAL_OIDC_SIGNING_KEY_PATH,
 )
 from orqetia.providers import (
@@ -57,10 +65,15 @@ from orqetia.providers import (
     ProviderSpec,
     ReasoningProfileSpec,
 )
-from orqetia.tenancy import PostgresTenantClientRepository, TenancyAdminService
+from orqetia.tenancy import (
+    PostgresTenantClientRepository,
+    ServiceClientRecord,
+    TenancyAdminService,
+    TenantRecord,
+)
 from orqetia.usage_accounting import PricingModel, PricingRule
 
-SessionFactory = object
+SessionFactory = async_sessionmaker[AsyncSession]
 
 _LOCAL_ROOT = Path("/var/lib/orqetia")
 _BOOTSTRAP_DIR = _LOCAL_ROOT / "bootstrap"
@@ -108,7 +121,7 @@ def ensure_local_oidc_signing_key() -> Path:
         os.chmod(path, 0o600)
         return path
 
-    value = secrets.token_urlsafe(48) + "\\n"
+    value = secrets.token_urlsafe(48) + "\n"
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
         os.write(descriptor, value.encode("utf-8"))
@@ -118,7 +131,7 @@ def ensure_local_oidc_signing_key() -> Path:
     return path
 
 
-def _atomic_private_json(path: Path, payload: dict[str, object]) -> None:
+def _atomic_private_json(path: Path, payload: Mapping[str, object]) -> None:
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     encoded = (
         json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n"
@@ -160,7 +173,7 @@ async def _ensure_named_tenant(
     repository: PostgresTenantClientRepository,
     display_name: str,
     occurred_at: datetime,
-):
+) -> TenantRecord:
     matches = tuple(
         item
         for item in await repository.list_tenants()
@@ -183,7 +196,7 @@ async def _ensure_named_client(
     tenant_id: UUID,
     display_name: str,
     occurred_at: datetime,
-):
+) -> ServiceClientRecord:
     matches = tuple(
         item
         for item in await repository.list_clients(tenant_id=tenant_id)
@@ -209,7 +222,7 @@ async def _ensure_customer(
     client_id: UUID,
     roles: tuple[CustomerRole, ...],
     occurred_at: datetime,
-):
+) -> tuple[CustomerIdentity, CustomerMembership]:
     identity = await repository.get_by_external_identity(
         issuer=LOCAL_OIDC_ISSUER,
         subject=subject,
@@ -373,9 +386,9 @@ async def _ensure_api_token(
 
 
 async def bootstrap_local(
-    session_factory,
+    session_factory: SessionFactory,
     *,
-    secret_store,
+    secret_store: ProviderSecretStore,
     environment: str,
     occurred_at: datetime | None = None,
 ) -> BootstrapResult:
@@ -384,6 +397,12 @@ async def bootstrap_local(
     normalized = environment.strip().lower()
     if normalized not in {"local", "test"}:
         raise RuntimeError("local bootstrap is restricted to LOCAL/TEST")
+    ensure_local_oidc_signing_key()
+    if not LOCAL_LOGIN_TOKENS_PATH.exists():
+        _atomic_private_json(
+            LOCAL_LOGIN_TOKENS_PATH,
+            {profile.profile_id: secrets.token_urlsafe(32) for profile in LOCAL_OIDC_PROFILES},
+        )
     now = occurred_at or datetime.now(UTC)
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("bootstrap occurred_at must be timezone-aware")

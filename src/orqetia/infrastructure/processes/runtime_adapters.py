@@ -236,7 +236,12 @@ class DurableProviderAdapterResolver:
             candidates=(),
             steps=(
                 SimulatorStep(
-                    scenario=SimulatorScenario.SUCCESS,
+                    scenario=(
+                        SimulatorScenario.REQUIREMENT_NOT_SATISFIED
+                        if attempt.operation == "LOCAL_ESCALATION"
+                        and attempt.target.model_id == "economy"
+                        else SimulatorScenario.SUCCESS
+                    ),
                     expected_cycle=attempt.cycle,
                     expected_attempt_index=attempt.attempt_index,
                     expected_target=target,
