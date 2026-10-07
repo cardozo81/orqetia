@@ -36,4 +36,5 @@ jobs:
         run: |
           uv run --no-sync --python 3.14 python -m unittest \
             tests.observability.test_telemetry_contract \
+            tests.observability.test_operational_policy \
             -v

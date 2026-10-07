@@ -94,3 +94,11 @@ The dedicated observability gate proves:
 - correlation_id and trace_id propagate into the provider adapter request;
 - provider dispatch events correlate tenant/client/session/task/work/attempt without
   logging raw payloads or provider cost.
+
+
+## Operational hardening policy
+
+Retention, cardinality, volume and deterministic trace-sampling controls are
+versioned separately in
+`docs/runtime/observability-retention-and-cost-policy.md` (`observability-v1`).
+The original #18 redaction/correlation invariants remain authoritative.

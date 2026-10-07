@@ -1,5 +1,16 @@
 """Observability contracts for structured logs, metrics and tracing."""
 
+from .policy import (
+    OBSERVABILITY_POLICY_VERSION,
+    CardinalityBudget,
+    OperationalObservabilityPolicy,
+    RetentionPolicy,
+    TelemetryEventClass,
+    TelemetrySignal,
+    VolumeBudget,
+    default_observability_policy,
+    should_sample_trace,
+)
 from .telemetry import (
     METRIC_CONTRACTS,
     REDACTED,
@@ -16,6 +27,15 @@ from .telemetry import (
 )
 
 __all__ = [
+    "OBSERVABILITY_POLICY_VERSION",
+    "CardinalityBudget",
+    "OperationalObservabilityPolicy",
+    "RetentionPolicy",
+    "TelemetryEventClass",
+    "TelemetrySignal",
+    "VolumeBudget",
+    "default_observability_policy",
+    "should_sample_trace",
     "METRIC_CONTRACTS",
     "REDACTED",
     "SPAN_CONTRACTS",
