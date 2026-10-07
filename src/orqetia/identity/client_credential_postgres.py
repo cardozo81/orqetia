@@ -204,11 +204,11 @@ class PostgresClientCredentialStore:
                 last_used_at=sa.case(
                     (
                         client_access_credentials.c.last_used_at.is_(None),
-                        occurred_at: datetime,
+                        occurred_at,
                     ),
                     (
                         client_access_credentials.c.last_used_at < occurred_at,
-                        occurred_at: datetime,
+                        occurred_at,
                     ),
                     else_=client_access_credentials.c.last_used_at,
                 )

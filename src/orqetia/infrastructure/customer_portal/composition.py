@@ -5,7 +5,6 @@ from __future__ import annotations
 from uuid import UUID, uuid7
 
 from fastapi import FastAPI
-
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from orqetia.audit import (

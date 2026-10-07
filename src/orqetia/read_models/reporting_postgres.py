@@ -9,8 +9,8 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import RowMapping
-from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.sql.elements import ColumnElement
 
 from orqetia.usage_accounting import NativeUsageQuantity
 
