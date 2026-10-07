@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import asyncio
 
+from orqetia.infrastructure.availability import (
+    MaintenanceMode,
+    OperationalAvailabilityController,
+)
 from orqetia.infrastructure.messaging import PostgresWakeup, PostgresWorkQueue
 from orqetia.infrastructure.persistence import create_engine, create_session_factory
 from orqetia.infrastructure.processes import (
@@ -31,6 +35,11 @@ async def amain() -> None:
             lease_seconds=settings.work_lease_seconds,
             poll_interval_seconds=settings.queue_poll_interval_seconds,
             shutdown_grace_seconds=settings.shutdown_grace_seconds,
+            availability_controller=OperationalAvailabilityController(
+                process_role="scheduler",
+                maintenance_mode=MaintenanceMode(settings.maintenance_mode),
+                retry_after_seconds=settings.maintenance_retry_after_seconds,
+            ),
         )
         process = SchedulerProcess(worker, PostgresWakeup(engine))
         install_signal_handlers(process)

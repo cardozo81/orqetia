@@ -38,6 +38,12 @@ from orqetia.identity.authentication import (
     AuthenticationRejected,
     BearerAuthenticator,
 )
+from orqetia.infrastructure.availability import (
+    AvailabilityState,
+    DependencyKind,
+    DependencyStatus,
+    OperationalAvailabilityController,
+)
 from orqetia.infrastructure.health import ReadinessProbe
 from orqetia.read_models import BoundedReadExceeded, ClientUsageReportService
 
@@ -117,6 +123,7 @@ def create_app(
     client_usage_service: ClientUsageReportService | None = None,
     execution_runtime: ClientExecutionRuntime | None = None,
     abuse_controller: InMemoryApiAbuseController | None = None,
+    availability_controller: OperationalAvailabilityController | None = None,
 ) -> FastAPI:
     """Build the client API shell around the versioned canonical OpenAPI document."""
 
@@ -240,6 +247,26 @@ def create_app(
         finally:
             if acquired:
                 await technical_abuse.release_request()
+
+    @app.middleware("http")
+    async def availability_middleware(request: Request, call_next: Any) -> Any:
+        if availability_controller is None:
+            return await call_next(request)
+        decision = availability_controller.admit_http(
+            method=request.method,
+            path=request.url.path,
+        )
+        if decision.allowed:
+            return await call_next(request)
+        response = error_response(
+            request,
+            status_code=503,
+            code=decision.code or "SERVICE_UNAVAILABLE",
+            message=decision.message or "Service is temporarily unavailable.",
+        )
+        if decision.retry_after_seconds is not None:
+            response.headers["Retry-After"] = str(decision.retry_after_seconds)
+        return response
 
     @app.middleware("http")
     async def security_headers_middleware(request: Request, call_next: Any) -> Any:
@@ -1016,19 +1043,61 @@ def create_app(
 
     @app.get("/health/ready", include_in_schema=False)
     async def health_ready() -> JSONResponse:
-        if readiness_probe is None:
-            return JSONResponse(status_code=200, content={"status": "ready", "checks": {}})
-        try:
-            await readiness_probe.check()
-        except Exception:
+        database_status = DependencyStatus.READY
+        if readiness_probe is not None:
+            try:
+                await readiness_probe.check()
+            except Exception:
+                database_status = DependencyStatus.UNAVAILABLE
+
+        if availability_controller is None:
+            if database_status is DependencyStatus.UNAVAILABLE:
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "status": "not_ready",
+                        "checks": {"database": "unavailable"},
+                    },
+                )
             return JSONResponse(
-                status_code=503,
-                content={"status": "not_ready", "checks": {"database": "unavailable"}},
+                status_code=200,
+                content={
+                    "status": "ready",
+                    "checks": (
+                        {}
+                        if readiness_probe is None
+                        else {"database": "ready"}
+                    ),
+                },
             )
-        return JSONResponse(
-            status_code=200,
-            content={"status": "ready", "checks": {"database": "ready"}},
+
+        snapshot = availability_controller.snapshot(
+            overrides={DependencyKind.DATABASE: database_status}
         )
+        status_code = 200 if snapshot.ready else 503
+        status = (
+            "ready"
+            if snapshot.readiness is AvailabilityState.READY
+            else (
+                "degraded"
+                if snapshot.readiness is AvailabilityState.DEGRADED
+                else "not_ready"
+            )
+        )
+        response = JSONResponse(
+            status_code=status_code,
+            content={
+                "status": status,
+                "state": snapshot.readiness.value,
+                "liveness": snapshot.liveness.value,
+                "maintenance_mode": snapshot.maintenance_mode.value,
+                "checks": dict(snapshot.checks),
+                "policy_version": snapshot.policy_version,
+            },
+        )
+        if status_code == 503:
+            response.headers["Retry-After"] = str(snapshot.retry_after_seconds)
+        return response
 
     @app.get("/v1/usage", response_model=UsagePageResponse)
     async def get_usage(

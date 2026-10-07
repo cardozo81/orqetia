@@ -5,6 +5,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from orqetia.infrastructure.availability import (
+    MaintenanceMode,
+    OperationalAvailabilityController,
+)
 from orqetia.identity.authentication import (
     AuthenticatedPrincipal,
     AuthenticationRejected,
@@ -31,6 +35,11 @@ app = create_app(
     openapi_document=canonical_openapi,
     authenticator=UnconfiguredAuthenticator(),
     readiness_probe=DatabaseReadinessProbe(engine),
+    availability_controller=OperationalAvailabilityController(
+        process_role="api",
+        maintenance_mode=MaintenanceMode(settings.maintenance_mode),
+        retry_after_seconds=settings.maintenance_retry_after_seconds,
+    ),
     cors_allowed_origins=settings.cors_allowed_origins,
     enable_hsts=settings.environment is Environment.PRODUCTION,
     shutdown_callback=engine.dispose,

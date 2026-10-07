@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from ipaddress import ip_network
-from typing import Self
+from typing import Literal, Self
 from urllib.parse import urlsplit
 
 from pydantic import AnyHttpUrl, Field, SecretStr, field_validator, model_validator
@@ -71,6 +71,9 @@ class RuntimeSettings(BaseSettings):
 
     telemetry_trace_sample_rate: float = Field(default=0.0, ge=0.0, le=1.0)
     telemetry_log_payloads: bool = False
+
+    maintenance_mode: Literal["normal", "draining", "maintenance"] = "normal"
+    maintenance_retry_after_seconds: int = Field(default=60, ge=1, le=86_400)
 
     @field_validator("secret_store_ref", "root_kek_ref", mode="before")
     @classmethod
@@ -192,4 +195,6 @@ class RuntimeSettings(BaseSettings):
             "shutdown_grace_seconds": self.shutdown_grace_seconds,
             "telemetry_trace_sample_rate": self.telemetry_trace_sample_rate,
             "telemetry_log_payloads": self.telemetry_log_payloads,
+            "maintenance_mode": self.maintenance_mode,
+            "maintenance_retry_after_seconds": self.maintenance_retry_after_seconds,
         }

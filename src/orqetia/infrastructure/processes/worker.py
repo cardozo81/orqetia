@@ -14,6 +14,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import uuid7
 
+from orqetia.infrastructure.availability import OperationalAvailabilityController
 from orqetia.observability import EventEmitter, JsonEventEmitter, work_telemetry_fields
 from orqetia.shared.messaging import QueueName, WakeupPort, WorkLease, WorkQueuePort
 
@@ -99,6 +100,7 @@ class WorkerProcess:
         process_id: str | None = None,
         heartbeat_interval_seconds: float = 30.0,
         telemetry: EventEmitter | None = None,
+        availability_controller: OperationalAvailabilityController | None = None,
     ) -> None:
         if concurrency < 1:
             raise ValueError("concurrency must be >= 1")
@@ -121,6 +123,7 @@ class WorkerProcess:
         self._process_id = process_id or default_process_id(queue_name.value)
         self._heartbeat_interval = heartbeat_interval_seconds
         self._telemetry = telemetry or JsonEventEmitter()
+        self._availability = availability_controller
         self._last_heartbeat = 0.0
         self._stop = asyncio.Event()
         self._inflight: set[asyncio.Task[None]] = set()
@@ -149,6 +152,9 @@ class WorkerProcess:
             self._log("process.stopped")
 
     async def run_once(self) -> int:
+        if self._availability is not None and not self._availability.can_claim_work():
+            return 0
+
         # Phase-1 shells deliberately do not claim unknown work before domain
         # handlers are registered by later implementation issues.
         if not self._registry.has_handlers:
