@@ -30,7 +30,7 @@ def test_m10_manifest_covers_integration_boundaries_and_residual_gates() -> None
     for residual in ("#162", "#28", "#41", "#135", "#46"):
         assert residual in text
 
-    normalized = " ".join(text.split())
+    normalized = " ".join(text.replace("**", "").split())
     assert "does not declare RC, GA, production readiness" in normalized
     assert "No paid provider or external identity service is used" in normalized
     assert "not that ORQETIA has been promoted from DEVELOPMENT" in normalized
