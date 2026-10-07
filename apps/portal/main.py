@@ -11,7 +11,7 @@ from orqetia.infrastructure.customer_portal.composition import (
     build_customer_portal_app,
 )
 from orqetia.infrastructure.health import DatabaseReadinessProbe
-from orqetia.infrastructure.local_oidc import LocalCustomerPortalOidcBroker
+from orqetia.infrastructure.local_oidc import (\n    LocalCustomerPortalOidcBroker,\n    load_local_oidc_signing_key,\n)
 from orqetia.infrastructure.persistence import create_engine, create_session_factory
 from orqetia.settings import Environment, ProcessRole, RuntimeSettings
 
@@ -40,7 +40,7 @@ session_factory = create_session_factory(engine)
 readiness = DatabaseReadinessProbe(engine)
 oidc = LocalCustomerPortalOidcBroker(
     environment=settings.environment.value,
-    signing_key=settings.local_oidc_signing_key.get_secret_value(),
+    signing_key=load_local_oidc_signing_key(\n        None\n        if settings.local_oidc_signing_key is None\n        else settings.local_oidc_signing_key.get_secret_value()\n    ),
     audience="portal",
     callback_url=f"{origin}/portal/callback",
     idp_public_url=f"{origin}/dev-idp",
