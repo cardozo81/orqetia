@@ -92,14 +92,14 @@ class ImmutableAuditEvent:
             normalized = value.strip()
             if not normalized or len(normalized) > maximum:
                 raise ValueError(f"{field_name} must contain 1..{maximum} characters")
-        for field_name, value, maximum in (
+        for field_name, optional_value, maximum in (
             ("actor_type", self.actor_type, 60),
             ("actor_id", self.actor_id, 500),
             ("resource_type", self.resource_type, 100),
             ("resource_id", self.resource_id, 500),
         ):
-            if value is not None and (
-                not value.strip() or len(value) > maximum
+            if optional_value is not None and (
+                not optional_value.strip() or len(optional_value) > maximum
             ):
                 raise ValueError(f"{field_name} must contain 1..{maximum} characters")
         if self.retention_policy_version < 1:
