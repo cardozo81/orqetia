@@ -41,5 +41,6 @@ def test_security_pack_maps_material_m9_controls_to_targeted_tests() -> None:
     ):
         assert case in text
 
-    assert "does not run the full test suite" in text
-    assert "no provider/network credential is required" in text
+    normalized = " ".join(text.split())
+    assert "does not run the full test suite" in normalized
+    assert "no provider/network credential is required" in normalized
