@@ -7,10 +7,10 @@ from uuid import uuid7
 import pytest
 
 from orqetia.read_models import (
+    CLIENT_USAGE_MAX_SOURCE_ROWS,
     BackofficeReportAccess,
     BackofficeReportingService,
     BoundedReadExceeded,
-    CLIENT_USAGE_MAX_SOURCE_ROWS,
     ClientUsageReportService,
     InMemoryReportExportAuditSink,
     InMemoryReportRollupStore,

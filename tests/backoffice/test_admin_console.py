@@ -480,6 +480,8 @@ async def test_admin_web_executes_control_plane_without_exposing_provider_secret
             "/backoffice/intelligence/export",
             csrf,
             {
+                "period_from": (NOW - timedelta(hours=2)).isoformat(),
+                "period_to": (NOW + timedelta(minutes=2)).isoformat(),
                 "tenant_id": str(tenant_id),
                 "client_id": str(client_id),
                 "provider_id": "alpha",

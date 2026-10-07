@@ -32,15 +32,6 @@ from .client_api_idempotency import (
 )
 from .client_api_postgres import PostgresClientApiIdempotencyJournal
 from .client_api_tables import client_api_idempotency
-from .retention import (
-    ArtifactRetentionCutoffs,
-    ClientArtifactRetentionCoordinator,
-    ClientArtifactRetentionPolicy,
-    ClientArtifactRetentionStore,
-    DEFAULT_CLIENT_ARTIFACT_RETENTION_POLICY,
-    RetentionHold,
-    RetentionPurgeResult,
-)
 from .orchestration import (
     AttemptObservation,
     AttemptObservationStatus,
@@ -54,6 +45,15 @@ from .orchestration import (
     rank_auto_candidates,
 )
 from .postgres import PostgresExecutionSessionStore
+from .retention import (
+    DEFAULT_CLIENT_ARTIFACT_RETENTION_POLICY,
+    ArtifactRetentionCutoffs,
+    ClientArtifactRetentionCoordinator,
+    ClientArtifactRetentionPolicy,
+    ClientArtifactRetentionStore,
+    RetentionHold,
+    RetentionPurgeResult,
+)
 from .sessions import (
     ExecutionSession,
     ExecutionSessionStore,

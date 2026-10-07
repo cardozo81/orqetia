@@ -12,6 +12,7 @@ from time import perf_counter
 from uuid import uuid7
 
 import httpx
+from benchmark_read_models import benchmark_read_models
 
 from orqetia.identity.authentication import AuthenticatedPrincipal
 from orqetia.infrastructure.http import create_app
@@ -19,8 +20,6 @@ from orqetia.infrastructure.messaging import PostgresWorkQueue
 from orqetia.infrastructure.persistence import create_engine, create_session_factory
 from orqetia.settings import RuntimeSettings
 from orqetia.shared.messaging import DataClassification, QueueName, WorkItem
-
-from benchmark_read_models import benchmark_read_models
 
 ROOT = Path(__file__).resolve().parents[1]
 OPENAPI = ROOT / "contracts" / "openapi" / "orqetia-v1.openapi.json"

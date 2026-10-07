@@ -5,13 +5,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from orqetia.infrastructure.availability import (
-    MaintenanceMode,
-    OperationalAvailabilityController,
-)
 from orqetia.identity.authentication import (
     AuthenticatedPrincipal,
     AuthenticationRejected,
+)
+from orqetia.infrastructure.availability import (
+    MaintenanceMode,
+    OperationalAvailabilityController,
 )
 from orqetia.infrastructure.health import DatabaseReadinessProbe
 from orqetia.infrastructure.http import create_app

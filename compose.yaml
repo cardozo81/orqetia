@@ -46,6 +46,11 @@ services:
 
   api:
     <<: *runtime-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       <<: *runtime-environment
       ORQETIA_PROCESS_ROLE: api
@@ -59,6 +64,11 @@ services:
 
   worker:
     <<: *runtime-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       <<: *runtime-environment
       ORQETIA_PROCESS_ROLE: worker
@@ -66,6 +76,11 @@ services:
 
   scheduler:
     <<: *runtime-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       <<: *runtime-environment
       ORQETIA_PROCESS_ROLE: scheduler

@@ -19,10 +19,10 @@ __all__ = [
 ]
 
 from .immutable import (
+    DEVELOPMENT_AUDIT_RETENTION_POLICY_V1,
     AuditClass,
     AuditRetentionPolicy,
     AuditRetentionRule,
-    DEVELOPMENT_AUDIT_RETENTION_POLICY_V1,
     ImmutableAuditEvent,
     ImmutableAuditStore,
     build_immutable_audit_event,

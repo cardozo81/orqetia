@@ -25,6 +25,7 @@ from orqetia.estimation import (
     EstimateUnavailable,
     ReferenceScope,
 )
+from orqetia.execution import OwnershipScope
 from orqetia.identity import (
     ClientAccessCredentialService,
     IdempotencyConflict,
@@ -35,7 +36,6 @@ from orqetia.identity.customer_web_sessions import (
     CustomerPortalWebSessionService,
 )
 from orqetia.identity.web_sessions import WebSessionRejected
-from orqetia.execution import OwnershipScope, TaskStatus
 from orqetia.infrastructure.http.execution_runtime import (
     ClientExecutionArtifactUnavailable,
     ClientExecutionConflict,

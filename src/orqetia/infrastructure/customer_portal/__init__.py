@@ -16,6 +16,6 @@ __all__ = [
     "create_customer_portal_app",
 ]
 
-from .composition import build_customer_portal_app
+from .composition import build_customer_portal_app as build_customer_portal_app
 
 __all__.append("build_customer_portal_app")

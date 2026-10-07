@@ -33,7 +33,6 @@ from orqetia.providers import (
     ProviderOutcome,
     ProviderUsage,
 )
-from orqetia.usage_accounting.domain import NativeUsageQuantity
 from orqetia.shared.messaging import (
     DataClassification,
     QueueName,
@@ -41,6 +40,7 @@ from orqetia.shared.messaging import (
     WorkLease,
     WorkQueuePort,
 )
+from orqetia.usage_accounting.domain import NativeUsageQuantity
 from orqetia.usage_accounting.quotas import (
     QuotaEnforcer,
     QuotaReservation,

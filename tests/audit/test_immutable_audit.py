@@ -9,9 +9,9 @@ import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
 
 from orqetia.audit import (
+    DEVELOPMENT_AUDIT_RETENTION_POLICY_V1,
     AuditClass,
     CustomerActivityEvent,
-    DEVELOPMENT_AUDIT_RETENTION_POLICY_V1,
     PostgresCustomerActivityStore,
     PostgresImmutableAuditStore,
     build_immutable_audit_event,

@@ -7,11 +7,6 @@ from uuid import uuid7
 import pytest
 
 from orqetia.estimation import (
-    BenchmarkBuilder,
-    BenchmarkFeatureKey,
-    BenchmarkPolicy,
-    BenchmarkSample,
-    BenchmarkUnavailableReason,
     GLOBAL_PUBLIC_ALLOWED_FEATURE_DIMENSIONS,
     GLOBAL_PUBLIC_MINIMUM_CLIENTS,
     GLOBAL_PUBLIC_MINIMUM_COHORT_BUCKET,
@@ -20,6 +15,11 @@ from orqetia.estimation import (
     GLOBAL_PUBLIC_PRIVACY_CONTRACT_VERSION,
     GLOBAL_PUBLIC_PROHIBITED_SAMPLE_FIELDS,
     GLOBAL_PUBLIC_PURPOSE,
+    BenchmarkBuilder,
+    BenchmarkFeatureKey,
+    BenchmarkPolicy,
+    BenchmarkSample,
+    BenchmarkUnavailableReason,
     ReferenceScope,
 )
 

@@ -246,6 +246,18 @@ def create_backoffice_app(
         value = optional_text(data, key)
         return None if value is None else int(value)
 
+    def optional_datetime(data: dict[str, str], key: str) -> datetime | None:
+        value = optional_text(data, key)
+        if value is None:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise ValueError(f"{key} must be an ISO-8601 datetime") from error
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError(f"{key} must include a timezone")
+        return parsed
+
     def parse_targets(raw: str) -> tuple[AuthorizedExecutionTarget, ...]:
         targets: list[AuthorizedExecutionTarget] = []
         for line in raw.splitlines():
@@ -271,6 +283,8 @@ def create_backoffice_app(
 
     def report_filters(data: dict[str, str]) -> ReportQuery:
         return ReportQuery(
+            period_from=optional_datetime(data, "period_from"),
+            period_to=optional_datetime(data, "period_to"),
             tenant_id=optional_uuid(data, "tenant_id"),
             client_id=optional_uuid(data, "client_id"),
             client_credential_id=optional_uuid(data, "client_credential_id"),
@@ -1203,6 +1217,8 @@ def create_backoffice_app(
     @app.get("/backoffice/intelligence")
     async def intelligence_page(
         request: Request,
+        period_from: str = "",
+        period_to: str = "",
         tenant_id: str = "",
         client_id: str = "",
         provider_id: str = "",
@@ -1211,6 +1227,8 @@ def create_backoffice_app(
     ) -> HTMLResponse:
         authenticated_session = await authorized_read(request, "reports:read")
         values = {
+            "period_from": period_from,
+            "period_to": period_to,
             "tenant_id": tenant_id,
             "client_id": client_id,
             "provider_id": provider_id,
@@ -1266,6 +1284,16 @@ def create_backoffice_app(
             + "</p>"
             + "<form method='get' action='/backoffice/intelligence'>"
             + (
+                "<label>From (ISO-8601) <input name='period_from' value='"
+                + escape(period_from)
+                + "'></label>"
+            )
+            + (
+                "<label>To (ISO-8601) <input name='period_to' value='"
+                + escape(period_to)
+                + "'></label>"
+            )
+            + (
                 "<label>Tenant ID <input name='tenant_id' value='"
                 + escape(tenant_id)
                 + "'></label>"
@@ -1299,6 +1327,8 @@ def create_backoffice_app(
             + "<h2>Export filtered rollups</h2>"
             + "<form method='post' action='/backoffice/intelligence/export'>"
             + csrf_field(request)
+            + "<input name='period_from' required value='" + escape(period_from) + "'>"
+            + "<input name='period_to' required value='" + escape(period_to) + "'>"
             + "<input name='tenant_id' value='" + escape(tenant_id) + "'>"
             + "<input name='client_id' value='" + escape(client_id) + "'>"
             + "<input name='provider_id' value='" + escape(provider_id) + "'>"

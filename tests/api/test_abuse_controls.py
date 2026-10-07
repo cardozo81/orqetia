@@ -8,7 +8,6 @@ import pytest
 
 from orqetia.identity import AuthenticatedPrincipal
 from orqetia.infrastructure.http import create_app
-
 from orqetia.infrastructure.http.abuse import (
     AbuseRule,
     ApiAbusePolicy,
