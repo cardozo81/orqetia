@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Protocol
 
@@ -13,20 +14,30 @@ from orqetia.control_plane.provider_credentials import (
 )
 from orqetia.execution import ProviderAttempt
 from orqetia.providers import (
+    ORQETIA_TEST_PROVIDER,
     AnthropicMessagesAdapter,
     CohereChatV2Adapter,
     DeepSeekResponsesAdapter,
+    DeterministicTestProvider,
     GeminiInteractionsAdapter,
     GitHubCopilotAdapter,
     KimiChatCompletionsAdapter,
     MiMoResponsesAdapter,
     MistralChatCompletionsAdapter,
     OpenAIResponsesAdapter,
+    OutputKind,
     ProviderAdapter,
+    ProviderAttemptRequest,
+    ProviderAttemptResult,
     ProviderCredential,
     ProviderRequestPayloadReader,
     ProviderResponsePayloadWriter,
+    ProviderTarget,
+    ProviderUsage,
     QwenChatCompletionsAdapter,
+    SimulatorFixture,
+    SimulatorScenario,
+    SimulatorStep,
     StructuredOutputValidator,
     XAIResponsesAdapter,
 )
@@ -47,6 +58,42 @@ def _utc_now() -> datetime:
 Clock = Callable[[], datetime]
 
 
+class _DurableLocalTestProvider:
+    """Persist deterministic simulator output through the canonical artifact port."""
+
+    def __init__(
+        self,
+        *,
+        delegate: DeterministicTestProvider,
+        artifacts: ProviderArtifactPorts,
+    ) -> None:
+        self._delegate = delegate
+        self._artifacts = artifacts
+
+    async def invoke(self, request: ProviderAttemptRequest) -> ProviderAttemptResult:
+        result = await self._delegate.invoke(request)
+        if result.output_kind not in {OutputKind.TEXT, OutputKind.STRUCTURED}:
+            return result
+
+        content = (
+            "{\"provider\":\"ORQETIA_TEST_PROVIDER\","
+            f"\"attempt_id\":\"{request.attempt_id}\","
+            "\"status\":\"success\"}"
+            if result.output_kind is OutputKind.STRUCTURED
+            else (
+                "ORQETIA_TEST_PROVIDER deterministic success "
+                f"for attempt {request.attempt_id}"
+            )
+        )
+        reference = await self._artifacts.store(
+            attempt_id=request.attempt_id,
+            target=request.target,
+            output_kind=result.output_kind,
+            content=content,
+        )
+        return replace(result, response_reference=reference)
+
+
 class DurableProviderAdapterResolver:
     """Resolve secret material only for the exact PREPARED attempt being dispatched."""
 
@@ -58,12 +105,14 @@ class DurableProviderAdapterResolver:
         artifacts: ProviderArtifactPorts,
         structured_validator: StructuredOutputValidator | None = None,
         clock: Clock = _utc_now,
+        allow_test_provider: bool = False,
     ) -> None:
         self._credentials = credentials
         self._secrets = secrets
         self._artifacts = artifacts
         self._structured_validator = structured_validator
         self._clock = clock
+        self._allow_test_provider = allow_test_provider
 
     async def __call__(self, attempt: ProviderAttempt) -> ProviderAdapter:
         credential_id = attempt.provider_credential_id
@@ -83,9 +132,16 @@ class DurableProviderAdapterResolver:
         if metadata.expires_at is not None and metadata.expires_at <= now:
             raise PermissionError("provider credential is expired")
 
+        provider_id = attempt.target.provider_id
+        if provider_id == ORQETIA_TEST_PROVIDER:
+            if not self._allow_test_provider:
+                raise PermissionError(
+                    "ORQETIA_TEST_PROVIDER is disabled outside local/test composition"
+                )
+            return self._build_local_test_provider(attempt)
+
         secret = await self._secrets.get(metadata.secret_reference)
         credential = ProviderCredential(secret.reveal())
-        provider_id = attempt.target.provider_id
         if provider_id == "openai":
             return OpenAIResponsesAdapter(
                 credential=credential,
@@ -164,3 +220,32 @@ class DurableProviderAdapterResolver:
                 structured_validator=self._structured_validator,
             )
         raise LookupError("provider has no synchronous runtime adapter")
+
+    def _build_local_test_provider(
+        self,
+        attempt: ProviderAttempt,
+    ) -> ProviderAdapter:
+        target = ProviderTarget(
+            provider_id=attempt.target.provider_id,
+            model_id=attempt.target.model_id,
+            reasoning_profile=attempt.target.reasoning_profile,
+        )
+        fixture = SimulatorFixture(
+            fixture_id=f"local-runtime-{attempt.attempt_id}",
+            seed="orqetia-local-runtime-v1",
+            candidates=(),
+            steps=(
+                SimulatorStep(
+                    scenario=SimulatorScenario.SUCCESS,
+                    expected_cycle=attempt.cycle,
+                    expected_attempt_index=attempt.attempt_index,
+                    expected_target=target,
+                    simulated_latency_ms=1,
+                    usage=ProviderUsage(input_tokens=12, output_tokens=8),
+                ),
+            ),
+        )
+        return _DurableLocalTestProvider(
+            delegate=DeterministicTestProvider(fixture),
+            artifacts=self._artifacts,
+        )
