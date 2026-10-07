@@ -63,7 +63,7 @@ jobs:
         run: uv run --no-sync --python 3.14 pytest -q tests/readiness/test_m10_manifest.py
       - name: Run targeted integration evidence
         run: |
-          uv run --no-sync --python 3.14 pytest -q \
+          uv run --no-sync --python 3.14 pytest -q --import-mode=importlib \
             tests/contracts/test_openapi_v1_contract.py::OpenApiV1ContractTests::test_task_create_is_async_and_idempotent \
             tests/identity/test_customer_authz.py::test_browser_selected_owner_cannot_escape_exact_membership \
             tests/processes/test_task_orchestration_worker.py::TaskOrchestrationWorkerIntegrationTests::test_auto_escalates_using_frozen_policy_and_completes \
