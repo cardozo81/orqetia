@@ -1,0 +1,43 @@
+{
+    auto_https disable_redirects
+    admin off
+}
+
+https://localhost:8443 {
+    tls internal
+
+    header {
+        -Server
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+    }
+
+    handle_path /dev-idp/* {
+        reverse_proxy local-idp:9000
+    }
+
+    handle /backoffice/* {
+        reverse_proxy backoffice:8100
+    }
+
+    handle /portal/* {
+        reverse_proxy portal:8200
+    }
+
+    handle /v1/* {
+        reverse_proxy api:8000
+    }
+
+    handle /openapi.json {
+        reverse_proxy api:8000
+    }
+
+    handle /health/* {
+        reverse_proxy api:8000
+    }
+
+    handle {
+        respond "ORQETIA local development gateway" 200
+    }
+}
