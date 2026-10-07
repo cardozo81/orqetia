@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 from orqetia.infrastructure.availability import (
     MaintenanceMode,
     OperationalAvailabilityController,
 )
+from orqetia.infrastructure.local_secrets import LocalFileProviderSecretStore
 from orqetia.infrastructure.messaging import PostgresWorkQueue
 from orqetia.infrastructure.persistence import create_engine, create_session_factory
 from orqetia.infrastructure.processes import (
@@ -15,8 +17,15 @@ from orqetia.infrastructure.processes import (
     build_execution_handler_registry,
     install_signal_handlers,
 )
-from orqetia.settings import Environment, ProcessRole, RuntimeSettings
+from orqetia.settings import (
+    Environment,
+    ProcessRole,
+    RuntimeSettings,
+    SecretStoreMode,
+)
 from orqetia.shared.messaging import QueueName
+
+_LOCAL_SECRET_ROOT = Path("/var/lib/orqetia/provider-secrets")
 
 
 async def amain() -> None:
@@ -30,6 +39,21 @@ async def amain() -> None:
             "production worker requires an injected managed/envelope secret store"
         )
 
+    allow_test_provider = settings.environment in {
+        Environment.LOCAL,
+        Environment.TEST,
+    }
+    secret_store = None
+    if settings.secret_store_mode is SecretStoreMode.LOCAL:
+        if not allow_test_provider:
+            raise RuntimeError(
+                "local provider secret store is restricted to LOCAL/TEST"
+            )
+        secret_store = LocalFileProviderSecretStore(
+            _LOCAL_SECRET_ROOT,
+            environment=settings.environment.value,
+        )
+
     engine = create_engine(settings)
     try:
         session_factory = create_session_factory(engine)
@@ -37,6 +61,8 @@ async def amain() -> None:
         registry = build_execution_handler_registry(
             session_factory=session_factory,
             queue=queue,
+            secret_store=secret_store,
+            allow_test_provider=allow_test_provider,
         )
         process = WorkerProcess(
             queue=queue,
