@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from orqetia.infrastructure.backoffice.composition import build_backoffice_app
 from orqetia.infrastructure.health import DatabaseReadinessProbe
-from orqetia.infrastructure.local_oidc import LocalBackofficeOidcBroker
+from orqetia.infrastructure.local_oidc import (\n    LocalBackofficeOidcBroker,\n    load_local_oidc_signing_key,\n)
 from orqetia.infrastructure.local_secrets import LocalFileProviderSecretStore
 from orqetia.infrastructure.persistence import create_engine, create_session_factory
 from orqetia.settings import (
@@ -48,7 +48,7 @@ secret_store = LocalFileProviderSecretStore(
 )
 oidc = LocalBackofficeOidcBroker(
     environment=settings.environment.value,
-    signing_key=settings.local_oidc_signing_key.get_secret_value(),
+    signing_key=load_local_oidc_signing_key(\n        None\n        if settings.local_oidc_signing_key is None\n        else settings.local_oidc_signing_key.get_secret_value()\n    ),
     audience="backoffice",
     callback_url=f"{origin}/backoffice/callback",
     idp_public_url=f"{origin}/dev-idp",
