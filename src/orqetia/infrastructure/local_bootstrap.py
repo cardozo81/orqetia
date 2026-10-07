@@ -291,6 +291,7 @@ async def _ensure_api_token(
             if (
                 principal.tenant_id == str(tenant_id)
                 and principal.client_id == str(client_id)
+                and principal.credential_id is not None
                 and frozenset(scopes) <= principal.scopes
             ):
                 credential_id = UUID(principal.credential_id)
