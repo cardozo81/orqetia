@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
@@ -153,6 +153,36 @@ class OperationalIntelligenceResult:
     source_row_count: int
 
 
+@dataclass
+class _IntelligenceAccumulator:
+    requests: int = 0
+    tasks: int = 0
+    attempts: int = 0
+    peak_concurrent: int = 0
+    maximum_quota_utilization: Decimal | None = None
+    input_tokens: int = 0
+    cached_input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_tokens: int = 0
+    total_tokens: int = 0
+    native: dict[tuple[str, str], Decimal] = field(default_factory=dict)
+    successes: int = 0
+    partials: int = 0
+    failures: int = 0
+    latency_ms_total: int = 0
+    cycles: int = 0
+    retries: int = 0
+    fallbacks: int = 0
+    health_events: int = 0
+    quarantine_events: int = 0
+    period_attempts: dict[str, int] = field(default_factory=dict)
+    period_start_min: datetime | None = None
+    period_end_max: datetime | None = None
+    estimated: dict[str, Decimal] = field(default_factory=dict)
+    observed: dict[str, Decimal] = field(default_factory=dict)
+    unpriced: int = 0
+
+
 class OperationalFinancialIntelligenceService:
     def __init__(
         self,
@@ -210,132 +240,63 @@ def _aggregate(
     dimensions: tuple[IntelligenceDimension, ...],
     zone: ZoneInfo,
 ) -> tuple[IntelligenceRow, ...]:
-    state: dict[tuple[str, ...], dict[str, object]] = {}
+    state: dict[tuple[str, ...], _IntelligenceAccumulator] = {}
     for row in rows:
         key = tuple(_dimension_value(row, dimension, zone) for dimension in dimensions)
-        item = state.setdefault(
-            key,
-            {
-                "requests": 0,
-                "tasks": 0,
-                "attempts": 0,
-                "peak_concurrent": 0,
-                "maximum_quota_utilization": None,
-                "input_tokens": 0,
-                "cached_input_tokens": 0,
-                "output_tokens": 0,
-                "reasoning_tokens": 0,
-                "total_tokens": 0,
-                "native": {},
-                "successes": 0,
-                "partials": 0,
-                "failures": 0,
-                "latency_ms_total": 0,
-                "cycles": 0,
-                "retries": 0,
-                "fallbacks": 0,
-                "health_events": 0,
-                "quarantine_events": 0,
-                "period_attempts": {},
-                "period_start_min": None,
-                "period_end_max": None,
-                "estimated": {},
-                "observed": {},
-                "unpriced": 0,
-            },
-        )
-        item["requests"] = int(item["requests"]) + row.requests
-        item["tasks"] = int(item["tasks"]) + row.tasks
-        attempts = int(item["attempts"]) + row.attempts
-        item["attempts"] = attempts
-        item["peak_concurrent"] = max(
-            int(item["peak_concurrent"]),
-            row.peak_concurrent,
-        )
+        item = state.setdefault(key, _IntelligenceAccumulator())
+        item.requests += row.requests
+        item.tasks += row.tasks
+        item.attempts += row.attempts
+        item.peak_concurrent = max(item.peak_concurrent, row.peak_concurrent)
         if row.quota_utilization is not None:
-            current_quota = item["maximum_quota_utilization"]
-            item["maximum_quota_utilization"] = (
+            item.maximum_quota_utilization = (
                 row.quota_utilization
-                if current_quota is None
-                else max(Decimal(current_quota), row.quota_utilization)
+                if item.maximum_quota_utilization is None
+                else max(item.maximum_quota_utilization, row.quota_utilization)
             )
-        for field in (
-            "input_tokens",
-            "cached_input_tokens",
-            "output_tokens",
-            "reasoning_tokens",
-            "total_tokens",
-            "latency_ms_total",
-            "cycles",
-            "retries",
-            "fallbacks",
-            "health_events",
-            "quarantine_events",
-        ):
-            item[field] = int(item[field]) + getattr(row, field)
+        item.input_tokens += row.input_tokens
+        item.cached_input_tokens += row.cached_input_tokens
+        item.output_tokens += row.output_tokens
+        item.reasoning_tokens += row.reasoning_tokens
+        item.total_tokens += row.total_tokens
+        item.latency_ms_total += row.latency_ms_total
+        item.cycles += row.cycles
+        item.retries += row.retries
+        item.fallbacks += row.fallbacks
+        item.health_events += row.health_events
+        item.quarantine_events += row.quarantine_events
 
         status = row.status.upper()
         if status == "SUCCESS":
-            item["successes"] = int(item["successes"]) + row.attempts
+            item.successes += row.attempts
         elif status == "PARTIAL":
-            item["partials"] = int(item["partials"]) + row.attempts
+            item.partials += row.attempts
         else:
-            item["failures"] = int(item["failures"]) + row.attempts
+            item.failures += row.attempts
 
-        native = item["native"]
-        assert isinstance(native, dict)
         for usage in row.native_usage:
             identity = (usage.name, usage.unit)
-            native[identity] = native.get(identity, Decimal("0")) + usage.quantity
+            item.native[identity] = item.native.get(identity, Decimal("0")) + usage.quantity
 
-        period_attempts = item["period_attempts"]
-        assert isinstance(period_attempts, dict)
         period_key = row.period_start.astimezone(zone).isoformat()
-        period_attempts[period_key] = (
-            int(period_attempts.get(period_key, 0)) + row.attempts
-        )
-        current_start = item["period_start_min"]
-        current_end = item["period_end_max"]
-        item["period_start_min"] = (
+        item.period_attempts[period_key] = item.period_attempts.get(period_key, 0) + row.attempts
+        item.period_start_min = (
             row.period_start
-            if current_start is None
-            else min(current_start, row.period_start)
+            if item.period_start_min is None
+            else min(item.period_start_min, row.period_start)
         )
-        item["period_end_max"] = (
+        item.period_end_max = (
             row.period_end
-            if current_end is None
-            else max(current_end, row.period_end)
+            if item.period_end_max is None
+            else max(item.period_end_max, row.period_end)
         )
 
-        _add_currency(
-            item["estimated"],
-            row.estimated_currency,
-            row.estimated_cost,
-        )
-        _add_currency(
-            item["observed"],
-            row.observed_currency,
-            row.observed_cost,
-        )
-        item["unpriced"] = int(item["unpriced"]) + row.unpriced_attempts
+        _add_currency(item.estimated, row.estimated_currency, row.estimated_cost)
+        _add_currency(item.observed, row.observed_currency, row.observed_cost)
+        item.unpriced += row.unpriced_attempts
 
     output: list[IntelligenceRow] = []
     for key, item in state.items():
-        attempts = int(item["attempts"])
-        failures = int(item["failures"])
-        retries = int(item["retries"])
-        latency_total = int(item["latency_ms_total"])
-        native = item["native"]
-        period_attempts = item["period_attempts"]
-        estimated = item["estimated"]
-        observed = item["observed"]
-        period_start_min = item["period_start_min"]
-        period_end_max = item["period_end_max"]
-        assert isinstance(native, dict)
-        assert isinstance(period_attempts, dict)
-        assert isinstance(estimated, dict)
-        assert isinstance(observed, dict)
-
         output.append(
             IntelligenceRow(
                 dimensions=tuple(
@@ -343,55 +304,44 @@ def _aggregate(
                     for dimension, value in zip(dimensions, key, strict=True)
                 ),
                 metrics=IntelligenceMetrics(
-                    requests=int(item["requests"]),
-                    tasks=int(item["tasks"]),
-                    attempts=attempts,
-                    peak_concurrent=int(item["peak_concurrent"]),
-                    maximum_quota_utilization=(
-                        None
-                        if item["maximum_quota_utilization"] is None
-                        else Decimal(item["maximum_quota_utilization"])
-                    ),
-                    input_tokens=int(item["input_tokens"]),
-                    cached_input_tokens=int(item["cached_input_tokens"]),
-                    output_tokens=int(item["output_tokens"]),
-                    reasoning_tokens=int(item["reasoning_tokens"]),
-                    total_tokens=int(item["total_tokens"]),
+                    requests=item.requests,
+                    tasks=item.tasks,
+                    attempts=item.attempts,
+                    peak_concurrent=item.peak_concurrent,
+                    maximum_quota_utilization=item.maximum_quota_utilization,
+                    input_tokens=item.input_tokens,
+                    cached_input_tokens=item.cached_input_tokens,
+                    output_tokens=item.output_tokens,
+                    reasoning_tokens=item.reasoning_tokens,
+                    total_tokens=item.total_tokens,
                     native_usage=tuple(
-                        NativeUsageQuantity(
-                            name=name,
-                            unit=unit,
-                            quantity=quantity,
-                        )
-                        for (name, unit), quantity in sorted(native.items())
+                        NativeUsageQuantity(name=name, unit=unit, quantity=quantity)
+                        for (name, unit), quantity in sorted(item.native.items())
                     ),
-                    successes=int(item["successes"]),
-                    partials=int(item["partials"]),
-                    failures=failures,
+                    successes=item.successes,
+                    partials=item.partials,
+                    failures=item.failures,
                     average_latency_ms=(
                         None
-                        if attempts == 0
-                        else Decimal(latency_total) / Decimal(attempts)
+                        if item.attempts == 0
+                        else Decimal(item.latency_ms_total) / Decimal(item.attempts)
                     ),
-                    cycles=int(item["cycles"]),
-                    retries=retries,
-                    fallbacks=int(item["fallbacks"]),
-                    health_events=int(item["health_events"]),
-                    quarantine_events=int(item["quarantine_events"]),
-                    peak_attempts_per_bucket=max(
-                        (int(value) for value in period_attempts.values()),
-                        default=0,
-                    ),
+                    cycles=item.cycles,
+                    retries=item.retries,
+                    fallbacks=item.fallbacks,
+                    health_events=item.health_events,
+                    quarantine_events=item.quarantine_events,
+                    peak_attempts_per_bucket=max(item.period_attempts.values(), default=0),
                     throughput_attempts_per_hour=_throughput(
-                        attempts,
-                        period_start_min,
-                        period_end_max,
+                        item.attempts,
+                        item.period_start_min,
+                        item.period_end_max,
                     ),
-                    failure_rate=_ratio(failures, attempts),
-                    retry_rate=_ratio(retries, attempts),
-                    estimated_costs=_currency_totals(estimated),
-                    observed_costs=_currency_totals(observed),
-                    unpriced_attempts=int(item["unpriced"]),
+                    failure_rate=_ratio(item.failures, item.attempts),
+                    retry_rate=_ratio(item.retries, item.attempts),
+                    estimated_costs=_currency_totals(item.estimated),
+                    observed_costs=_currency_totals(item.observed),
+                    unpriced_attempts=item.unpriced,
                 ),
             )
         )
@@ -402,7 +352,6 @@ def _aggregate(
         )
     )
     return tuple(output)
-
 
 def _dimension_value(
     row: ReportRollup,
@@ -443,19 +392,18 @@ def _dimension_value(
 
 
 def _add_currency(
-    raw: object,
+    raw: dict[str, Decimal],
     currency: str | None,
     amount: Decimal | None,
 ) -> None:
     if currency is None or amount is None:
         return
-    assert isinstance(raw, dict)
     raw[currency] = raw.get(currency, Decimal("0")) + amount
 
 
-def _currency_totals(raw: dict[object, object]) -> tuple[CurrencyTotal, ...]:
+def _currency_totals(raw: dict[str, Decimal]) -> tuple[CurrencyTotal, ...]:
     return tuple(
-        CurrencyTotal(currency=str(currency), amount=Decimal(amount))
+        CurrencyTotal(currency=currency, amount=amount)
         for currency, amount in sorted(raw.items())
     )
 
@@ -468,10 +416,10 @@ def _ratio(numerator: int, denominator: int) -> Decimal:
 
 def _throughput(
     attempts: int,
-    period_start: object,
-    period_end: object,
+    period_start: datetime | None,
+    period_end: datetime | None,
 ) -> Decimal | None:
-    if not isinstance(period_start, datetime) or not isinstance(period_end, datetime):
+    if period_start is None or period_end is None:
         return None
     seconds = Decimal(str((period_end - period_start).total_seconds()))
     if seconds <= 0:

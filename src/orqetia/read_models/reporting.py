@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Protocol
@@ -77,52 +77,46 @@ class ReportRollup:
     unpriced_attempts: int = 0
 
     def __post_init__(self) -> None:
-        for field, value in (
-            ("period_start", self.period_start),
-            ("period_end", self.period_end),
-            ("as_of", self.as_of),
-        ):
-            _aware(value, field)
+        _aware(self.period_start, "period_start")
+        _aware(self.period_end, "period_end")
+        _aware(self.as_of, "as_of")
         if self.period_end <= self.period_start:
             raise ValueError("period_end must be after period_start")
         if self.as_of < self.period_end:
             raise ValueError("as_of cannot precede period_end")
-        for field, value in (
-            ("attempts", self.attempts),
-            ("input_tokens", self.input_tokens),
-            ("cached_input_tokens", self.cached_input_tokens),
-            ("output_tokens", self.output_tokens),
-            ("reasoning_tokens", self.reasoning_tokens),
-            ("total_tokens", self.total_tokens),
-            ("requests", self.requests),
-            ("tasks", self.tasks),
-            ("peak_concurrent", self.peak_concurrent),
-            ("quota_utilization", self.quota_utilization),
-            ("latency_ms_total", self.latency_ms_total),
-            ("cycles", self.cycles),
-            ("retries", self.retries),
-            ("fallbacks", self.fallbacks),
-            ("health_events", self.health_events),
-            ("quarantine_events", self.quarantine_events),
-            ("unpriced_attempts", self.unpriced_attempts),
-            ("estimated_cost", self.estimated_cost),
-            ("observed_cost", self.observed_cost),
-        ):
-            _non_negative(value, field)
+        _non_negative(self.attempts, "attempts")
+        _non_negative(self.input_tokens, "input_tokens")
+        _non_negative(self.cached_input_tokens, "cached_input_tokens")
+        _non_negative(self.output_tokens, "output_tokens")
+        _non_negative(self.reasoning_tokens, "reasoning_tokens")
+        _non_negative(self.total_tokens, "total_tokens")
+        _non_negative(self.requests, "requests")
+        _non_negative(self.tasks, "tasks")
+        _non_negative(self.peak_concurrent, "peak_concurrent")
+        _non_negative(self.quota_utilization, "quota_utilization")
+        _non_negative(self.latency_ms_total, "latency_ms_total")
+        _non_negative(self.cycles, "cycles")
+        _non_negative(self.retries, "retries")
+        _non_negative(self.fallbacks, "fallbacks")
+        _non_negative(self.health_events, "health_events")
+        _non_negative(self.quarantine_events, "quarantine_events")
+        _non_negative(self.unpriced_attempts, "unpriced_attempts")
+        _non_negative(self.estimated_cost, "estimated_cost")
+        _non_negative(self.observed_cost, "observed_cost")
         if self.cached_input_tokens > self.input_tokens:
             raise ValueError("cached_input_tokens cannot exceed input_tokens")
         if self.quota_utilization is not None and self.quota_utilization > 1:
             raise ValueError("quota_utilization cannot exceed 1")
         if self.provider_credential_id is not None and self.provider_account_id is None:
             raise ValueError("provider credential provenance requires provider account")
-        for field, value, maximum in (
+        for field_name, value, maximum in (
             ("provider_id", self.provider_id, 100),
             ("model_id", self.model_id, 200),
             ("status", self.status, 100),
             ("error_class", self.error_class, 200),
         ):
             if value is not None and (not value.strip() or len(value) > maximum):
-                raise ValueError(f"{field} must contain 1..{maximum} characters")
+                raise ValueError(f"{field_name} must contain 1..{maximum} characters")
         if (self.estimated_cost is None) != (self.estimated_currency is None):
             raise ValueError("estimated cost and currency must be both present or absent")
         if (self.observed_cost is None) != (self.observed_currency is None):
@@ -477,61 +471,52 @@ class BackofficeReportingService:
         return payload
 
 
+@dataclass
+class _ClientUsageAccumulator:
+    input_tokens: int = 0
+    cached_input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_tokens: int = 0
+    total_tokens: int = 0
+    native: dict[tuple[str, str], Decimal] = field(default_factory=dict)
+
+
 def _client_buckets(
     rows: tuple[ReportRollup, ...],
 ) -> tuple[ClientUsageBucket, ...]:
-    grouped: dict[
-        tuple[datetime, datetime],
-        dict[str, object],
-    ] = {}
+    grouped: dict[tuple[datetime, datetime], _ClientUsageAccumulator] = {}
     for row in rows:
         key = (row.period_start, row.period_end)
-        bucket = grouped.setdefault(
-            key,
-            {
-                "input_tokens": 0,
-                "cached_input_tokens": 0,
-                "output_tokens": 0,
-                "reasoning_tokens": 0,
-                "total_tokens": 0,
-                "native": {},
-            },
-        )
-        for field in (
-            "input_tokens",
-            "cached_input_tokens",
-            "output_tokens",
-            "reasoning_tokens",
-            "total_tokens",
-        ):
-            bucket[field] = int(bucket[field]) + getattr(row, field)
-        native = bucket["native"]
-        assert isinstance(native, dict)
+        bucket = grouped.setdefault(key, _ClientUsageAccumulator())
+        bucket.input_tokens += row.input_tokens
+        bucket.cached_input_tokens += row.cached_input_tokens
+        bucket.output_tokens += row.output_tokens
+        bucket.reasoning_tokens += row.reasoning_tokens
+        bucket.total_tokens += row.total_tokens
         for item in row.native_usage:
             identity = (item.name, item.unit)
-            native[identity] = native.get(identity, Decimal("0")) + item.quantity
+            bucket.native[identity] = (
+                bucket.native.get(identity, Decimal("0")) + item.quantity
+            )
 
     output: list[ClientUsageBucket] = []
     for (period_start, period_end), bucket in sorted(grouped.items()):
-        native = bucket["native"]
-        assert isinstance(native, dict)
         output.append(
             ClientUsageBucket(
                 period_start=period_start,
                 period_end=period_end,
-                input_tokens=int(bucket["input_tokens"]),
-                cached_input_tokens=int(bucket["cached_input_tokens"]),
-                output_tokens=int(bucket["output_tokens"]),
-                reasoning_tokens=int(bucket["reasoning_tokens"]),
-                total_tokens=int(bucket["total_tokens"]),
+                input_tokens=bucket.input_tokens,
+                cached_input_tokens=bucket.cached_input_tokens,
+                output_tokens=bucket.output_tokens,
+                reasoning_tokens=bucket.reasoning_tokens,
+                total_tokens=bucket.total_tokens,
                 native_usage=tuple(
                     NativeUsageQuantity(name=name, unit=unit, quantity=quantity)
-                    for (name, unit), quantity in sorted(native.items())
+                    for (name, unit), quantity in sorted(bucket.native.items())
                 ),
             )
         )
     return tuple(output)
-
 
 def _authorize_filters(
     access: BackofficeReportAccess,

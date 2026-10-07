@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Protocol
 
@@ -43,6 +44,9 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+Clock = Callable[[], datetime]
+
+
 class DurableProviderAdapterResolver:
     """Resolve secret material only for the exact PREPARED attempt being dispatched."""
 
@@ -53,7 +57,7 @@ class DurableProviderAdapterResolver:
         secrets: ProviderSecretStore,
         artifacts: ProviderArtifactPorts,
         structured_validator: StructuredOutputValidator | None = None,
-        clock=_utc_now,
+        clock: Clock = _utc_now,
     ) -> None:
         self._credentials = credentials
         self._secrets = secrets
@@ -81,33 +85,82 @@ class DurableProviderAdapterResolver:
 
         secret = await self._secrets.get(metadata.secret_reference)
         credential = ProviderCredential(secret.reveal())
-        common = {
-            "credential": credential,
-            "payload_reader": self._artifacts,
-            "response_writer": self._artifacts,
-            "structured_validator": self._structured_validator,
-        }
         provider_id = attempt.target.provider_id
         if provider_id == "openai":
-            return OpenAIResponsesAdapter(**common)
+            return OpenAIResponsesAdapter(
+                credential=credential,
+                payload_reader=self._artifacts,
+                response_writer=self._artifacts,
+                structured_validator=self._structured_validator,
+            )
         if provider_id == "deepseek":
-            return DeepSeekResponsesAdapter(**common)
+            return DeepSeekResponsesAdapter(
+                credential=credential,
+                payload_reader=self._artifacts,
+                response_writer=self._artifacts,
+                structured_validator=self._structured_validator,
+            )
         if provider_id == "mimo":
-            return MiMoResponsesAdapter(**common)
+            return MiMoResponsesAdapter(
+                credential=credential,
+                payload_reader=self._artifacts,
+                response_writer=self._artifacts,
+                structured_validator=self._structured_validator,
+            )
         if provider_id == "xai":
-            return XAIResponsesAdapter(**common)
+            return XAIResponsesAdapter(
+                credential=credential,
+                payload_reader=self._artifacts,
+                response_writer=self._artifacts,
+                structured_validator=self._structured_validator,
+            )
         if provider_id == "qwen":
-            return QwenChatCompletionsAdapter(**common)
+            return QwenChatCompletionsAdapter(
+                credential=credential,
+                payload_reader=self._artifacts,
+                response_writer=self._artifacts,
+                structured_validator=self._structured_validator,
+            )
         if provider_id == "mistral":
-            return MistralChatCompletionsAdapter(**common)
+            return MistralChatCompletionsAdapter(
+                credential=credential,
+                payload_reader=self._artifacts,
+                response_writer=self._artifacts,
+                structured_validator=self._structured_validator,
+            )
         if provider_id == "kimi":
-            return KimiChatCompletionsAdapter(**common)
+            return KimiChatCompletionsAdapter(
+                credential=credential,
+                payload_reader=self._artifacts,
+                response_writer=self._artifacts,
+                structured_validator=self._structured_validator,
+            )
         if provider_id == "gemini":
-            return GeminiInteractionsAdapter(**common)
+            return GeminiInteractionsAdapter(
+                credential=credential,
+                payload_reader=self._artifacts,
+                response_writer=self._artifacts,
+                structured_validator=self._structured_validator,
+            )
         if provider_id == "anthropic":
-            return AnthropicMessagesAdapter(**common)
+            return AnthropicMessagesAdapter(
+                credential=credential,
+                payload_reader=self._artifacts,
+                response_writer=self._artifacts,
+                structured_validator=self._structured_validator,
+            )
         if provider_id == "cohere":
-            return CohereChatV2Adapter(**common)
+            return CohereChatV2Adapter(
+                credential=credential,
+                payload_reader=self._artifacts,
+                response_writer=self._artifacts,
+                structured_validator=self._structured_validator,
+            )
         if provider_id == "copilot":
-            return GitHubCopilotAdapter(**common)
+            return GitHubCopilotAdapter(
+                credential=credential,
+                payload_reader=self._artifacts,
+                response_writer=self._artifacts,
+                structured_validator=self._structured_validator,
+            )
         raise LookupError("provider has no synchronous runtime adapter")
