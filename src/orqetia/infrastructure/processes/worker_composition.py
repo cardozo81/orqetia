@@ -76,6 +76,7 @@ def build_execution_handler_registry(
     session_factory: SessionFactory,
     queue: PostgresWorkQueue,
     secret_store: ProviderSecretStore | None = None,
+    allow_test_provider: bool = False,
 ) -> HandlerRegistry:
     sessions = PostgresExecutionSessionStore(session_factory)
     tasks = PostgresExecutionTaskStore(session_factory)
@@ -109,6 +110,7 @@ def build_execution_handler_registry(
         credentials=credential_repository,
         secrets=secret_store or UnavailableProviderSecretStore(),
         artifacts=artifacts,
+        allow_test_provider=allow_test_provider,
     )
 
     task_handler = TaskOrchestrationHandler(
