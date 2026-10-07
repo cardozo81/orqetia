@@ -1,0 +1,81 @@
+name: M10 technical readiness
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - docs/readiness/m10-technical-readiness.md
+      - tests/readiness/test_m10_manifest.py
+      - .github/workflows/m10-technical-readiness.yml
+  push:
+    branches: [main]
+    paths:
+      - docs/readiness/m10-technical-readiness.md
+      - tests/readiness/test_m10_manifest.py
+      - .github/workflows/m10-technical-readiness.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m10-technical-readiness-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  targeted:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: orqetia_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d orqetia_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ORQETIA_ENVIRONMENT: test
+      ORQETIA_PROCESS_ROLE: worker
+      ORQETIA_DATABASE_DSN: postgresql+psycopg://postgres@127.0.0.1:5432/orqetia_test
+      ORQETIA_SECRET_STORE_MODE: none
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned uv bootstrap tool
+        run: python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+      - name: Verify locked dependencies
+        run: uv lock --check
+      - name: Reproduce locked Python 3.14 development environment
+        run: uv sync --locked --python 3.14
+      - name: Apply migrations
+        run: uv run --no-sync --python 3.14 alembic upgrade head
+      - name: Verify readiness manifest
+        run: uv run --no-sync --python 3.14 pytest -q tests/readiness/test_m10_manifest.py
+      - name: Run targeted integration evidence
+        run: |
+          uv run --no-sync --python 3.14 pytest -q \
+            tests/contracts/test_openapi_v1_contract.py::OpenApiV1ContractTests::test_task_create_is_async_and_idempotent \
+            tests/identity/test_customer_authz.py::test_browser_selected_owner_cannot_escape_exact_membership \
+            tests/processes/test_task_orchestration_worker.py::TaskOrchestrationWorkerIntegrationTests::test_auto_escalates_using_frozen_policy_and_completes \
+            tests/execution/test_orchestration_policy.py::CanonicalOrchestrationPolicyTests::test_explicit_target_ignores_cheaper_candidates_and_retries_same_target \
+            tests/providers/test_registry.py::ProviderRegistryContractTests::test_public_metadata_is_authorization_scoped_and_has_no_sensitive_fields \
+            tests/usage_accounting/test_accounting.py::test_client_usage_projection_has_no_financial_fields \
+            tests/estimation/test_estimate_service.py::test_auto_uses_canonical_cost_rank_without_provider_call \
+            tests/usage_accounting/test_quotas.py::test_hard_limit_reserves_atomically_and_rejects_over_limit \
+            tests/control_plane/test_provider_accounts.py::test_select_credential_respects_account_priority_status_and_expiry \
+            tests/backoffice/test_security_shell.py::test_oidc_login_creates_secure_server_side_session_and_home \
+            tests/portal/test_security_shell.py::test_customer_portal_security_shell_and_viewer_navigation \
+            tests/security/test_pre_rc_security_pack.py::test_security_pack_maps_material_m9_controls_to_targeted_tests \
+            tests/observability/test_operational_policy.py::OperationalObservabilityPolicyTests::test_metric_contracts_have_explicit_bounded_cardinality_budgets \
+            tests/docs/test_client_api_manual.py::test_auto_and_explicit_quickstarts_match_http_model \
+            tests/ops/test_operational_runbooks.py::test_operational_runbook_covers_required_drills_and_safe_commands
