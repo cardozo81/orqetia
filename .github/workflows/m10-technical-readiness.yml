@@ -68,7 +68,7 @@ jobs:
             tests/identity/test_customer_authz.py::test_browser_selected_owner_cannot_escape_exact_membership \
             tests/processes/test_task_orchestration_worker.py::TaskOrchestrationWorkerIntegrationTests::test_auto_escalates_using_frozen_policy_and_completes \
             tests/execution/test_orchestration_policy.py::CanonicalOrchestrationPolicyTests::test_explicit_target_ignores_cheaper_candidates_and_retries_same_target \
-            tests/providers/test_registry.py::ProviderRegistryContractTests::test_public_metadata_is_authorization_scoped_and_has_no_sensitive_fields \
+            tests/providers/test_registry.py::ProviderRegistryTests::test_public_metadata_is_authorization_scoped_and_has_no_sensitive_fields \
             tests/usage_accounting/test_accounting.py::test_client_usage_projection_has_no_financial_fields \
             tests/estimation/test_estimate_service.py::test_auto_uses_canonical_cost_rank_without_provider_call \
             tests/usage_accounting/test_quotas.py::test_hard_limit_reserves_atomically_and_rejects_over_limit \
