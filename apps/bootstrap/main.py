@@ -5,7 +5,10 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from orqetia.infrastructure.local_bootstrap import (\n    bootstrap_local,\n    ensure_local_oidc_signing_key,\n)
+from orqetia.infrastructure.local_bootstrap import (
+    bootstrap_local,
+    ensure_local_oidc_signing_key,
+)
 from orqetia.infrastructure.local_secrets import LocalFileProviderSecretStore
 from orqetia.infrastructure.persistence import create_engine, create_session_factory
 from orqetia.settings import (
@@ -33,6 +36,7 @@ async def amain() -> None:
 
     engine = create_engine(settings)
     try:
+        ensure_local_oidc_signing_key()
         session_factory = create_session_factory(engine)
         result = await bootstrap_local(
             session_factory,

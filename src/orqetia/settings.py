@@ -153,6 +153,13 @@ class RuntimeSettings(BaseSettings):
                 "telemetry payload logging is disabled until an explicit data policy exists"
             )
 
+        if self.environment not in {Environment.LOCAL, Environment.TEST}:
+            if self.local_oidc_signing_key is not None:
+                raise ValueError("local OIDC signing key is forbidden outside LOCAL/TEST")
+            if self.process_role in {ProcessRole.BACKOFFICE, ProcessRole.PORTAL,
+                                     ProcessRole.LOCAL_IDP, ProcessRole.BOOTSTRAP}:
+                raise ValueError("local process composition is forbidden outside LOCAL/TEST")
+
         if self.environment is not Environment.PRODUCTION:
             return self
 

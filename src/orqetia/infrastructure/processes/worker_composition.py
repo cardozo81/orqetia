@@ -78,6 +78,8 @@ def build_execution_handler_registry(
     secret_store: ProviderSecretStore | None = None,
     allow_test_provider: bool = False,
 ) -> HandlerRegistry:
+    from orqetia.infrastructure.local_reporting import LocalAttemptReportingObserver
+
     sessions = PostgresExecutionSessionStore(session_factory)
     tasks = PostgresExecutionTaskStore(session_factory)
     attempts = PostgresProviderAttemptStore(session_factory)
@@ -134,6 +136,8 @@ def build_execution_handler_registry(
         completed_observer=CompositeCompletedAttemptObserver(
             attempt_quotas,
             accounting,
+            *( (LocalAttemptReportingObserver(session_factory, environment="local"),)
+               if allow_test_provider else () ),
         ),
         pre_dispatch_gate=attempt_quotas,
     )

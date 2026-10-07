@@ -3,6 +3,10 @@
     admin off
 }
 
+http://127.0.0.1:8080 {
+    respond /health/live "ok" 200
+}
+
 https://localhost:8443 {
     tls internal
 
@@ -17,11 +21,13 @@ https://localhost:8443 {
         reverse_proxy local-idp:9000
     }
 
-    handle /backoffice/* {
+    @backoffice path /backoffice /backoffice/*
+    handle @backoffice {
         reverse_proxy backoffice:8100
     }
 
-    handle /portal/* {
+    @portal path /portal /portal/*
+    handle @portal {
         reverse_proxy portal:8200
     }
 

@@ -7,8 +7,9 @@ import json
 import sys
 from typing import Any
 
-EXPECTED_SERVICES = {"api", "worker", "scheduler", "migrate", "postgres"}
-RUNTIME_SERVICES = {"api", "worker", "scheduler", "migrate"}
+RUNTIME_SERVICES = {"api", "worker", "scheduler", "migrate", "bootstrap",
+                    "backoffice", "portal", "local-idp"}
+EXPECTED_SERVICES = RUNTIME_SERVICES | {"postgres", "gateway"}
 
 
 def validate_compose(config: dict[str, Any]) -> list[str]:
@@ -29,6 +30,12 @@ def validate_compose(config: dict[str, Any]) -> list[str]:
             errors.append(f"service {name} must not be privileged")
         if service.get("network_mode") == "host":
             errors.append(f"service {name} must not use host networking")
+        for port in service.get("ports", []):
+            if not isinstance(port, dict) or port.get("host_ip") not in {"127.0.0.1", "::1"}:
+                errors.append(f"{name} host port must be loopback-only")
+        if (name in {"backoffice", "portal", "local-idp", "worker", "scheduler"}
+                and service.get("ports")):
+            errors.append(f"{name} must remain private to Compose")
 
     postgres = services.get("postgres", {})
     ports = postgres.get("ports", []) if isinstance(postgres, dict) else []
@@ -68,6 +75,8 @@ def validate_compose(config: dict[str, Any]) -> list[str]:
             errors.append(f"{name} is missing ORQETIA_DATABASE_DSN")
         if environment.get("ORQETIA_SECRET_STORE_MODE") != "local":
             errors.append(f"{name} must use synthetic local secret-store mode")
+        if environment.get("ORQETIA_ENVIRONMENT") != "local":
+            errors.append(f"{name} must be restricted to local environment")
         if any(key.startswith("PROVIDER_") for key in environment):
             errors.append(f"{name} must not receive provider credentials in baseline Compose")
 

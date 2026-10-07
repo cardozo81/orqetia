@@ -11,15 +11,16 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import secrets
 import time
 from dataclasses import dataclass
-from pathlib import Path
 from datetime import UTC, datetime
 from html import escape
-from urllib.parse import urlencode
+from pathlib import Path
+from urllib.parse import parse_qs, urlencode, urlsplit
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from orqetia.identity import HumanAuthenticationContext
@@ -36,6 +37,8 @@ LOCAL_OIDC_ISSUER = "https://orqetia.local/dev-idp"
 LOCAL_OIDC_SIGNING_KEY_PATH = Path(
     "/var/lib/orqetia/bootstrap/local-oidc-signing.key"
 )
+LOCAL_LOGIN_TOKENS_PATH = Path("/var/lib/orqetia/bootstrap/local-login-tokens.json")
+LOCAL_USED_CODES_PATH = Path("/var/lib/orqetia/oidc-used")
 _LOCAL_ENVIRONMENTS = frozenset({"local", "test"})
 _TOKEN_TTL_SECONDS = 300
 
@@ -127,6 +130,8 @@ def _sign(payload: dict[str, object], key: bytes) -> str:
 
 
 def _verify(token: str, key: bytes) -> dict[str, object]:
+    if not token.isascii():
+        raise ValueError("invalid local OIDC token encoding")
     try:
         body, signature = token.split(".", 1)
     except ValueError as error:
@@ -190,8 +195,7 @@ class _LocalBrokerBase:
         challenge = _b64encode(
             hashlib.sha256(verifier.encode("ascii")).digest()
         )
-        transaction = _sign(
-            {
+        payload: dict[str, object] = {
                 "v": 1,
                 "kind": "transaction",
                 "issuer": LOCAL_OIDC_ISSUER,
@@ -202,14 +206,14 @@ class _LocalBrokerBase:
                 "code_challenge": challenge,
                 "iat": now,
                 "exp": now + _TOKEN_TTL_SECONDS,
-            },
-            self._key,
-        )
+            }
+        transaction = _sign(payload, self._key)
         authorization_url = (
             f"{self._idp_public_url}/authorize?"
             + urlencode({"transaction": transaction})
         )
-        return authorization_url, transaction
+        # Only the HttpOnly BFF transaction cookie contains the verifier.
+        return authorization_url, _sign({**payload, "code_verifier": verifier}, self._key)
 
     def _complete(
         self,
@@ -231,6 +235,10 @@ class _LocalBrokerBase:
                 raise ValueError("callback mismatch")
             if _require_string(transaction, "state") != state:
                 raise ValueError("state mismatch")
+            verifier = _require_string(transaction, "code_verifier")
+            challenge = _b64encode(hashlib.sha256(verifier.encode("ascii")).digest())
+            if not hmac.compare_digest(challenge, _require_string(transaction, "code_challenge")):
+                raise ValueError("PKCE challenge mismatch")
 
             authorization = _verify(code, self._key)
             _require_current(authorization)
@@ -244,15 +252,28 @@ class _LocalBrokerBase:
                 transaction, "nonce"
             ):
                 raise ValueError("nonce mismatch")
-            transaction_hash = hashlib.sha256(
-                transaction_token.encode("utf-8")
-            ).hexdigest()
+            public_transaction = _sign(
+                {k: v for k, v in transaction.items() if k != "code_verifier"}, self._key,
+            )
+            transaction_hash = hashlib.sha256(public_transaction.encode("utf-8")).hexdigest()
             if _require_string(authorization, "transaction_hash") != transaction_hash:
                 raise ValueError("authorization transaction mismatch")
             subject = _require_string(authorization, "subject")
             authenticated_at_raw = authorization.get("authenticated_at")
             if not isinstance(authenticated_at_raw, int):
                 raise ValueError("authenticated_at is invalid")
+            if not 0 <= int(time.time()) - authenticated_at_raw <= _TOKEN_TTL_SECONDS:
+                raise ValueError("authentication time is invalid")
+            LOCAL_USED_CODES_PATH.mkdir(mode=0o700, parents=True, exist_ok=True)
+            try:
+                descriptor = os.open(
+                    LOCAL_USED_CODES_PATH / transaction_hash,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600,
+                )
+            except FileExistsError as error:
+                raise ValueError("authorization transaction already consumed") from error
+            else:
+                os.close(descriptor)
         except ValueError as error:
             raise PermissionError(str(error)) from error
 
@@ -386,33 +407,46 @@ def create_local_oidc_app(
             if profile.audience == audience
         )
         links = "".join(
-            "<li><a href='/select?"
-            + escape(
-                urlencode(
-                    {
-                        "transaction": transaction,
-                        "profile": profile.profile_id,
-                    }
-                ),
-                quote=True,
-            )
-            + "'>"
+            "<option value='" + escape(profile.profile_id, quote=True) + "'>"
             + escape(profile.display_name)
-            + "</a></li>"
+            + "</option>"
             for profile in profiles
         )
         return HTMLResponse(
             "<!doctype html><html><head><title>ORQETIA Local Login</title>"
             "</head><body><main><h1>ORQETIA Local Login</h1>"
-            "<p>Development identity provider. No external credentials are used.</p>"
-            f"<ul>{links}</ul></main></body></html>"
+            "<p>LOCAL/TEST synthetic identity broker. MFA is simulated for homologation.</p>"
+            "<form method='post' action='/dev-idp/select'>"
+            f"<input type='hidden' name='transaction' value='{escape(transaction, quote=True)}'>"
+            f"<label>Identity <select name='profile'>{links}</select></label>"
+            "<label>Local access token <input type='password' name='access_token' "
+            "autocomplete='off' required></label><button>Login</button>"
+            "</form></main></body></html>"
         )
 
-    @app.get("/select")
-    async def select_profile(
-        transaction: str = Query(min_length=20, max_length=4096),
-        profile: str = Query(min_length=1, max_length=100),
-    ) -> RedirectResponse:
+    @app.post("/select")
+    async def select_profile(request: Request) -> RedirectResponse:
+        # Capability for this local installation, never a product password protocol.
+        # No access token travels in URLs, cookies, or logs.
+        allowed_origins = {
+            f"{urlsplit(callback).scheme}://{urlsplit(callback).netloc}"
+            for callback in callbacks
+        }
+        if request.headers.get("origin") not in allowed_origins:
+            raise HTTPException(status_code=403, detail="invalid origin")
+        if request.headers.get("sec-fetch-site") not in {None, "same-origin"}:
+            raise HTTPException(status_code=403, detail="invalid fetch origin")
+        body = await request.body()
+        if len(body) > 8192:
+            raise HTTPException(status_code=413, detail="login form too large")
+        form = parse_qs(body.decode("utf-8"), max_num_fields=4)
+        transaction = form.get("transaction", [""])[0]
+        profile = form.get("profile", [""])[0]
+        supplied = form.get("access_token", [""])[0]
+        tokens = json.loads(LOCAL_LOGIN_TOKENS_PATH.read_text(encoding="utf-8"))
+        expected = tokens.get(profile)
+        if not isinstance(expected, str) or not hmac.compare_digest(supplied, expected):
+            raise HTTPException(status_code=403, detail="invalid local login")
         payload = transaction_payload(transaction)
         audience = _require_string(payload, "audience")
         selected = next(

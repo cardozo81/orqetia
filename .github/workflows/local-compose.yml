@@ -33,61 +33,16 @@ jobs:
       - name: Build locked non-root runtime image
         run: docker compose build
 
-      - name: Start local stack
-        run: docker compose up -d postgres api worker scheduler
+      - name: Start all local processes and wait for health
+        run: docker compose up -d --wait --wait-timeout 120
 
-      - name: Apply migrations explicitly
-        run: docker compose run --rm migrate
-
-      - name: Verify services and migrated schemas
+      - name: Install locked acceptance dependencies
         run: |
-          python3 - <<'PY'
-          import subprocess
-          expected = {"postgres", "api", "worker", "scheduler"}
-          actual = set(
-              subprocess.check_output(
-                  ["docker", "compose", "ps", "--status", "running", "--services"],
-                  text=True,
-              ).split()
-          )
-          missing = expected - actual
-          if missing:
-              raise SystemExit(f"services not running: {sorted(missing)}")
-          PY
-          docker compose exec -T postgres             psql -U orqetia -d orqetia -Atc             "SELECT count(*) FROM information_schema.schemata WHERE schema_name IN ('identity','control','execution','accounting','estimation','audit','readmodel','messaging');"             | grep -qx "8"
+          python3 -m pip install --disable-pip-version-check "uv==0.10.0"
+          uv sync --locked --python 3.14
 
-      - name: Verify canonical OpenAPI from Uvicorn
-        run: |
-          python3 - <<'PY'
-          import json
-          import time
-          import urllib.request
-
-          expected = json.load(open("contracts/openapi/orqetia-v1.openapi.json", encoding="utf-8"))
-          last_error = None
-          for _ in range(20):
-              try:
-                  with urllib.request.urlopen("http://127.0.0.1:8000/openapi.json", timeout=2) as response:
-                      actual = json.load(response)
-                  if actual != expected:
-                      raise SystemExit("served OpenAPI differs from canonical contract")
-                  break
-              except Exception as exc:
-                  last_error = exc
-                  time.sleep(1)
-          else:
-              raise SystemExit(f"API did not become ready: {last_error}")
-          PY
-
-      - name: Clean process restart smoke
-        run: |
-          docker compose restart worker scheduler
-          sleep 2
-          docker compose ps --status running --services | grep -qx "worker"
-          docker compose ps --status running --services | grep -qx "scheduler"
-          docker compose down
-          docker compose up -d postgres api worker scheduler
-          docker compose ps --status running --services | grep -qx "api"
+      - name: Real HTTPS acceptance, restart and persistent down/up
+        run: uv run --no-sync --python 3.14 python scripts/accept_local.py --with-recovery
 
       - name: Cleanup
         if: always()

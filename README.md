@@ -36,6 +36,11 @@ External Clients┘        │
 
 Development starts locally with containers and must remain deployable later as a permanent public web service.
 
+Start the operational DEVELOPMENT stack with the
+[Windows Docker runbook](docs/development/local-compose.md). It includes local
+HTTPS, bootstrap access, recovery and synthetic-provider acceptance. The
+[endpoint map](docs/development/local-endpoints.md) lists Client API and human routes.
+
 ## Product boundaries
 
 ### Backoffice
