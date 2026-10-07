@@ -53,14 +53,18 @@ class ProviderAccount:
         ):
             if not value.strip() or len(value) > maximum:
                 raise ValueError(f"{field_name} must contain 1..{maximum} characters")
-        for field_name, value, maximum in (
+        for field_name, optional_value, maximum in (
             ("commercial_mode", self.commercial_mode, 100),
             ("commercial_tier", self.commercial_tier, 100),
             ("region", self.region, 100),
             ("contract_reference", self.contract_reference, 300),
         ):
-            if value is not None and (not value.strip() or len(value) > maximum):
-                raise ValueError(f"{field_name} must contain 1..{maximum} characters when present")
+            if optional_value is not None and (
+                not optional_value.strip() or len(optional_value) > maximum
+            ):
+                raise ValueError(
+                    f"{field_name} must contain 1..{maximum} characters when present"
+                )
         if self.priority < 0:
             raise ValueError("priority cannot be negative")
         if self.state_version < 1:
