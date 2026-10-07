@@ -47,20 +47,20 @@ class ProviderAccount:
     state_version: int = 1
 
     def __post_init__(self) -> None:
-        for field, value, maximum in (
+        for field_name, value, maximum in (
             ("provider_id", self.provider_id, 100),
             ("display_label", self.display_label, 200),
         ):
             if not value.strip() or len(value) > maximum:
-                raise ValueError(f"{field} must contain 1..{maximum} characters")
-        for field, value, maximum in (
+                raise ValueError(f"{field_name} must contain 1..{maximum} characters")
+        for field_name, value, maximum in (
             ("commercial_mode", self.commercial_mode, 100),
             ("commercial_tier", self.commercial_tier, 100),
             ("region", self.region, 100),
             ("contract_reference", self.contract_reference, 300),
         ):
             if value is not None and (not value.strip() or len(value) > maximum):
-                raise ValueError(f"{field} must contain 1..{maximum} characters when present")
+                raise ValueError(f"{field_name} must contain 1..{maximum} characters when present")
         if self.priority < 0:
             raise ValueError("priority cannot be negative")
         if self.state_version < 1:

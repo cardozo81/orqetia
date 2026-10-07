@@ -9,6 +9,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import RowMapping
+from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from orqetia.usage_accounting import NativeUsageQuantity
@@ -160,7 +161,7 @@ class PostgresReportRollupStore:
     ) -> tuple[ReportRollup, ...]:
         if limit < 1 or limit > REPORT_STORE_MAX_ROWS:
             raise ValueError("report query limit outside allowed range")
-        conditions: list[object] = []
+        conditions: list[ColumnElement[bool]] = []
         if filters.period_from is not None:
             conditions.append(report_rollups.c.period_end > filters.period_from)
         if filters.period_to is not None:

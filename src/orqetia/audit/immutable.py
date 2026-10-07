@@ -83,7 +83,7 @@ class ImmutableAuditEvent:
     resource_id: str | None = None
 
     def __post_init__(self) -> None:
-        for field, value, maximum in (
+        for field_name, value, maximum in (
             ("action", self.action, 100),
             ("result", self.result, 40),
             ("correlation_id", self.correlation_id, 200),
@@ -91,8 +91,8 @@ class ImmutableAuditEvent:
         ):
             normalized = value.strip()
             if not normalized or len(normalized) > maximum:
-                raise ValueError(f"{field} must contain 1..{maximum} characters")
-        for field, value, maximum in (
+                raise ValueError(f"{field_name} must contain 1..{maximum} characters")
+        for field_name, value, maximum in (
             ("actor_type", self.actor_type, 60),
             ("actor_id", self.actor_id, 500),
             ("resource_type", self.resource_type, 100),
@@ -101,16 +101,16 @@ class ImmutableAuditEvent:
             if value is not None and (
                 not value.strip() or len(value) > maximum
             ):
-                raise ValueError(f"{field} must contain 1..{maximum} characters")
+                raise ValueError(f"{field_name} must contain 1..{maximum} characters")
         if self.retention_policy_version < 1:
             raise ValueError("retention policy version must be positive")
-        for field, value in (
+        for timestamp_name, timestamp in (
             ("occurred_at", self.occurred_at),
             ("recorded_at", self.recorded_at),
             ("retain_until", self.retain_until),
         ):
-            if value.tzinfo is None or value.utcoffset() is None:
-                raise ValueError(f"{field} must be timezone-aware")
+            if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+                raise ValueError(f"{timestamp_name} must be timezone-aware")
         if self.recorded_at < self.occurred_at:
             raise ValueError("recorded_at cannot precede occurred_at")
         if self.retain_until <= self.occurred_at:

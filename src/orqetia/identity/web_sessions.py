@@ -48,20 +48,25 @@ class BackofficeWebSession:
     version: int = 1
 
     def __post_init__(self) -> None:
-        for field, value in (("token_hash", self.token_hash), ("csrf_hash", self.csrf_hash)):
-            if len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
-                raise ValueError(f"{field} must be lowercase SHA-256 hex")
+        for hash_name, hash_value in (
+            ("token_hash", self.token_hash),
+            ("csrf_hash", self.csrf_hash),
+        ):
+            if len(hash_value) != 64 or any(
+                char not in "0123456789abcdef" for char in hash_value
+            ):
+                raise ValueError(f"{hash_name} must be lowercase SHA-256 hex")
         if not self.issuer.strip() or not self.subject.strip():
             raise ValueError("session issuer/subject are required")
-        for field, value in (
+        for timestamp_name, timestamp in (
             ("authenticated_at", self.authenticated_at),
             ("created_at", self.created_at),
             ("last_activity_at", self.last_activity_at),
             ("absolute_expires_at", self.absolute_expires_at),
             ("revoked_at", self.revoked_at),
         ):
-            if value is not None:
-                _aware(value, field)
+            if timestamp is not None:
+                _aware(timestamp, timestamp_name)
         if self.absolute_expires_at <= self.created_at:
             raise ValueError("absolute session expiry must follow creation")
         if self.last_activity_at < self.created_at:

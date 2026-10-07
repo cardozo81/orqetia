@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import cast
 from uuid import UUID, uuid7
 
@@ -79,7 +80,7 @@ class PostgresClientCredentialStore:
         credential: ClientAccessCredential,
         key_hash: str,
         request_fingerprint: str,
-        occurred_at,
+        occurred_at: datetime,
     ) -> tuple[ClientAccessCredential, bool]:
         async with self._sessions.begin() as database:
             replay_id = await _claim_operation(
@@ -103,7 +104,7 @@ class PostgresClientCredentialStore:
         credential: ClientAccessCredential,
         key_hash: str,
         request_fingerprint: str,
-        occurred_at,
+        occurred_at: datetime,
     ) -> tuple[ClientAccessCredential, bool]:
         async with self._sessions.begin() as database:
             replay_id = await _claim_operation(
@@ -135,7 +136,7 @@ class PostgresClientCredentialStore:
         credential: ClientAccessCredential,
         key_hash: str,
         request_fingerprint: str,
-        occurred_at,
+        occurred_at: datetime,
     ) -> tuple[ClientAccessCredential, bool]:
         async with self._sessions.begin() as database:
             replay_id = await _claim_operation(
@@ -194,7 +195,7 @@ class PostgresClientCredentialStore:
         self,
         *,
         credential_id: UUID,
-        occurred_at,
+        occurred_at: datetime,
     ) -> None:
         statement = (
             sa.update(client_access_credentials)
@@ -203,11 +204,11 @@ class PostgresClientCredentialStore:
                 last_used_at=sa.case(
                     (
                         client_access_credentials.c.last_used_at.is_(None),
-                        occurred_at,
+                        occurred_at: datetime,
                     ),
                     (
                         client_access_credentials.c.last_used_at < occurred_at,
-                        occurred_at,
+                        occurred_at: datetime,
                     ),
                     else_=client_access_credentials.c.last_used_at,
                 )
@@ -227,7 +228,7 @@ async def _claim_operation(
     operation: CredentialOperation,
     key_hash: str,
     request_fingerprint: str,
-    occurred_at,
+    occurred_at: datetime,
 ) -> UUID | None:
     statement = (
         insert(client_credential_operations)
