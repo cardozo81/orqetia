@@ -78,7 +78,24 @@ class FakeAttemptStore:
         result: ProviderAttemptResult,
         occurred_at: datetime,
     ) -> bool:
-        del scope, attempt_id, work_id, result, occurred_at
+        if scope != self._attempt.ownership or attempt_id != self._attempt.attempt_id:
+            raise AssertionError("unexpected ownership/attempt")
+        self._attempt = replace(
+            self._attempt,
+            status=ProviderAttemptStatus.COMPLETED,
+            dispatch_work_id=work_id,
+            provider_outcome=result.outcome.value,
+            accepted_requirements=result.accepted_requirements,
+            missing_requirements=result.missing_requirements,
+            response_reference=result.response_reference,
+            error_class=result.error_class,
+            retry_after_seconds=result.retry_after_seconds,
+            latency_ms=result.latency_ms,
+            usage=result.usage,
+            updated_at=occurred_at,
+            terminal_at=occurred_at,
+            version=3,
+        )
         self.completed = True
         return True
 
