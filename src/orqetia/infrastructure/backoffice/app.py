@@ -29,6 +29,7 @@ from orqetia.control_plane.provider_catalog_postgres import (
     decode_provider_endpoints,
 )
 from orqetia.identity import (
+    AuthenticatedWebSession,
     BackofficeAuthorizationService,
     BackofficeBindingStatus,
     BackofficeRole,
@@ -136,7 +137,7 @@ def create_backoffice_app(
             )
         return response
 
-    async def authenticated(request: Request):
+    async def authenticated(request: Request) -> AuthenticatedWebSession:
         token = request.cookies.get(_SESSION_COOKIE, "")
         if not token:
             raise WebSessionRejected("Backoffice session required")
@@ -167,7 +168,10 @@ def create_backoffice_app(
             raise BackofficeUnavailable("Backoffice administrative services unavailable")
         return admin
 
-    async def authorized_read(request: Request, permission: str):
+    async def authorized_read(
+        request: Request,
+        permission: str,
+    ) -> AuthenticatedWebSession:
         authenticated_session = await authenticated(request)
         if permission not in authenticated_session.principal.permissions:
             raise PermissionError("Backoffice permission denied")
@@ -176,7 +180,7 @@ def create_backoffice_app(
     async def authorized_mutation(
         request: Request,
         permission: str,
-    ):
+    ) -> tuple[AuthenticatedWebSession, dict[str, str]]:
         require_same_origin(request)
         authenticated_session = await authenticated(request)
         data = await form_data(request)

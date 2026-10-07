@@ -538,7 +538,7 @@ def _matches(item: ReportRollup, filters: ReportQuery) -> bool:
         return False
     if filters.period_to is not None and item.period_start >= filters.period_to:
         return False
-    for field in (
+    for field_name in (
         "tenant_id",
         "client_id",
         "client_credential_id",
@@ -553,8 +553,8 @@ def _matches(item: ReportRollup, filters: ReportQuery) -> bool:
         "status",
         "error_class",
     ):
-        expected = getattr(filters, field)
-        if expected is not None and getattr(item, field) != expected:
+        expected = getattr(filters, field_name)
+        if expected is not None and getattr(item, field_name) != expected:
             return False
     return True
 

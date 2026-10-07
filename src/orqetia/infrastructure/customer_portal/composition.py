@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from uuid import uuid7
+from uuid import UUID, uuid7
+
+from fastapi import FastAPI
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -97,8 +99,8 @@ class _EffectivePolicyResolver:
     async def resolve_effective(
         self,
         *,
-        tenant_id,
-        client_id,
+        tenant_id: UUID,
+        client_id: UUID,
     ) -> EffectiveExecutionPolicy:
         effective = await self._repository.get_effective(
             tenant_id=tenant_id,
@@ -128,7 +130,7 @@ def build_customer_portal_app(
     client_openapi_document: dict[str, object],
     estimation: EstimateService | None = None,
     enable_hsts: bool = False,
-):
+) -> FastAPI:
     """Compose PostgreSQL-owned Portal services around explicit external ports."""
 
     activity = PostgresCustomerActivityStore(session_factory)

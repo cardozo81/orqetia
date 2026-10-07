@@ -14,6 +14,8 @@ from orqetia.control_plane import (
     PostgresQuotaPolicyRepository,
     ProviderAccountService,
     ProviderSecretStore,
+    SecretReference,
+    SecretValue,
 )
 from orqetia.execution import (
     PostgresExecutionSessionStore,
@@ -56,15 +58,15 @@ SessionFactory = async_sessionmaker[AsyncSession]
 class UnavailableProviderSecretStore:
     """Fail-closed placeholder used until a deployable secret backend is injected."""
 
-    async def put(self, secret):
+    async def put(self, secret: SecretValue) -> SecretReference:
         del secret
         raise RuntimeError("provider secret store is not configured")
 
-    async def get(self, reference):
+    async def get(self, reference: SecretReference) -> SecretValue:
         del reference
         raise LookupError("provider secret store is not configured")
 
-    async def delete(self, reference):
+    async def delete(self, reference: SecretReference) -> None:
         del reference
         raise RuntimeError("provider secret store is not configured")
 

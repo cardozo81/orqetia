@@ -28,11 +28,14 @@ from orqetia.estimation import (
 from orqetia.execution import OwnershipScope
 from orqetia.identity import (
     ClientAccessCredentialService,
+    CredentialMutationResult,
+    CustomerPrincipal,
     IdempotencyConflict,
 )
 from orqetia.identity.backoffice_authz import HumanAuthenticationContext
 from orqetia.identity.customer_authz import CustomerAuthorizationService
 from orqetia.identity.customer_web_sessions import (
+    AuthenticatedCustomerPortalSession,
     CustomerPortalWebSessionService,
 )
 from orqetia.identity.web_sessions import WebSessionRejected
@@ -165,7 +168,9 @@ def create_customer_portal_app(
         except ValueError as error:
             raise ValueError(f"{field} must be a UUID") from error
 
-    async def authenticated(request: Request):
+    async def authenticated(
+        request: Request,
+    ) -> AuthenticatedCustomerPortalSession:
         token = request.cookies.get(_SESSION_COOKIE, "")
         if not token:
             raise WebSessionRejected("Customer Portal session required")
@@ -174,7 +179,10 @@ def create_customer_portal_app(
             occurred_at=datetime.now(UTC),
         )
 
-    async def authorized(request: Request, permission: str):
+    async def authorized(
+        request: Request,
+        permission: str,
+    ) -> AuthenticatedCustomerPortalSession:
         current = await authenticated(request)
         authorization.require_permission(
             principal=current.principal,
@@ -244,7 +252,7 @@ def create_customer_portal_app(
         return activity
 
     async def record_activity(
-        current,
+        current: AuthenticatedCustomerPortalSession,
         *,
         action: str,
         resource_type: str | None = None,
@@ -289,7 +297,7 @@ def create_customer_portal_app(
             output.add("estimates:write")
         return frozenset(output)
 
-    def ownership(principal) -> OwnershipScope:
+    def ownership(principal: CustomerPrincipal) -> OwnershipScope:
         return OwnershipScope(
             tenant_id=principal.tenant_id,
             client_id=principal.client_id,
@@ -298,7 +306,7 @@ def create_customer_portal_app(
     async def authorized_mutation(
         request: Request,
         permission: str,
-    ):
+    ) -> tuple[AuthenticatedCustomerPortalSession, dict[str, str]]:
         require_same_origin(request)
         current = await authenticated(request)
         authorization.require_permission(
@@ -1362,7 +1370,7 @@ def create_customer_portal_app(
     def one_time_secret_page(
         *,
         title: str,
-        result,
+        result: CredentialMutationResult,
         permissions: frozenset[str],
     ) -> HTMLResponse:
         secret = (
