@@ -26,6 +26,10 @@ class ProcessRole(StrEnum):
     API = "api"
     WORKER = "worker"
     SCHEDULER = "scheduler"
+    BACKOFFICE = "backoffice"
+    PORTAL = "portal"
+    LOCAL_IDP = "local_idp"
+    BOOTSTRAP = "bootstrap"
 
 
 class SecretStoreMode(StrEnum):
@@ -63,6 +67,7 @@ class RuntimeSettings(BaseSettings):
     secret_store_mode: SecretStoreMode = SecretStoreMode.NONE
     secret_store_ref: str | None = None
     root_kek_ref: str | None = None
+    local_oidc_signing_key: SecretStr | None = None
 
     worker_concurrency: int = Field(default=4, ge=1, le=256)
     work_lease_seconds: int = Field(default=60, ge=5, le=3600)
@@ -151,6 +156,9 @@ class RuntimeSettings(BaseSettings):
         if self.environment is not Environment.PRODUCTION:
             return self
 
+        if self.local_oidc_signing_key is not None:
+            raise ValueError("local OIDC signing key is forbidden in production")
+
         if self.debug:
             raise ValueError("debug must be disabled in production")
 
@@ -189,6 +197,9 @@ class RuntimeSettings(BaseSettings):
             "secret_store_mode": self.secret_store_mode.value,
             "secret_store_ref": self.secret_store_ref,
             "root_kek_ref": self.root_kek_ref,
+            "local_oidc_signing_key": (
+                None if self.local_oidc_signing_key is None else "[REDACTED]"
+            ),
             "worker_concurrency": self.worker_concurrency,
             "work_lease_seconds": self.work_lease_seconds,
             "queue_poll_interval_seconds": self.queue_poll_interval_seconds,
