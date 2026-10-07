@@ -74,7 +74,7 @@ jobs:
             tests/usage_accounting/test_quotas.py::test_hard_limit_reserves_atomically_and_rejects_over_limit \
             tests/control_plane/test_provider_accounts.py::test_select_credential_respects_account_priority_status_and_expiry \
             tests/backoffice/test_security_shell.py::test_oidc_login_creates_secure_server_side_session_and_home \
-            tests/portal/test_security_shell.py::test_customer_portal_security_shell_and_viewer_navigation \
+            tests/portal/test_customer_portal_security_shell.py::test_customer_portal_security_shell_and_viewer_navigation \
             tests/security/test_pre_rc_security_pack.py::test_security_pack_maps_material_m9_controls_to_targeted_tests \
             tests/observability/test_operational_policy.py::OperationalObservabilityPolicyTests::test_metric_contracts_have_explicit_bounded_cardinality_budgets \
             tests/docs/test_client_api_manual.py::test_auto_and_explicit_quickstarts_match_http_model \
