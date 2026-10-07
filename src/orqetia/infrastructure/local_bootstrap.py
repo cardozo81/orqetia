@@ -45,7 +45,10 @@ from orqetia.identity import (
     StoredClientCredentialAuthenticator,
 )
 from orqetia.infrastructure.local_audit import LocalJsonlAuditSink
-from orqetia.infrastructure.local_oidc import LOCAL_OIDC_ISSUER
+from orqetia.infrastructure.local_oidc import (
+    LOCAL_OIDC_ISSUER,
+    LOCAL_OIDC_SIGNING_KEY_PATH,
+)
 from orqetia.providers import (
     ORQETIA_TEST_PROVIDER,
     AdapterResolution,
@@ -91,6 +94,28 @@ _READ_SCOPES = (
 class BootstrapResult:
     manifest_path: Path
     token_path: Path
+
+
+def ensure_local_oidc_signing_key() -> Path:
+    """Create the local IdP key once with private permissions."""
+
+    path = LOCAL_OIDC_SIGNING_KEY_PATH
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if path.exists():
+        value = path.read_text(encoding="utf-8").strip()
+        if len(value.encode("utf-8")) < 32:
+            raise RuntimeError("persisted local OIDC signing key is invalid")
+        os.chmod(path, 0o600)
+        return path
+
+    value = secrets.token_urlsafe(48) + "\\n"
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        os.write(descriptor, value.encode("utf-8"))
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    return path
 
 
 def _atomic_private_json(path: Path, payload: dict[str, object]) -> None:
