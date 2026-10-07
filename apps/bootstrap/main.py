@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from orqetia.infrastructure.local_bootstrap import bootstrap_local
+from orqetia.infrastructure.local_bootstrap import (\n    bootstrap_local,\n    ensure_local_oidc_signing_key,\n)
 from orqetia.infrastructure.local_secrets import LocalFileProviderSecretStore
 from orqetia.infrastructure.persistence import create_engine, create_session_factory
 from orqetia.settings import (
