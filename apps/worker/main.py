@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from orqetia.control_plane import ProviderSecretStore
 from orqetia.infrastructure.availability import (
     MaintenanceMode,
     OperationalAvailabilityController,
@@ -43,7 +44,7 @@ async def amain() -> None:
         Environment.LOCAL,
         Environment.TEST,
     }
-    secret_store = None
+    secret_store: ProviderSecretStore | None = None
     if settings.secret_store_mode is SecretStoreMode.LOCAL:
         if not allow_test_provider:
             raise RuntimeError(
