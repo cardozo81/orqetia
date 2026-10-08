@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID, uuid7
 
+import pytest
 from fastapi.testclient import TestClient
 
 from orqetia.identity.backoffice_authz import HumanAuthenticationContext
@@ -126,6 +127,7 @@ def test_customer_portal_security_shell_and_viewer_navigation() -> None:
     response = client.get("/portal")
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
+    assert response.headers["referrer-policy"] == "strict-origin"
     assert response.headers["x-frame-options"] == "DENY"
     assert response.headers["strict-transport-security"].startswith(
         "max-age=31536000"
@@ -144,14 +146,15 @@ def test_customer_portal_security_shell_and_viewer_navigation() -> None:
     assert "pricing" not in body.lower()
 
 
-def test_customer_portal_rejects_cross_origin_mutation() -> None:
+@pytest.mark.parametrize("origin", ["https://evil.example", "null"])
+def test_customer_portal_rejects_cross_origin_mutation(origin: str) -> None:
     client = _client(CustomerRole.OWNER)
     _login(client)
 
     response = client.post(
         "/portal/logout",
         headers={
-            "origin": "https://evil.example",
+            "origin": origin,
             "sec-fetch-site": "cross-site",
         },
         data={"csrf_token": "irrelevant"},

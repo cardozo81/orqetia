@@ -14,7 +14,6 @@ https://localhost:8443 {
         -Server
         X-Content-Type-Options "nosniff"
         X-Frame-Options "DENY"
-        Referrer-Policy "no-referrer"
     }
 
     handle_path /dev-idp/* {

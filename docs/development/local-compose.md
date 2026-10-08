@@ -194,3 +194,22 @@ unavailable without an actual eligible cohort.
 
 Browser visual acceptance remains separately gated by human CA trust. Passing
 HTTP acceptance alone does not mean the browser trusts this installation's CA.
+
+## Browser form authentication
+
+The IdP, Backoffice and Portal send `Referrer-Policy: strict-origin`. This
+preserves the browser Origin on same-origin form POSTs while excluding paths
+and query strings from Referer, including OIDC callback codes. No referrer is
+sent on HTTPS-to-HTTP downgrade. The gateway preserves each application's
+policy; the machine API retains `no-referrer`.
+
+Do not use `no-referrer` on these form pages: Chromium submits `Origin: null`
+for non-CORS form POSTs, which the strict origin guard correctly rejects.
+Do not fix this by allowing a null Origin or disabling CSRF/browser protection.
+
+Browser qualification on 2026-10-08 confirmed Backoffice ADMIN and Portal
+VIEWER, DEVELOPER (Operator), and OWNER (Admin). The Operator created a session
+and completed a synthetic task; Admin inspected credentials, usage and activity,
+submitted a provider-free estimate, and received Not found for a Tenant B session.
+The prior HTTP recovery/persistence acceptance remains complementary evidence.
+Local MFA is simulated; this is not production identity-provider qualification.

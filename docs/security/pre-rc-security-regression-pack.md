@@ -26,7 +26,7 @@ the full test suite, call real providers or require a paid security service.
 
 ~~~text
 tests/identity/test_customer_authz.py::test_browser_selected_owner_cannot_escape_exact_membership
-tests/portal/test_security_shell.py::test_customer_portal_rejects_cross_origin_mutation
+tests/portal/test_customer_portal_security_shell.py::test_customer_portal_rejects_cross_origin_mutation
 tests/identity/test_customer_authz.py::test_credential_write_requires_recent_mfa_but_read_does_not
 tests/identity/test_client_credentials.py::test_issue_idempotency_replays_without_revealing_secret_again
 tests/control_plane/test_provider_catalog_admin.py::test_endpoint_metadata_is_admin_only_and_rejects_unsafe_urls
