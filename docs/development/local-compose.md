@@ -126,6 +126,47 @@ Record the fingerprint before deleting `caddy_data`: a replacement volume create
 a different CA. Automated HTTP acceptance trusts the exported CA only in its own
 Python TLS context; it neither changes Windows trust nor disables verification.
 
+## Incremental GitHub-to-Docker synchronization
+
+The Windows quick start above is for first installation. For updates, verify
+the exact approved remote commit and the local working tree **before** modifying
+a running stack. Never discard an unknown local change or reset a working copy.
+
+```powershell
+Set-Location C:\\IA-PROJETOS\\github\\orqetia
+git status --short
+git fetch origin main
+git rev-parse origin/main
+git merge --ff-only origin/main
+docker compose config --quiet
+```
+
+Stop if `git status --short` reports unexpected changes or if the fetch,
+fast-forward or Compose validation fails. Verify that `origin/main` matches
+the reviewed commit. For **documentation-only** revisions, do not rebuild,
+recreate, migrate or bootstrap containers; use read-only health checks.
+
+For code/image changes, first review the Git diff, `compose.yaml`, affected
+services, migration files and environment/secret changes. Record a safe backup
+point before any schema migration. The runtime applications share the
+`orqetia-local-runtime:dev` image: one targeted image build can affect several
+services, so Docker Compose may need to recreate every consumer of that image.
+
+```powershell
+# Only when application/runtime content changed:
+docker compose build api
+# Only if reviewed schema changes require it and compatibility is verified:
+# docker compose run --rm migrate
+docker compose up --no-build -d --wait --wait-timeout 120
+docker compose ps -a
+```
+
+Confirm `migrate` and `bootstrap` one-shot statuses when those services were
+recreated; do not blindly delete/reseed their state. Validate only changed
+surfaces plus basic readiness/HTTPS/login. Preserve named volumes, local CA,
+identities and credential copies. Never run `down -v`, `git reset --hard`,
+a force-push or automatic credential regeneration as an update shortcut.
+
 ## Daily operation and recovery
 
 ```powershell
@@ -192,8 +233,10 @@ unavailable without an actual eligible cohort.
 - Run PostgreSQL integration tests in Linux containers against a separate test
   DB; native Windows psycopg requires a compatible asynchronous event loop.
 
-Browser visual acceptance remains separately gated by human CA trust. Passing
-HTTP acceptance alone does not mean the browser trusts this installation's CA.
+Browser visual acceptance was completed on 2026-10-08 after the local CA was
+explicitly trusted on that Windows installation. On a new host/user profile,
+CA trust and browser acceptance must be verified again; passing HTTP acceptance
+alone never establishes browser trust.
 
 ## Browser form authentication
 

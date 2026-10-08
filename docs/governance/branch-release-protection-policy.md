@@ -25,6 +25,43 @@ Observed through the available GitHub integration:
 Therefore force-push/delete protection must be treated as **not verified**, not as
 enabled.
 
+
+## Read-only reconciliation — 2026-10-08
+
+At `main` HEAD `29d09c99498573fdc3be662ee59de67984fc4a81`:
+
+- GitHub branch metadata reports `protected=false`. No repository rulesets are visible (`[]`).
+- The detailed `main/protection` endpoint still returns HTTP 403 to this integration.
+- All 37 GitHub Actions check-runs completed successfully on that HEAD.
+- The two retained `codex/165-*` branch tips are ancestors of `main`; both corresponding PRs have been merged. Their deletion is not available through the connected GitHub write actions.
+
+The branch metadata is positive evidence that protection is **not enabled**;
+lack of permission to read detailed settings must never be represented as
+a successful protection audit. Repository settings remain a human/admin gate.
+
+### Required-check configuration hazard
+
+The titles listed below identify **workflows**, not necessarily the exact
+status-check contexts to select in repository branch protection. GitHub checks
+are emitted by **jobs** (for example, `baseline` by Security baseline and
+`targeted` by Pre-RC security pack). The generic job name `contract`
+appears in multiple workflows, so selecting that bare context is ambiguous.
+
+Some of the listed workflows are path-filtered (including Pre-RC security pack,
+Schema compatibility, PostgreSQL restore drill and Operational runbook drills).
+A path-skipped workflow does not reliably provide a check-run for an unrelated PR.
+Do **not** mark a path-filtered/ambiguous job as globally required before
+resolving that behavior: it can permanently block normal PR merges.
+
+Before activating repository enforcement, the administrator/development agent
+must map required checks to **unique, reliably emitted** job contexts on both
+relevant PRs and merge candidates, or first implement an always-running
+aggregate verification check without enabling paid execution. Preserve evidence
+for the eight release-critical workflow gates below separately when a
+particular change does not trigger them. Do not weaken the release criteria to
+work around the status-check configuration problem.
+
+
 ## DEVELOPMENT policy
 
 While the project remains DEVELOPMENT and one autonomous agent is the only writer:
