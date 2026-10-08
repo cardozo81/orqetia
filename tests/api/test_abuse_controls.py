@@ -163,8 +163,12 @@ async def test_http_abuse_middleware_returns_sanitized_body_and_complexity_error
         content=b"x" * 65,
     )
     assert oversized.status_code == 413
-    assert oversized.json()["code"] == "REQUEST_BODY_TOO_LARGE"
-    assert "65" not in oversized.text
+    error_body = oversized.json()
+    assert error_body["code"] == "REQUEST_BODY_TOO_LARGE"
+    # The response carries a random correlation ID, which may legitimately contain "65".
+    # Only check attacker-influenced error fields for request-size disclosure.
+    assert "65" not in error_body["message"]
+    assert error_body["details"] == []
 
     complex_payload = b'{"a":{"b":{"c":{"d":1}}}}'
     complex_response = await _request(
