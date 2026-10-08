@@ -32,6 +32,10 @@ async def test_local_login_token_pkce_origin_state_and_durable_replay(tmp_path, 
     assert "code_verifier" in oidc._verify(start.transaction_token, key.encode())
     form = {"transaction": public, "profile": "backoffice-admin", "access_token": token}
     with TestClient(app, base_url=ORIGIN, follow_redirects=False) as client:
+        page = client.get("/authorize", params={"transaction": public})
+        assert page.status_code == 200
+        assert page.headers["referrer-policy"] == "strict-origin"
+        assert client.post("/select", data=form, headers={"Origin": "null"}).status_code == 403
         assert client.get("/select", params=form).status_code == 405
         assert client.post("/select", data=form).status_code == 403
         assert client.post("/select", data=form,

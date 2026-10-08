@@ -117,6 +117,7 @@ async def test_oidc_login_creates_secure_server_side_session_and_home() -> None:
         assert "admin-subject" in home.text
         assert "default-src 'none'" in home.headers["content-security-policy"]
         assert home.headers["cache-control"] == "no-store"
+        assert home.headers["referrer-policy"] == "strict-origin"
         assert "max-age=31536000" in home.headers["strict-transport-security"]
 
 
@@ -139,6 +140,14 @@ async def test_logout_requires_same_origin_and_bound_csrf() -> None:
             follow_redirects=False,
         )
         assert rejected.status_code == 401
+
+        null_origin = await client.post(
+            "/backoffice/logout",
+            headers={"Origin": "null", "Sec-Fetch-Site": "same-origin"},
+            data={"csrf_token": csrf},
+            follow_redirects=False,
+        )
+        assert null_origin.status_code == 401
 
         rejected_csrf = await client.post(
             "/backoffice/logout",
