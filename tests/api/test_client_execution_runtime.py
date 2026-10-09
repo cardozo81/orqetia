@@ -760,4 +760,4 @@ async def test_explicit_target_rejects_unapproved_synchronous_capability() -> No
         key="task-capability-reject",
     )
     assert response.status_code == 403
-    assert queue.items == []
+    assert not queue.items
