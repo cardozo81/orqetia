@@ -328,6 +328,9 @@
           "409": {
             "$ref": "#/components/responses/Conflict"
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
           }
@@ -451,6 +454,9 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
@@ -1343,7 +1349,8 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AttemptSummary"
-            }
+            },
+            "description": "Preview limited to first 100 attempts. Use GET /v1/tasks/{task_id}/attempts for paginated provenance."
           },
           "created_at": {
             "type": "string",
@@ -1578,7 +1585,8 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/UUID"
-            }
+            },
+            "description": "Complete result IDs up to 5,000 attempts; returns 413 READ_LIMIT_EXCEEDED rather than silently truncate on overflow."
           }
         }
       },

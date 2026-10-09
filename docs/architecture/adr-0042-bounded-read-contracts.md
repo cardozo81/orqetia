@@ -17,7 +17,10 @@ State: DEVELOPMENT
 
 - The production Postgres client-facing list now applies SQL `LIMIT (page_size+1)` and `OFFSET` with tenant/client/task predicates before materializing rows, preserving the v1 cursor wire contract and returning a sentinel-based `next_cursor` (first technical increment for #169).
 - Worker replay continues to use the full task-attempt journal, preserving orchestration semantics.
-- Remaining #169 work: replace deep-offset pagination with bounded/keyset reads and bound the result endpoint's `attempt_ids` projection without silent truncation. This increment alone does not close #169.
+- Client list navigation and legacy v1 offset cursors are bounded to 5,000 rows per task. SQL rejects out-of-range offsets and reads at most one sentinel beyond the page. A 5,001st row discovered at the read boundary returns sanitized HTTP 413 `READ_LIMIT_EXCEEDED` instead of signaling a false end-of-results.
+- `GET /v1/tasks/{task_id}/result` loads attempt IDs only, with an ownership-scoped SQL projection and `LIMIT 5001`. When the task has more than 5,000 attempts, HTTP 413 is returned before result artifact lookup; `attempt_ids` are never silently truncated.
+- `GET /v1/tasks/{task_id}` includes at most the first 100 attempt summaries (preview). Use the dedicated paginated attempts endpoint for provenance.
+- The bounded offset policy preserves v1 cursor syntax and worker replay semantics, without changing administrative max attempts/cycles.
 
 Attempt cursors carry a version, offset and SHA-256 query fingerprint derived from
 tenant_id + client_id + task_id. A cursor from another task/owner is rejected as

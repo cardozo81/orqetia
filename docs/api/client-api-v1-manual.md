@@ -305,6 +305,8 @@ curl -sS -X POST   "$ORQETIA_BASE_URL/v1/sessions/$SESSION_ID/tasks"   -H "Autho
 ### GET /v1/tasks/{task_id}
 
 **Finalidade:** consulta estado e provenance client-safe de uma task própria.
+`attempts` traz somente o resumo inicial de até 100 attempts; para paginação, use
+`/v1/tasks/{task_id}/attempts`.
 
 | Item | Contrato |
 | --- | --- |
@@ -326,7 +328,9 @@ curl -sS "$ORQETIA_BASE_URL/v1/tasks/$TASK_ID"   -H "Authorization: Bearer $ORQE
 ### GET /v1/tasks/{task_id}/result
 
 **Finalidade:** retorna o resultado client-safe atual/terminal com accepted/missing
-e attempt_ids.
+e attempt_ids. O conjunto integral de IDs tem limite de 5.000 attempts por task.
+Com mais de 5.000, retorna 413 `READ_LIMIT_EXCEEDED`, sem truncar os IDs.
+Este limite de leitura não modifica o orçamento administrativo de execução.
 
 | Item | Contrato |
 | --- | --- |
@@ -334,7 +338,7 @@ e attempt_ids.
 | Ownership | task deve pertencer ao owner autenticado |
 | Params | task_id UUID |
 | Success | 200 TaskResultView |
-| Erros declarados | 401, 403, 404, 409, 429 |
+| Erros declarados | 401, 403, 404, 409, 413, 429 |
 | Idempotência | Não aplicável |
 | Limites/quota | Artifact retention pode tornar resultado indisponível |
 | Version/deprecation | v1; não deprecated |
@@ -376,9 +380,9 @@ curl -sS -X POST "$ORQETIA_BASE_URL/v1/tasks/$TASK_ID/cancel"   -H "Authorizatio
 | Ownership | task/attempts do owner autenticado |
 | Query | cursor opcional; limit 1..100, default 50 |
 | Success | 200 object com items AttemptView e next_cursor |
-| Erros declarados | 401, 403, 404, 429 |
+| Erros declarados | 400, 401, 403, 404, 413, 429 |
 | Idempotência | Não aplicável |
-| Limites/quota | Paginação determinística |
+| Limites/quota | Paginação determinística; 1..100 por página; máximo de 5.000 attempts por janela. Cursores profundos/excesso retornam 413 `READ_LIMIT_EXCEEDED`. |
 | Version/deprecation | v1; não deprecated |
 
 AttemptView pode conter provider identity client-safe, model, reasoning, status,
