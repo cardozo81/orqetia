@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  contract:
+  observability-contract:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

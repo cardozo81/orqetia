@@ -133,3 +133,76 @@ The agent can verify repository metadata and visible rulesets but cannot current
 read `main` protection or write repository settings with the available connector.
 #162 remains the human/admin gate and blocks first RC/M10 final readiness until the
 settings are applied and verified.
+
+## Staged GitHub administration plan — verified 2026-10-09
+
+This is a **configuration plan**, not evidence that enforcement has been
+activated. As of this audit `main` remains `protected=false`, rulesets `[]`
+and the admin settings write operation is unavailable to the connected agent.
+Following completion of #165, the only remote branch is `main`; both
+`codex/165-*` branches were removed after their merge into `main`.
+The branch HEAD for this inspection was `fe074ee6f8095d0204ca5c33d91c30cd9ac4315d`
+with 36 successful checks and no open PRs.
+
+### Phase A — integrity protection without disrupting single-agent DEVELOPMENT
+
+Using an authorized repository administrator in GitHub:
+`Settings → Rules → Rulesets → New ruleset → New branch ruleset`
+
+1. Set ruleset name `orqetia-main-integrity-development`; enforcement
+   **Active**; target only the default branch (`main`).
+2. Enable **Restrict deletions** and **Block force pushes**.
+3. Do **not** enable **Restrict updates**, **Require a pull request before
+   merging**, **Require status checks**, **Require merge queue**, or a mandatory
+   human review yet. These restrictions may prevent the current single-agent
+   direct-`main` fast-forward workflow.
+4. Do not configure broad bypass actors. If an emergency bypass is objectively
+   necessary, name the actor and record its scope, reason and expiry in #162.
+5. Save; read back the **active** ruleset and branch metadata, and confirm that
+   ordinary non-force direct commits remain permitted. Never test enforcement
+   by attempting a destructive force-push or deleting `main`.
+
+This reduces accidental branch destruction risk during DEVELOPMENT, but **does not
+close #162 or authorize RC** because release required-check enforcement remains
+pending.
+
+### Phase B — first RC requires changing the integration workflow
+
+Before enforcing required checks, migrate the release-candidate integration path
+to a short-lived branch + PR. This is a **deliberate exception** to the normal
+single-agent direct-`main` policy, justified by the RC gate. Required checks may
+block direct pushes because the new commit has not run CI yet.
+
+Current mapping of the eight release-critical **workflow** names to job contexts:
+
+| Release-critical workflow | Status check job context | Present on every ordinary PR to `main`? |
+| --- | --- | --- |
+| Security baseline | `baseline` | Yes |
+| Pre-RC security pack | `targeted` (also used elsewhere) | **No**; path-filtered and ambiguous |
+| Schema compatibility | `compatibility` | **No**; path-filtered |
+| Supply chain | `artifacts` | **No**; path-filtered |
+| PostgreSQL restore drill | `restore` | **No**; path-filtered |
+| Availability policy | `availability-contract` | Yes, with unique job ID after the #162 CI update |
+| Observability contract | `observability-contract` | Yes, with unique job ID after the #162 CI update |
+| Operational runbook drills | `drills` | **No**; path-filtered |
+
+`Phase 1 quality gate` emits the always-on, unambiguous `quality` job as
+an additional general-purpose CI gate. Confirm each job name, GitHub Actions
+source and successful checks on a **representative PR** after the workflow
+renaming before selecting it as required in GitHub settings.
+
+Do **not** globally require `targeted`, `compatibility`, `artifacts`,
+`restore` or `drills` until each is always emitted, uniquely identified
+and validated for the intended PR/release scope. Options for later implementation:
+make each critical workflow unfiltered on PRs (higher CI cost), or implement an
+auditable always-running release gate that executes/evaluates these contracts.
+Merely adding a lightweight green aggregate without actually checking the
+critical controls is **not** acceptable. All eight substantive evidence gates
+remain mandatory for any authorized first RC on its candidate revision.
+
+During Phase B configure required checks **only after** the single-agent
+release-PR workflow and the complete eight-gate enforcement are proven working.
+Keep the minimal release bypass surface explicit. `delete_branch_on_merge=true`
+may be enabled when PR branches are actually used. Record read-back evidence,
+PR behavior and final checked SHA in #162 and #47, then evaluate #164 and #46.
+
