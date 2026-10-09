@@ -3,22 +3,6 @@ name: Pre-RC security pack
 on:
   pull_request:
     branches: [main]
-    paths:
-      - src/orqetia/identity/**
-      - src/orqetia/infrastructure/http/**
-      - src/orqetia/control_plane/**
-      - src/orqetia/audit/**
-      - tests/identity/**
-      - tests/portal/**
-      - tests/api/**
-      - tests/control_plane/**
-      - tests/contracts/**
-      - tests/audit/**
-      - tests/security/**
-      - docs/security/**
-      - scripts/generate_supply_chain_artifacts.py
-      - uv.lock
-      - .github/workflows/pre-rc-security-pack.yml
   push:
     branches: [main]
     paths:
@@ -35,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  targeted:
+  pre-rc-security:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:

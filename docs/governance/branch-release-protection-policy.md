@@ -178,27 +178,31 @@ Current mapping of the eight release-critical **workflow** names to job contexts
 | Release-critical workflow | Status check job context | Present on every ordinary PR to `main`? |
 | --- | --- | --- |
 | Security baseline | `baseline` | Yes |
-| Pre-RC security pack | `targeted` (also used elsewhere) | **No**; path-filtered and ambiguous |
-| Schema compatibility | `compatibility` | **No**; path-filtered |
-| Supply chain | `artifacts` | **No**; path-filtered |
-| PostgreSQL restore drill | `restore` | **No**; path-filtered |
+| Pre-RC security pack | `pre-rc-security` | Yes (PR unfiltered; evidence on representative PR still pending) |
+| Schema compatibility | `schema-compatibility` | Yes (PR unfiltered; representative PR pending) |
+| Supply chain | `supply-chain` | Yes (PR unfiltered; representative PR pending) |
+| PostgreSQL restore drill | `postgres-restore-drill` | Yes (PR unfiltered; representative PR pending) |
 | Availability policy | `availability-contract` | Yes, with unique job ID after the #162 CI update |
 | Observability contract | `observability-contract` | Yes, with unique job ID after the #162 CI update |
-| Operational runbook drills | `drills` | **No**; path-filtered |
+| Operational runbook drills | `operational-runbooks` | Yes (PR unfiltered; representative PR pending) |
 
 `Phase 1 quality gate` emits the always-on, unambiguous `quality` job as
 an additional general-purpose CI gate. Confirm each job name, GitHub Actions
 source and successful checks on a **representative PR** after the workflow
 renaming before selecting it as required in GitHub settings.
 
-Do **not** globally require `targeted`, `compatibility`, `artifacts`,
-`restore` or `drills` until each is always emitted, uniquely identified
-and validated for the intended PR/release scope. Options for later implementation:
-make each critical workflow unfiltered on PRs (higher CI cost), or implement an
-auditable always-running release gate that executes/evaluates these contracts.
-Merely adding a lightweight green aggregate without actually checking the
-critical controls is **not** acceptable. All eight substantive evidence gates
-remain mandatory for any authorized first RC on its candidate revision.
+The five previously path-filtered workflows now emit distinct check contexts
+on every PR targeting `main`, with the **original substantive test steps** intact.
+Their push-to-`main` path filters are retained to avoid unnecessary CI in the
+single-agent DEVELOPMENT workflow. PostgreSQL restore drill concurrency is scoped
+to the ref so unrelated PRs cannot cancel one another.
+
+**Do not activate required status checks yet**: first validate all eight job
+contexts (and `quality`) on a representative release-candidate PR, including
+correct SHA attribution, GitHub Actions as the source, and full green execution.
+An always-green proxy is not acceptable. Existing DEVELOPMENT direct-`main`
+commits are still allowed by Phase A. All eight substantive release gates remain
+mandatory for an authorized RC.
 
 During Phase B configure required checks **only after** the single-agent
 release-PR workflow and the complete eight-gate enforcement are proven working.
@@ -206,3 +210,22 @@ Keep the minimal release bypass surface explicit. `delete_branch_on_merge=true`
 may be enabled when PR branches are actually used. Record read-back evidence,
 PR behavior and final checked SHA in #162 and #47, then evaluate #164 and #46.
 
+
+## Live verification and Phase B technical checkpoint — 2026-10-09
+
+The historical snapshots above describe earlier dates, not the current
+administrative state. At the post-#170 checkpoint, `main` was
+`7c54f01ca70fad56780711635a5cfc22432344e4` with 37/37 passing check-runs,
+only one remote branch (`main`) and no open PRs. The active repository ruleset
+`orqetia-main-integrity-development` (ID `24785675`) targets the default
+branch, enforcing **deletion** and **non_fast_forward** restrictions with no bypass
+actors. `main.protected=true`; no PR or required-check enforcement is active.
+Detailed legacy branch protection remains unreadable through the integration
+(403). The #162 Phase A requirement was independently confirmed via the ruleset.
+
+The #162 Phase B *technical* preparation now gives the five conditional gates
+stable, unique job IDs and unfiltered `pull_request` triggers while preserving
+substantive checks. This is not administrative enforcement, not evidence of a PR
+run, not a completed restore of the Windows backup files, and not permission to
+promote the lifecycle. Final checks/PR integration, admin rule updates and
+read-back are separately outstanding in #162.

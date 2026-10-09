@@ -3,10 +3,6 @@ name: Operational runbook drills
 on:
   pull_request:
     branches: [main]
-    paths:
-      - docs/runbooks/operational-recovery.md
-      - tests/ops/test_operational_runbooks.py
-      - .github/workflows/operational-runbooks.yml
   push:
     branches: [main]
     paths:
@@ -22,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  drills:
+  operational-runbooks:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:

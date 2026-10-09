@@ -3,21 +3,6 @@ name: Schema compatibility
 on:
   pull_request:
     branches: [main]
-    paths:
-      - contracts/openapi/**
-      - contracts/execution/**
-      - contracts/compatibility/**
-      - contracts/events/**
-      - src/orqetia/shared/messaging.py
-      - contracts/events/**
-      - src/orqetia/shared/messaging.py
-      - scripts/schema_compatibility_check.py
-      - docs/architecture/adr-0042-schema-evolution-v1.md
-      - docs/api/client-api-v1-manual.md
-      - tests/contracts/test_schema_compatibility.py
-      - tests/contracts/test_event_envelope_schema.py
-      - tests/contracts/test_event_envelope_schema.py
-      - .github/workflows/schema-compatibility.yml
   push:
     branches: [main]
     paths:
@@ -38,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  compatibility:
+  schema-compatibility:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

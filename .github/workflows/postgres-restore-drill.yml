@@ -3,10 +3,6 @@ name: PostgreSQL restore drill
 on:
   pull_request:
     branches: [main]
-    paths:
-      - docs/operations/backup-restore-dr.md
-      - scripts/postgres_restore_drill.sh
-      - .github/workflows/postgres-restore-drill.yml
   push:
     branches: [main]
     paths:
@@ -18,11 +14,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: postgres-restore-drill-main
+  group: postgres-restore-drill-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  restore:
+  postgres-restore-drill:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     services:

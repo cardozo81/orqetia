@@ -3,14 +3,6 @@ name: Supply chain
 on:
   pull_request:
     branches: [main]
-    paths:
-      - pyproject.toml
-      - uv.lock
-      - scripts/generate_supply_chain_artifacts.py
-      - scripts/security_baseline_check.py
-      - docs/security/supply-chain-hardening.md
-      - tests/security/test_supply_chain.py
-      - .github/workflows/**
   push:
     branches: [main]
     paths:
@@ -30,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  artifacts:
+  supply-chain:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
