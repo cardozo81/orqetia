@@ -12,7 +12,7 @@ from orqetia.execution.attempt_postgres import PostgresProviderAttemptStore
 
 
 class _QueryResult:
-    def mappings(self) -> "_QueryResult":
+    def mappings(self) -> _QueryResult:
         return self
 
     def all(self) -> list[object]:
@@ -23,7 +23,7 @@ class _RecordingSession:
     def __init__(self) -> None:
         self.statement = None
 
-    async def __aenter__(self) -> "_RecordingSession":
+    async def __aenter__(self) -> _RecordingSession:
         return self
 
     async def __aexit__(self, *_exc: object) -> None:
