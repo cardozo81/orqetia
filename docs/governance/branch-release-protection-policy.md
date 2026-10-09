@@ -229,3 +229,12 @@ substantive checks. This is not administrative enforcement, not evidence of a PR
 run, not a completed restore of the Windows backup files, and not permission to
 promote the lifecycle. Final checks/PR integration, admin rule updates and
 read-back are separately outstanding in #162.
+
+## Representative PR check-evidence procedure
+
+For the bounded #162 technical PR dry run and eventual authorized administrative
+transition, follow [First RC PR check evidence and enforcement](rc-check-evidence-runbook.md).
+The runbook distinguishes GitHub Actions job identities from workflow names,
+requires exact revision/source/read-back evidence and retains the #164/#46 human
+gates. A representative PR is evidence of technical feasibility, **not**
+permission to activate required-check enforcement or publish a release.
