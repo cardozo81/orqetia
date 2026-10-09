@@ -99,3 +99,34 @@ def test_all_eight_release_gates_run_substantive_jobs_on_every_main_pr() -> None
 
     restore = (workflows / "postgres-restore-drill.yml").read_text(encoding="utf-8")
     assert "postgres-restore-drill-${{ github.workflow }}-${{ github.ref }}" in restore
+
+
+
+def test_release_pr_runbook_requires_all_substantive_checks_and_human_gates() -> None:
+    runbook = ROOT / "docs" / "governance" / "rc-check-evidence-runbook.md"
+    text = runbook.read_text(encoding="utf-8")
+    policy = POLICY.read_text(encoding="utf-8")
+    assert "rc-check-evidence-runbook.md" in policy
+    for context in (
+        "baseline",
+        "pre-rc-security",
+        "schema-compatibility",
+        "supply-chain",
+        "postgres-restore-drill",
+        "availability-contract",
+        "observability-contract",
+        "operational-runbooks",
+        "quality",
+    ):
+        assert f"`{context}`" in text
+    for condition in (
+        "DEVELOPMENT",
+        "#162",
+        "#164",
+        "#46",
+        "github-actions",
+        "status=completed",
+        "conclusion=success",
+        "delete_branch_on_merge=true",
+    ):
+        assert condition in text
