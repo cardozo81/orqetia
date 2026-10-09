@@ -229,6 +229,18 @@ class FakeAttemptStore:
             )
         )
 
+    async def page_for_task(
+        self,
+        *,
+        scope: OwnershipScope,
+        task_id: UUID,
+        offset: int,
+        limit: int,
+    ) -> tuple[ProviderAttempt, ...]:
+        assert offset >= 0 and 1 <= limit <= 101
+        all_items = await self.list_for_task(scope=scope, task_id=task_id)
+        return all_items[offset : offset + limit]
+
 
 class FakeWorkQueue:
     def __init__(self) -> None:

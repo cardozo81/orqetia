@@ -188,6 +188,15 @@ class ProviderAttemptQueryStore(Protocol):
         task_id: UUID,
     ) -> tuple[ProviderAttempt, ...]: ...
 
+    async def page_for_task(
+        self,
+        *,
+        scope: OwnershipScope,
+        task_id: UUID,
+        offset: int,
+        limit: int,
+    ) -> tuple[ProviderAttempt, ...]: ...
+
 
 class ClientExecutionRuntimeError(RuntimeError):
     pass
@@ -546,10 +555,6 @@ class ClientExecutionRuntime:
         if not 1 <= limit <= 100:
             raise ValueError("attempt page limit must be between 1 and 100")
         await self.get_task(scope=scope, task_id=task_id)
-        items = await self._attempts.list_for_task(
-            scope=scope,
-            task_id=task_id,
-        )
         query_fingerprint = _fingerprint(
             {
                 "tenant_id": str(scope.tenant_id),
@@ -558,13 +563,21 @@ class ClientExecutionRuntime:
             }
         )
         start = _offset(cursor, query_fingerprint=query_fingerprint)
-        page = items[start : start + limit]
+        # Request one sentinel row to establish continuation without loading
+        # the entire task history. The durable Postgres adapter applies SQL LIMIT.
+        items = await self._attempts.page_for_task(
+            scope=scope,
+            task_id=task_id,
+            offset=start,
+            limit=limit + 1,
+        )
+        page = items[:limit]
         next_offset = start + len(page)
         return ClientAttemptPage(
             items=page,
             next_cursor=(
                 _cursor(next_offset, query_fingerprint=query_fingerprint)
-                if next_offset < len(items)
+                if len(items) > limit
                 else None
             ),
         )

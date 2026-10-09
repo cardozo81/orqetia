@@ -15,6 +15,10 @@ State: DEVELOPMENT
 
 ## Attempts
 
+- The production Postgres client-facing list now applies SQL `LIMIT (page_size+1)` and `OFFSET` with tenant/client/task predicates before materializing rows, preserving the v1 cursor wire contract and returning a sentinel-based `next_cursor` (first technical increment for #169).
+- Worker replay continues to use the full task-attempt journal, preserving orchestration semantics.
+- Remaining #169 work: replace deep-offset pagination with bounded/keyset reads and bound the result endpoint's `attempt_ids` projection without silent truncation. This increment alone does not close #169.
+
 Attempt cursors carry a version, offset and SHA-256 query fingerprint derived from
 tenant_id + client_id + task_id. A cursor from another task/owner is rejected as
 an invalid request and never becomes authority.
