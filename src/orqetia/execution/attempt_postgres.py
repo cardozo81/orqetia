@@ -19,6 +19,7 @@ from orqetia.providers import (
 )
 
 from .attempt_tables import provider_attempts
+from .client_read_limits import MAX_CLIENT_ATTEMPT_ROWS
 from .attempts import (
     DispatchAction,
     DispatchClaim,
@@ -327,7 +328,11 @@ class PostgresProviderAttemptStore:
         limit: int,
     ) -> tuple[ProviderAttempt, ...]:
         """Bound client-facing reads in SQL; the worker retains full replay reads."""
-        if offset < 0 or not 1 <= limit <= 101:
+        if (
+            not 0 <= offset < MAX_CLIENT_ATTEMPT_ROWS
+            or not 1 <= limit <= 101
+            or offset + limit > MAX_CLIENT_ATTEMPT_ROWS + 1
+        ):
             raise ValueError("attempt page bounds are invalid")
         statement = (
             sa.select(provider_attempts)
@@ -348,6 +353,34 @@ class PostgresProviderAttemptStore:
         async with self._sessions() as database:
             rows = (await database.execute(statement)).mappings().all()
         return tuple(_attempt_from_row(row) for row in rows)
+
+    async def list_attempt_ids_bounded(
+        self,
+        *,
+        scope: OwnershipScope,
+        task_id: UUID,
+        limit: int,
+    ) -> tuple[UUID, ...]:
+        """Read only bounded IDs for the client result, not entire attempts."""
+        if not 1 <= limit <= MAX_CLIENT_ATTEMPT_ROWS + 1:
+            raise ValueError("attempt ID read limit is invalid")
+        statement = (
+            sa.select(provider_attempts.c.attempt_id)
+            .where(
+                provider_attempts.c.task_id == task_id,
+                provider_attempts.c.tenant_id == scope.tenant_id,
+                provider_attempts.c.client_id == scope.client_id,
+            )
+            .order_by(
+                provider_attempts.c.cycle,
+                provider_attempts.c.attempt_index,
+                provider_attempts.c.created_at,
+                provider_attempts.c.attempt_id,
+            )
+            .limit(limit)
+        )
+        async with self._sessions() as database:
+            return tuple((await database.execute(statement)).scalars().all())
 
     async def claim_dispatch(
         self,

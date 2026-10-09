@@ -36,6 +36,7 @@ from orqetia.execution import (
 from orqetia.execution import (
     SanitizedEvidenceRecord as SanitizedEvidenceRecord,
 )
+from orqetia.execution.client_read_limits import MAX_CLIENT_ATTEMPT_ROWS
 from orqetia.providers import ProviderCapability, PublicProviderTargetMetadata
 from orqetia.shared.messaging import (
     DataClassification,
@@ -92,7 +93,9 @@ def _offset(cursor: str | None, *, query_fingerprint: str) -> int:
             or value.get("query") != query_fingerprint
         ):
             raise ValueError("attempt cursor query fingerprint mismatch")
-        offset = int(value["offset"])
+        offset = value["offset"]
+        if type(offset) is not int:
+            raise ValueError("invalid attempt cursor offset")
     except (ValueError, TypeError, KeyError, json.JSONDecodeError) as error:
         raise ValueError("invalid attempt cursor") from error
     if offset < 0:
@@ -197,6 +200,14 @@ class ProviderAttemptQueryStore(Protocol):
         limit: int,
     ) -> tuple[ProviderAttempt, ...]: ...
 
+    async def list_attempt_ids_bounded(
+        self,
+        *,
+        scope: OwnershipScope,
+        task_id: UUID,
+        limit: int,
+    ) -> tuple[UUID, ...]: ...
+
 
 class ClientExecutionRuntimeError(RuntimeError):
     pass
@@ -216,6 +227,10 @@ class ClientExecutionForbidden(ClientExecutionRuntimeError):
 
 class ClientExecutionArtifactUnavailable(ClientExecutionRuntimeError):
     pass
+
+
+class ClientExecutionReadLimitExceeded(ClientExecutionRuntimeError):
+    """The client read would exceed the allowed server-side row window."""
 
 
 class ClientExecutionRuntime:
@@ -475,6 +490,13 @@ class ClientExecutionRuntime:
         task = await self.get_task(scope=scope, task_id=task_id)
         if not task.status.terminal:
             raise ClientExecutionConflict("task result is not terminal")
+        attempt_ids = await self._attempts.list_attempt_ids_bounded(
+            scope=scope,
+            task_id=task_id,
+            limit=MAX_CLIENT_ATTEMPT_ROWS + 1,
+        )
+        if len(attempt_ids) > MAX_CLIENT_ATTEMPT_ROWS:
+            raise ClientExecutionReadLimitExceeded("attempt result read cap exceeded")
         result: dict[str, object] = {}
         if task.result_reference is not None:
             loaded = await self._results.read_result(
@@ -486,17 +508,13 @@ class ClientExecutionRuntime:
                     "task result artifact is unavailable"
                 )
             result = loaded
-        attempts = await self._attempts.list_for_task(
-            scope=scope,
-            task_id=task_id,
-        )
         return ClientTaskResult(
             task_id=task.task_id,
             status=task.status.value,
             result=result,
             accepted=task.accepted_requirements,
             missing=task.missing_requirements,
-            attempt_ids=tuple(item.attempt_id for item in attempts),
+            attempt_ids=attempt_ids,
         )
 
     async def cancel_task(
@@ -563,14 +581,19 @@ class ClientExecutionRuntime:
             }
         )
         start = _offset(cursor, query_fingerprint=query_fingerprint)
-        # Request one sentinel row to establish continuation without loading
-        # the entire task history. The durable Postgres adapter applies SQL LIMIT.
+        if start >= MAX_CLIENT_ATTEMPT_ROWS:
+            raise ClientExecutionReadLimitExceeded("attempt page offset cap exceeded")
+        remaining = MAX_CLIENT_ATTEMPT_ROWS - start
+        # A sentinel detects rows beyond the bounded read window. Preserve the
+        # v1 cursor format without permitting arbitrarily deep SQL OFFSET scans.
         items = await self._attempts.page_for_task(
             scope=scope,
             task_id=task_id,
             offset=start,
-            limit=limit + 1,
+            limit=min(limit, remaining) + 1,
         )
+        if len(items) > remaining:
+            raise ClientExecutionReadLimitExceeded("attempt page read cap exceeded")
         page = items[:limit]
         next_offset = start + len(page)
         return ClientAttemptPage(

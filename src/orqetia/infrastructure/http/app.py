@@ -58,6 +58,7 @@ from .execution_runtime import (
     ClientExecutionConflict,
     ClientExecutionForbidden,
     ClientExecutionNotFound,
+    ClientExecutionReadLimitExceeded,
     ClientExecutionRuntime,
     ClientExecutionRuntimeError,
     ClientRequestedTarget,
@@ -548,6 +549,12 @@ def create_app(
                 404,
                 "ARTIFACT_NOT_RETAINED",
                 "Requested retained artifact is unavailable.",
+            )
+        if isinstance(exc, ClientExecutionReadLimitExceeded):
+            return ApiError(
+                413,
+                "READ_LIMIT_EXCEEDED",
+                "Attempt read exceeds the supported window.",
             )
         if isinstance(exc, ClientExecutionConflict):
             return ApiError(

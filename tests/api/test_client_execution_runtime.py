@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid7
@@ -33,6 +34,9 @@ from orqetia.execution import (
 from orqetia.identity.authentication import AuthenticatedPrincipal
 from orqetia.infrastructure.http import create_app
 from orqetia.infrastructure.http.execution_runtime import (
+    MAX_CLIENT_ATTEMPT_ROWS,
+    _cursor,
+    _fingerprint,
     ClientExchangeEvidence,
     ClientExecutionRuntime,
     InMemoryClientExecutionArtifacts,
@@ -202,6 +206,7 @@ class FakeTaskStore:
 class FakeAttemptStore:
     def __init__(self) -> None:
         self.items: dict[UUID, ProviderAttempt] = {}
+        self.attempt_ids_override: tuple[UUID, ...] | None = None
 
     async def get_owned(
         self,
@@ -240,6 +245,18 @@ class FakeAttemptStore:
         assert offset >= 0 and 1 <= limit <= 101
         all_items = await self.list_for_task(scope=scope, task_id=task_id)
         return all_items[offset : offset + limit]
+
+    async def list_attempt_ids_bounded(
+        self,
+        *,
+        scope: OwnershipScope,
+        task_id: UUID,
+        limit: int,
+    ) -> tuple[UUID, ...]:
+        if self.attempt_ids_override is not None:
+            return self.attempt_ids_override[:limit]
+        items = await self.list_for_task(scope=scope, task_id=task_id)
+        return tuple(item.attempt_id for item in items[:limit])
 
 
 class FakeWorkQueue:
@@ -773,3 +790,87 @@ async def test_explicit_target_rejects_unapproved_synchronous_capability() -> No
     )
     assert response.status_code == 403
     assert not queue.items
+
+@pytest.mark.asyncio
+async def test_result_attempt_ids_fail_closed_without_truncation() -> None:
+    runtime, _sessions, tasks, attempts, artifacts, _queue = _runtime()
+    app = create_app(
+        openapi_document=CANONICAL,
+        authenticator=FakeAuthenticator(),
+        execution_runtime=runtime,
+    )
+    session = await _request(
+        app, "POST", "/v1/sessions", body={}, key="session-result-bounded"
+    )
+    task = await _request(
+        app, "POST", f"/v1/sessions/{session.json()['session_id']}/tasks",
+        body={"operation": "TASK_EXECUTION", "input": {"message": "safe"}},
+        key="task-result-bounded",
+    )
+    task_id = UUID(task.json()["task_id"])
+    result_reference = "artifact://bounded-result"
+    completed = tasks.complete(task_id, result_reference=result_reference)
+    attempt_id = uuid7()
+    attempts.attempt_ids_override = (attempt_id,) * (MAX_CLIENT_ATTEMPT_ROWS + 1)
+    oversized = await _request(app, "GET", f"/v1/tasks/{task_id}/result")
+    assert oversized.status_code == 413
+    assert oversized.json()["code"] == "READ_LIMIT_EXCEEDED"
+    assert str(attempt_id) not in oversized.text
+
+    artifacts.seed_result(
+        scope=completed.ownership,
+        result_reference=result_reference,
+        value={"answer": "safe"},
+    )
+    attempts.attempt_ids_override = (attempt_id,) * MAX_CLIENT_ATTEMPT_ROWS
+    supported = await _request(app, "GET", f"/v1/tasks/{task_id}/result")
+    assert supported.status_code == 200
+    assert len(supported.json()["attempt_ids"]) == MAX_CLIENT_ATTEMPT_ROWS
+    cross_owner = await _request(
+        app, "GET", f"/v1/tasks/{task_id}/result", token="other"
+    )
+    assert cross_owner.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_attempt_cursor_rejects_deep_offsets_and_extra_sentinel() -> None:
+    runtime, _sessions, _tasks, attempts, _artifacts, _queue = _runtime()
+    app = create_app(
+        openapi_document=CANONICAL,
+        authenticator=FakeAuthenticator(),
+        execution_runtime=runtime,
+    )
+    session = await _request(
+        app, "POST", "/v1/sessions", body={}, key="session-deep-cursor"
+    )
+    created = await _request(
+        app, "POST", f"/v1/sessions/{session.json()['session_id']}/tasks",
+        body={"operation": "TASK_EXECUTION", "input": {"message": "bounded"}},
+        key="task-deep-cursor",
+    )
+    task_id = UUID(created.json()["task_id"])
+    fingerprint = _fingerprint({
+        "tenant_id": str(TENANT),
+        "client_id": str(CLIENT),
+        "task_id": str(task_id),
+    })
+    beyond = _cursor(MAX_CLIENT_ATTEMPT_ROWS, query_fingerprint=fingerprint)
+    denied = await _request(
+        app, "GET", f"/v1/tasks/{task_id}/attempts?cursor={beyond}&limit=1"
+    )
+    assert denied.status_code == 413
+    assert denied.json()["code"] == "READ_LIMIT_EXCEEDED"
+
+    attempts.page_for_task = AsyncMock(return_value=(object(), object()))
+    near_end = _cursor(MAX_CLIENT_ATTEMPT_ROWS - 1, query_fingerprint=fingerprint)
+    end_page = await _request(
+        app, "GET", f"/v1/tasks/{task_id}/attempts?cursor={near_end}&limit=100"
+    )
+    assert end_page.status_code == 413
+    assert end_page.json()["code"] == "READ_LIMIT_EXCEEDED"
+    attempts.page_for_task.assert_awaited_once_with(
+        scope=OwnershipScope(TENANT, CLIENT),
+        task_id=task_id,
+        offset=MAX_CLIENT_ATTEMPT_ROWS - 1,
+        limit=2,
+    )

@@ -15,6 +15,9 @@ class _QueryResult:
     def mappings(self) -> _QueryResult:
         return self
 
+    def scalars(self) -> _QueryResult:
+        return self
+
     def all(self) -> list[object]:
         return []
 
@@ -67,9 +70,62 @@ async def test_client_attempt_page_rejects_bad_internal_limits_before_sql() -> N
         client_id=UUID("0199b39a-9bf1-7000-8000-000000000102"),
     )
     task_id = UUID("0199b39a-9bf1-7000-8000-000000000103")
-    for offset, limit in ((-1, 1), (0, 0), (0, 102)):
+    for offset, limit in (
+        (-1, 1), (0, 0), (0, 102), (5_000, 1), (4_999, 3),
+    ):
         with pytest.raises(ValueError, match="bounds"):
             await store.page_for_task(
                 scope=scope, task_id=task_id, offset=offset, limit=limit,
             )
     assert session.statement is None
+
+@pytest.mark.asyncio
+async def test_result_id_projection_is_only_ids_and_sql_bounded() -> None:
+    session = _RecordingSession()
+    store = PostgresProviderAttemptStore(lambda: session)
+    scope = OwnershipScope(
+        tenant_id=UUID("0199b39a-9bf1-7000-8000-000000000101"),
+        client_id=UUID("0199b39a-9bf1-7000-8000-000000000102"),
+    )
+    task_id = UUID("0199b39a-9bf1-7000-8000-000000000103")
+    assert await store.list_attempt_ids_bounded(
+        scope=scope, task_id=task_id, limit=5_001,
+    ) == ()
+    compiled = str(session.statement.compile(
+        dialect=postgresql.dialect(),
+        compile_kwargs={"literal_binds": True},
+    ))
+    assert "SELECT execution.provider_attempts.attempt_id" in compiled
+    assert "LIMIT 5001" in compiled
+    assert "cost_snapshot" not in compiled
+    assert str(scope.tenant_id) in compiled
+    assert str(scope.client_id) in compiled
+    assert str(task_id) in compiled
+
+    session.statement = None
+    for bad_limit in (0, 5_002):
+        with pytest.raises(ValueError, match="read limit"):
+            await store.list_attempt_ids_bounded(
+                scope=scope, task_id=task_id, limit=bad_limit,
+            )
+    assert session.statement is None
+
+
+@pytest.mark.asyncio
+async def test_last_client_page_is_still_sql_bounded() -> None:
+    session = _RecordingSession()
+    store = PostgresProviderAttemptStore(lambda: session)
+    scope = OwnershipScope(
+        tenant_id=UUID("0199b39a-9bf1-7000-8000-000000000101"),
+        client_id=UUID("0199b39a-9bf1-7000-8000-000000000102"),
+    )
+    task_id = UUID("0199b39a-9bf1-7000-8000-000000000103")
+    assert await store.page_for_task(
+        scope=scope, task_id=task_id, offset=4_999, limit=2,
+    ) == ()
+    compiled = str(session.statement.compile(
+        dialect=postgresql.dialect(),
+        compile_kwargs={"literal_binds": True},
+    ))
+    assert "LIMIT 2" in compiled
+    assert "OFFSET 4999" in compiled
