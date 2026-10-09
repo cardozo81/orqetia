@@ -78,12 +78,12 @@ def test_all_eight_release_gates_run_substantive_jobs_on_every_main_pr() -> None
 
     for filename, job_id in gates.items():
         body = (workflows / filename).read_text(encoding="utf-8")
-        pr_trigger = body.split("  pull_request:\\n", 1)[1].split("  push:\\n", 1)[0]
+        pr_trigger = body.split("  pull_request:\n", 1)[1].split("  push:\n", 1)[0]
         assert "branches: [main]" in pr_trigger, filename
         assert "paths:" not in pr_trigger, filename
         assert "paths-ignore:" not in pr_trigger, filename
-        assert f"\\n  {job_id}:\\n" in body, filename
-        assert "    steps:\\n" in body, filename
+        assert f"\n  {job_id}:\n" in body, filename
+        assert "    steps:\n" in body, filename
         assert "        run:" in body, filename
 
     for filename in (
@@ -94,7 +94,7 @@ def test_all_eight_release_gates_run_substantive_jobs_on_every_main_pr() -> None
         "operational-runbooks.yml",
     ):
         body = (workflows / filename).read_text(encoding="utf-8")
-        push_trigger = body.split("  push:\\n", 1)[1].split("\\npermissions:", 1)[0]
+        push_trigger = body.split("  push:\n", 1)[1].split("\npermissions:", 1)[0]
         assert "paths:" in push_trigger, filename
 
     restore = (workflows / "postgres-restore-drill.yml").read_text(encoding="utf-8")
