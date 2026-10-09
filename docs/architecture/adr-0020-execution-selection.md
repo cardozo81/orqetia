@@ -77,6 +77,14 @@ AUTO is the default.
 
 ### Eligibility
 
+For the M0 synchronous Client API/worker route, every admitted target must have the
+registry-approved `SYNCHRONOUS` capability. This applies both to explicit target
+resolution before task submission and to the worker candidate pool; an offered but
+unapproved capability is insufficient. This is a server-owned runtime requirement,
+not a browser-supplied condition. Any additional operation-specific capability
+requirements need a separately versioned server-side contract; no implicit inference
+from client payload is authorized (delta #168).
+
 Candidate admission requires all applicable runtime/control conditions:
 
     integrated

@@ -36,7 +36,7 @@ from orqetia.execution import (
 from orqetia.execution import (
     SanitizedEvidenceRecord as SanitizedEvidenceRecord,
 )
-from orqetia.providers import PublicProviderTargetMetadata
+from orqetia.providers import ProviderCapability, PublicProviderTargetMetadata
 from orqetia.shared.messaging import (
     DataClassification,
     QueueName,
@@ -369,7 +369,7 @@ class ClientExecutionRuntime:
             try:
                 resolved = effective_catalog.registry.resolve_explicit_target(
                     requested=target,
-                    required_capabilities=(),
+                    required_capabilities=(ProviderCapability.SYNCHRONOUS,),
                     authorized_targets=session.policy.authorized_targets,
                 )
             except ValueError as error:

@@ -16,7 +16,7 @@ from orqetia.execution import (
     ExecutionTask,
     OrchestrationCandidate,
 )
-from orqetia.providers import RegistryEligibilityMode
+from orqetia.providers import ProviderCapability, RegistryEligibilityMode
 from orqetia.usage_accounting import TechnicalUsage
 
 
@@ -58,7 +58,7 @@ class ControlPlaneOrchestrationCandidateResolver:
 
         resolved = catalog.registry.eligible_targets(
             mode=mode,
-            required_capabilities=(),
+            required_capabilities=(ProviderCapability.SYNCHRONOUS,),
             authorized_targets=authorized_targets,
         )
         policy_rank = {

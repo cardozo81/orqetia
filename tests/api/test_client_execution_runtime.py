@@ -281,7 +281,12 @@ class FakePolicyResolver:
 
 
 class FakeCatalogResolver:
-    def __init__(self) -> None:
+    def __init__(self, *, approve_synchronous: bool = True) -> None:
+        alpha_capabilities = frozenset({
+            ProviderCapability.STRUCTURED_OUTPUT,
+            ProviderCapability.REASONING,
+            ProviderCapability.SYNCHRONOUS,
+        })
         alpha = ProviderSpec(
             provider_id="alpha",
             display_name="Alpha Provider",
@@ -290,17 +295,11 @@ class FakeCatalogResolver:
                 ProviderModelSpec(
                     model_id="alpha-1",
                     adapter=AdapterResolution("alpha.adapter"),
-                    offered_capabilities=frozenset(
-                        {
-                            ProviderCapability.STRUCTURED_OUTPUT,
-                            ProviderCapability.REASONING,
-                        }
-                    ),
-                    approved_capabilities=frozenset(
-                        {
-                            ProviderCapability.STRUCTURED_OUTPUT,
-                            ProviderCapability.REASONING,
-                        }
+                    offered_capabilities=alpha_capabilities,
+                    approved_capabilities=(
+                        alpha_capabilities
+                        if approve_synchronous
+                        else alpha_capabilities - {ProviderCapability.SYNCHRONOUS}
                     ),
                     reasoning_profiles=(ReasoningProfileSpec("standard"),),
                     default_reasoning_profile="standard",
@@ -342,7 +341,7 @@ class FakeCatalogResolver:
         return self.effective
 
 
-def _runtime() -> tuple[
+def _runtime(*, catalog: FakeCatalogResolver | None = None) -> tuple[
     ClientExecutionRuntime,
     FakeSessionStore,
     FakeTaskStore,
@@ -360,7 +359,7 @@ def _runtime() -> tuple[
         tasks=tasks,
         attempts=attempts,
         policies=FakePolicyResolver(),
-        catalog=FakeCatalogResolver(),
+        catalog=catalog or FakeCatalogResolver(),
         request_artifacts=artifacts,
         results=artifacts,
         exchanges=artifacts,
@@ -725,3 +724,40 @@ async def test_task_submission_rejects_when_execution_queue_is_saturated() -> No
     assert rejected.json()["code"] == "QUEUE_BACKPRESSURE"
     assert rejected.headers["retry-after"] == "5"
     assert queue.items == {}
+
+
+@pytest.mark.asyncio
+async def test_explicit_target_rejects_unapproved_synchronous_capability() -> None:
+    """Even a tenant-authorized target must be approved for the synchronous runtime."""
+    runtime, _sessions, _tasks, _attempts, _artifacts, queue = _runtime(
+        catalog=FakeCatalogResolver(approve_synchronous=False)
+    )
+    app = create_app(
+        openapi_document=CANONICAL,
+        authenticator=FakeAuthenticator(),
+        execution_runtime=runtime,
+    )
+    created = await _request(
+        app, "POST", "/v1/sessions", body={}, key="session-capability"
+    )
+    assert created.status_code == 201
+    response = await _request(
+        app,
+        "POST",
+        f"/v1/sessions/{created.json()['session_id']}/tasks",
+        body={
+            "operation": "TASK_EXECUTION",
+            "input": {"message": "capability bound"},
+            "execution": {
+                "mode": "EXPLICIT_TARGET",
+                "target": {
+                    "provider": "alpha",
+                    "model": "alpha-1",
+                    "reasoning_profile": "standard",
+                },
+            },
+        },
+        key="task-capability-reject",
+    )
+    assert response.status_code == 403
+    assert queue.items == []
