@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock
 from pathlib import Path
 from typing import Any
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid7
 
 import httpx
@@ -35,12 +35,12 @@ from orqetia.identity.authentication import AuthenticatedPrincipal
 from orqetia.infrastructure.http import create_app
 from orqetia.infrastructure.http.execution_runtime import (
     MAX_CLIENT_ATTEMPT_ROWS,
-    _cursor,
-    _fingerprint,
     ClientExchangeEvidence,
     ClientExecutionRuntime,
     InMemoryClientExecutionArtifacts,
     SanitizedEvidenceRecord,
+    _cursor,
+    _fingerprint,
 )
 from orqetia.providers import (
     AdapterResolution,
@@ -874,3 +874,26 @@ async def test_attempt_cursor_rejects_deep_offsets_and_extra_sentinel() -> None:
         offset=MAX_CLIENT_ATTEMPT_ROWS - 1,
         limit=2,
     )
+
+@pytest.mark.asyncio
+async def test_malformed_attempt_cursor_is_sanitized_invalid_request() -> None:
+    runtime, _sessions, _tasks, _attempts, _artifacts, _queue = _runtime()
+    app = create_app(
+        openapi_document=CANONICAL,
+        authenticator=FakeAuthenticator(),
+        execution_runtime=runtime,
+    )
+    session = await _request(
+        app, "POST", "/v1/sessions", body={}, key="session-bad-cursor"
+    )
+    created = await _request(
+        app, "POST", f"/v1/sessions/{session.json()['session_id']}/tasks",
+        body={"operation": "TASK_EXECUTION", "input": {"message": "bad cursor"}},
+        key="task-bad-cursor",
+    )
+    task_id = UUID(created.json()["task_id"])
+    response = await _request(
+        app, "GET", f"/v1/tasks/{task_id}/attempts?cursor=a&limit=1"
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "INVALID_REQUEST"

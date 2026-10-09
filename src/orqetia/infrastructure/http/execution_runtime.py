@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import json
 from dataclasses import dataclass
@@ -96,7 +97,14 @@ def _offset(cursor: str | None, *, query_fingerprint: str) -> int:
         offset = value["offset"]
         if type(offset) is not int:
             raise ValueError("invalid attempt cursor offset")
-    except (ValueError, TypeError, KeyError, json.JSONDecodeError) as error:
+    except (
+        ValueError,
+        TypeError,
+        KeyError,
+        UnicodeDecodeError,
+        binascii.Error,
+        json.JSONDecodeError,
+    ) as error:
         raise ValueError("invalid attempt cursor") from error
     if offset < 0:
         raise ValueError("invalid attempt cursor")

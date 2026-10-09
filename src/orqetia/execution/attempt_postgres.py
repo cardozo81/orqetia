@@ -19,13 +19,13 @@ from orqetia.providers import (
 )
 
 from .attempt_tables import provider_attempts
-from .client_read_limits import MAX_CLIENT_ATTEMPT_ROWS
 from .attempts import (
     DispatchAction,
     DispatchClaim,
     ProviderAttempt,
     ProviderAttemptStatus,
 )
+from .client_read_limits import MAX_CLIENT_ATTEMPT_ROWS
 from .sessions import (
     ExecutionTargetSnapshot,
     OwnershipScope,
