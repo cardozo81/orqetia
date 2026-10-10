@@ -132,6 +132,15 @@ recovery with missing/incomplete coverage. A separate **#174** tracks bounded
 retention/controlled cleanup, including clock and concurrency safety, before any
 implementation or operational purge. This audit does not implement #174.
 
+Subsequent #174 analysis is recorded in the
+[marker retention safety specification](../security/local-oidc-marker-retention.md).
+Synthetic counterexamples show that finite waiting and a same-store signed
+rejection horizon do not establish safety when that horizon and the clock can
+both be restored backwards. Destructive implementation remains blocked pending
+an explicit non-rollback authority or restart/restore invalidation contract.
+The runtime still retains all markers; there is no collector or operational purge.
+The trusted-clock prerequisite of the recovery procedure above remains essential.
+
 ### Caddy reconstruction evidence
 
 The running gateway uses `caddy run --config /etc/caddy/Caddyfile --adapter
