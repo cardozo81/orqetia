@@ -13,7 +13,7 @@ rename the completed Local Docker Operational Homologation phase of #47.
 | Repository integrity | #162 Phase A; PR #172 integrated at `cf8c00e6cafcce363dddac3b04fdecc845f9101c`, 41/41 PR checks and 36/36 main checks | Phase B integration decision and administrative enforcement remain open; do not enable required checks by inference |
 | Local installation | #170 runtime qualification on 2026-10-09 | Documentation changes alone require no rebuild, restart or migration |
 | Concrete backup restore | #171: isolated PostgreSQL restore and extraction of two TARs | Does not establish whole-installation or host-loss recovery; #171 stays closed |
-| Five-volume coverage | #173; [volume inventory](../operations/volume-recovery-inventory.md) | Record observed metadata, OIDC expiry/replay classification and Caddy reconstruction evidence |
+| Five-volume coverage | #173; [volume inventory](../operations/volume-recovery-inventory.md): observed mounts/metadata, OIDC expiry tests and isolated Caddy reconstruction | #174 separately tracks controlled OIDC marker retention; no operational purge performed |
 | Private security intake | #164: reporting enabled; public button observed | External non-admin verification and explicit owner/fallback acceptance remain pending |
 | Independent recovery domain | #48; [host-loss plan](../operations/host-loss-recovery-plan.md) | Destination, custody, retention, costs and isolated drill require a separate decision |
 
@@ -39,6 +39,13 @@ Local validation for this pack is limited to:
 Existing CI executes its configured checks on push. Confirm every emitted check
 belongs to the new HEAD and has completed successfully before calling integration
 complete. Do not equate a green CI run with operational host recovery.
+
+The initial documentary commit `36f08e544a0d2f646ec787bd13a2516669f3d87e`
+passed 35/35 GitHub checks. Subsequent #173 evidence adds only the observed volume
+classification and two isolated OIDC recovery cases; final SHA/check results are
+recorded on #173. The Caddy test used disposable tmpfs with trust installation
+disabled and no operational mounts. Existing services and original backups were
+preserved. Host-loss and #162/#164 gates remain open.
 
 ## Completion and handoff
 

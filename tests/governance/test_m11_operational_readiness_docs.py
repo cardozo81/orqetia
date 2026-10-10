@@ -28,7 +28,8 @@ def test_recovery_matrix_covers_exact_compose_volumes_and_mounts() -> None:
     declarations = compose.split("\nvolumes:\n", 1)[1].split("\nnetworks:", 1)[0]
     volumes = set(re.findall(r"^  ([a-z_]+):", declarations, re.MULTILINE))
     inventory = DOCUMENTS[2].read_text(encoding="utf-8")
-    rows = re.findall(r"^\| `([a-z_]+)` \| (.+)$", inventory, re.MULTILINE)
+    matrix = inventory.split("## Recovery matrix", 1)[1].split("\nThe mount topology", 1)[0]
+    rows = re.findall(r"^\| `([a-z_]+)` \| (.+)$", matrix, re.MULTILINE)
     assert len(rows) == len(volumes) == 5
     assert {name for name, _ in rows} == volumes
     for name, row in rows:
