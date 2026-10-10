@@ -47,6 +47,15 @@ Before changing any running Docker installation, test the actual brokers:
 7. Marker files from the real installation and the previous #171 archives are not accessed or altered during these tests. Local Windows symlink restrictions are not disguised as successful coverage.
 8. When code is integrated, confirm targeted Ruff/mypy/tests, all required GitHub CI checks on final `main` HEAD, and record in #174/#47/#48. Runtime update is a **separate** operational decision with backup point and narrow HTTPS login/RBAC checks.
 
+## Implementation checkpoint — security primitive only
+
+- `src/orqetia/infrastructure/local_oidc_epoch.py` supplies an ephemeral process-generation registry with bounded capacity (4,096), bounded heap sweep (64), monotonic 301-second expiry, atomic consume-once and PID/fork fail-closed.
+- `tests/devenv/test_local_oidc_epoch.py` exercises the primitive's restart generation, rollback, concurrent consume, bounded capacity and fork denial with generated synthetic inputs.
+- **The existing `LocalBackofficeOidcBroker` and `LocalCustomerPortalOidcBroker` are NOT wired to the new primitive.** Their existing file-backed replay policy is still operational, and the application continues to create file markers until that targeted integration is completed.
+- **No legacy marker has been deleted; no collector was added.** Do not interpret the existence of the primitive or its tests as a complete #174 fix or approval of a Docker rollout. Before wiring, adapt the previously accepted #173/#174 tests to the explicitly changed restart contract, retaining the old rollback counterexample as historical synthetic evidence. Run a real broker/IdP/callback regression and review CI before declaring completed.
+- The primitive's `ttl_seconds + 1` monotonic fence is deliberately conservative with respect to the existing wall-clock integer expiry, inclusive at the exact last second. Once its record is removed, an old token remains rejected as missing.
+- Security boundary remains: restore must stop ALL old verifiers first, and multi-replica/same-audience callback affinity is not implemented. No production OIDC guarantees are implied.
+
 ## Release and ownership gates
 
 This architectural approval changes #174 from **BLOCKED_HUMAN** to **READY_FOR_SAFE_IMPLEMENTATION**; it does **not** close it. No code or garbage collector is considered delivered by the ADR alone. No operational deletion, credential/key rotation, CA/trust-store change, database migration, Docker reset, new service/cost or RASAi mutation is authorized.
