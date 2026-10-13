@@ -73,6 +73,47 @@ Cross-check PR-triggered workflow run event, revision, job ID and app; GitHub ma
 7. If the new rule blocks expected integration, do **not** force-push or disable protections silently; stop, document why, and apply a bounded corrective rule change approved for this transition.
 8. Only after #162 and #164 are independently closed with evidence may the responsible human authorize #46 to consider a first RC. No tag or release is produced by this runbook.
 
+## Single-command administrative execution (issue #162)
+
+The repository includes an **offline-audited, fail-closed** standard-library helper,
+[scripts/apply_162_phase_b.py](../../scripts/apply_162_phase_b.py). It invokes
+**only the already authenticated GitHub CLI**. No token is generated, printed,
+exported, or committed. Its default mode performs read-only checks.
+
+In the Windows checkout, use Python 3.14 from the existing environment and
+the **actual** SHA of current `main` (do not reuse an outdated example SHA).
+Make sure Codex has reconciled the checkout before starting:
+
+```console
+python scripts/apply_162_phase_b.py --expected-head <40-character-main-SHA>
+python scripts/apply_162_phase_b.py --expected-head <40-character-main-SHA> --apply
+```
+
+The first command performs **no administrative write** and must report
+`DRY-RUN`. Only the second command executes an authorized PUT of ruleset
+`24785675` followed, after successful read-back, by a PATCH of
+`delete_branch_on_merge=true`. The helper checks the single active ruleset,
+absence of bypass, Phase-A deletion/force-push protections, administrator
+permissions, exact `main` SHA, green CI, no open PR, and the nine real
+substantive job checks on merged PR #172 (GitHub Actions app ID `15368`).
+Any discrepancy refuses to write. Re-running after success is idempotent.
+
+The script re-reads the rule and branch immediately before PUT, and verifies
+the complete approval-free PR rule, nine distinct check contexts, source app,
+and auto-delete after change. If a GitHub call fails, stop; do **not** disable
+protection, force-push, delete `main`, or claim completion. A partial
+ruleset update without auto-delete may be resumed safely after inspecting
+the real settings. No branches, PRs, workflows or Docker services are
+created by this helper. The new helper's synthetic regression tests are in
+[tests/governance/test_apply_162_phase_b.py](../../tests/governance/test_apply_162_phase_b.py).
+
+**Important:** successful read-back is objective configuration evidence, not
+proof of a newly merged candidate. Record the sanitized results in #162,
+verify a genuine PR integration if later needed, and close #162 only against
+its accepted evidence. The separate #164 external-human security acceptance
+and #46 release decision remain **mandatory before RC**. DEVELOPMENT
+continues; this command does not tag or release.
+
 ## Residual operating risks
 
 - GitHub App connectors may be read-only for branch settings even when ordinary repository metadata is readable. Permission failures are **not** evidence that controls are enabled.
