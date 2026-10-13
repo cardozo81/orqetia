@@ -70,4 +70,7 @@ def test_m10_m11_readiness_reflect_completed_pr_enforcement() -> None:
     assert "genuine PRs" in m10
     assert "nine required" in m11
     assert "Single-agent integration uses main directly" not in m11
-    assert "Phase B integration decision and administrative enforcement remain open" not in m11
+    assert (
+        "Phase B integration decision and administrative enforcement remain open"
+        not in m11
+    )
