@@ -9,6 +9,14 @@ This policy is compatible with the current single-agent/direct-`main` developmen
 model. It does not claim that GitHub branch protection is enabled when the current
 integration cannot verify or write that setting.
 
+## Current verification — 2026-10-13 (supersedes dated operational to-do items below)
+
+- The Phase A repository ruleset `24785675` is **active** for the default branch and enforces `deletion` and `non_fast_forward`, with no bypass actors; `main.protected=true`. It deliberately does not require PRs or status checks during single-agent DEVELOPMENT.
+- The technical representative PR stage **was completed**, not left pending: [PR #172](https://github.com/cardozo81/orqetia/pull/172), head `97dac6539669a52f38b6d8126d7673c6da9bcd9c`, demonstrated **41/41 successful GitHub Actions checks**, including all eight uniquely named, substantive release contexts and additional `quality`. The PR was squash-merged as `cf8c00e6cafcce363dddac3b04fdecc845f9101c`; its temporary branch was deleted after content-equivalence verification. See [#162 evidence](https://github.com/cardozo81/orqetia/issues/162#issuecomment-6086075629).
+- Current `main` at this audit: `ae15b6c6a4461622d37286da34eb8cdfc10ca6ca`, **35/35 successful push check-runs**, only `main` remote, zero open PRs. These push checks are not a substitute for all eight release checks on a new RC candidate.
+- **Do not create another technical demonstration PR solely to re-prove #172.** The next authorized Phase B action is an explicit decision to change release-candidate integration to PR, then administrative enforcement of required checks and read-back verification. A new candidate still requires checks on its own tested SHA.
+- **#162 remains OPEN.** #164 external reporter access and explicit real security owner/fallback acceptance remain unresolved. No RC/tag/release is authorized by this checkpoint. Older sections below retain their original observation dates as historical procedure/evidence.
+
 ## Verified repository snapshot — 2026-10-07
 
 Observed through the available GitHub integration:

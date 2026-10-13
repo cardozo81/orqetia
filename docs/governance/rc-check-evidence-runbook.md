@@ -19,7 +19,15 @@ The following are **GitHub Actions job/check-run names**, not workflow display n
 
 Additional mandatory general check: `quality` from Phase 1 quality gate. Do not select generic `targeted` or `contract` in branch rules: they can be ambiguous. A successful aggregate/proxy cannot replace substantive release jobs.
 
-## Representative PR evidence (technical dry run)
+## Previously completed representative PR validation — 2026-10-13
+
+The Phase B **technical PR check-evidence exercise is already DONE**: [PR #172](https://github.com/cardozo81/orqetia/pull/172), head `97dac6539669a52f38b6d8126d7673c6da9bcd9c`, emitted 41/41 successful GitHub Actions check-runs on `pull_request`, including all eight named release contexts below and independent `quality`. It was integrated by squash at `cf8c00e6cafcce363dddac3b04fdecc845f9101c`; branch cleanup was verified. Detailed [#162 evidence](https://github.com/cardozo81/orqetia/issues/162#issuecomment-6086075629).
+
+**Do not repeat the demonstration PR as an outstanding task.** The procedure below is reusable if the actual release candidate or future policy change needs fresh check evidence. A new candidate must pass on its own evaluated SHA; historical #172 results do not approve a new RC revision.
+
+The remaining Phase B gate is **not a missing technical test**: obtain explicit authorization to switch release integration to PRs, apply and read back branch rules with the nine exact required contexts, and verify non-destructive enforcement. #164's external security reporter and accepted real owner/fallback, and the #46 lifecycle decision, remain independent human gates. Until then maintain direct-`main` DEVELOPMENT, no required checks, no RC/tag/release.
+
+## Representative PR evidence (technical dry run; reusable procedure)
 
 1. Use a legitimate, bounded #162 documentation/governance change on one short-lived branch. Do **not** make an empty/no-op PR merely to obtain green checks. Inspect the diff; do not change the application, providers, deployment or secrets to run this dry run.
 2. Open PR into `main`; wait for the PR-triggered workflows. Do not activate required status checks in repository rules while DEVELOPMENT still uses direct writes to `main`.
