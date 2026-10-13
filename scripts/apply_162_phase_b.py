@@ -56,8 +56,7 @@ class GhCli:
             result = subprocess.run(
                 command,
                 input=json.dumps(payload) if payload is not None else None,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
                 check=False,
                 timeout=50,
