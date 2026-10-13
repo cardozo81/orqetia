@@ -1,12 +1,13 @@
 """Directed evidence for the #174 approved LOCAL/TEST epoch primitive.
 
-The currently deployed broker has not yet been migrated to this primitive.
+The public brokers reuse this primitive; their integration has separate tests.
 No operational volumes, credentials, services or OIDC markers are accessed.
 """
 
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 
 import pytest
 
@@ -30,7 +31,7 @@ def test_monotonic_expiry_rejects_after_wall_clock_rollback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monotonic = [0.0]
-    monkeypatch.setattr(epoch.time, "monotonic", lambda: monotonic[0])
+    monkeypatch.setattr(epoch, "time", SimpleNamespace(monotonic=lambda: monotonic[0]))
     ledger = epoch.LocalOidcEpochLedger(ttl_seconds=2, sweep_budget=4)
     ledger.issue("consumed")
     ledger.consume("consumed", ledger.generation)
@@ -47,7 +48,7 @@ def test_capacity_is_fail_closed_and_sweep_is_bounded(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monotonic = [0.0]
-    monkeypatch.setattr(epoch.time, "monotonic", lambda: monotonic[0])
+    monkeypatch.setattr(epoch, "time", SimpleNamespace(monotonic=lambda: monotonic[0]))
     ledger = epoch.LocalOidcEpochLedger(ttl_seconds=1, limit=3, sweep_budget=2)
     for index in range(3):
         ledger.issue(str(index))
@@ -79,7 +80,7 @@ def test_concurrent_consumers_have_exactly_one_winner() -> None:
 def test_forked_broker_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     ledger = epoch.LocalOidcEpochLedger()
     ledger.issue("synthetic")
-    monkeypatch.setattr(epoch.os, "getpid", lambda: -1)
+    monkeypatch.setattr(epoch, "os", SimpleNamespace(getpid=lambda: -1))
     with pytest.raises(PermissionError, match="process changed"):
         ledger.consume("synthetic", "unknown")
     with pytest.raises(PermissionError, match="process changed"):

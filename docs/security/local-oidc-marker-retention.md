@@ -2,7 +2,17 @@
 
 Issue: #174 (explicit delta to #165). Parent: #40. Roadmap: #47; gaps: #48.
 Lifecycle: **DEVELOPMENT**. Baseline: `ad00eec29874bee66038ae88ec9ce78925c229e5`.
-Status: **BLOCKED — restore freshness is not provable with the available state**.
+Status: **HISTORICAL file-deletion analysis — superseded for new transactions by
+[approved Option B](local-oidc-epoch-invalidations.md), integrated 2026-10-13**.
+
+The sections below characterize the pre-B file-backed policy at the stated
+baseline. Their counterexamples remain valid for restorable file/horizon schemes;
+they do not describe current broker admission or an outstanding architecture gate.
+Current brokers bind an ephemeral verifier generation to signed transactions,
+use bounded monotonic admission, and create no new marker files. All historical
+markers remain untouched. The old O_EXCL policy is explicitly injected only in
+synthetic historical tests; runtime uses the approved atomic in-memory transition.
+Operational approval and final evidence are tracked on #174; DEVELOPMENT remains.
 
 This document evaluates deletion, not an operational cleanup command. It reuses
 [local_oidc.py](../../src/orqetia/infrastructure/local_oidc.py), the existing

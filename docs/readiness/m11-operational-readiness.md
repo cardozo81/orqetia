@@ -13,7 +13,7 @@ rename the completed Local Docker Operational Homologation phase of #47.
 | Repository integrity | #162 Phase A; PR #172 integrated at `cf8c00e6cafcce363dddac3b04fdecc845f9101c`, 41/41 PR checks and 36/36 main checks | Phase B integration decision and administrative enforcement remain open; do not enable required checks by inference |
 | Local installation | #170 runtime qualification on 2026-10-09 | Documentation changes alone require no rebuild, restart or migration |
 | Concrete backup restore | #171: isolated PostgreSQL restore and extraction of two TARs | Does not establish whole-installation or host-loss recovery; #171 stays closed |
-| Five-volume coverage | #173; [volume inventory](../operations/volume-recovery-inventory.md): observed mounts/metadata, OIDC expiry tests and isolated Caddy reconstruction | #174 remains open: destructive retention blocked by restore-freshness proof; [safety specification](../security/local-oidc-marker-retention.md), no collector or operational purge |
+| Five-volume coverage | #173; [volume inventory](../operations/volume-recovery-inventory.md): observed mounts/metadata, OIDC expiry tests and isolated Caddy reconstruction | #174 approved [Option B](../security/local-oidc-epoch-invalidations.md) integrated: bounded ephemeral admission, no new markers; closure requires CI and authorized Docker evidence on #174. Historical markers preserved; no collector or purge |
 | Private security intake | #164: reporting enabled; public button observed | External non-admin verification and explicit owner/fallback acceptance remain pending |
 | Independent recovery domain | #48; [host-loss plan](../operations/host-loss-recovery-plan.md) | Destination, custody, retention, costs and isolated drill require a separate decision |
 
@@ -55,6 +55,8 @@ Close #173 only when its classification/preservation criteria are evidenced.
 Any objectively demonstrated functional gap gets a separate issue before code
 changes. Keep #162 and #164 open until their own gates are met.
 
-No paid providers, external backup transfer, operational volume modification,
+The #174 user instruction separately authorizes the narrow post-CI runtime
+update documented in its ADR; the original documentary pack alone does not.
+No paid providers, external backup transfer, destructive operational volume modification,
 credential/user/certificate changes, trust-store changes, ruleset changes,
 `docker compose down -v`, RC, tag, release or RASAi mutation are authorized.

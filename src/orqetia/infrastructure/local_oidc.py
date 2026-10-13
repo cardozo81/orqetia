@@ -11,7 +11,6 @@ import base64
 import hashlib
 import hmac
 import json
-import os
 import secrets
 import time
 from dataclasses import dataclass
@@ -32,6 +31,7 @@ from orqetia.infrastructure.customer_portal.app import (
     CustomerPortalOidcAuthorizationStart,
     CustomerPortalOidcRejected,
 )
+from orqetia.infrastructure.local_oidc_epoch import LocalOidcEpochLedger
 
 LOCAL_OIDC_ISSUER = "https://orqetia.local/dev-idp"
 LOCAL_OIDC_SIGNING_KEY_PATH = Path(
@@ -186,6 +186,8 @@ class _LocalBrokerBase:
         self._audience = audience
         self._callback_url = callback_url
         self._idp_public_url = idp_public_url.rstrip("/")
+        # Constructed once by each LOCAL/TEST BFF process; never restored from disk.
+        self._epoch = LocalOidcEpochLedger(ttl_seconds=_TOKEN_TTL_SECONDS)
 
     def _start(self) -> tuple[str, str]:
         now = int(time.time())
@@ -198,6 +200,7 @@ class _LocalBrokerBase:
         payload: dict[str, object] = {
                 "v": 1,
                 "kind": "transaction",
+                "generation": self._epoch.generation,
                 "issuer": LOCAL_OIDC_ISSUER,
                 "audience": self._audience,
                 "callback": self._callback_url,
@@ -208,6 +211,7 @@ class _LocalBrokerBase:
                 "exp": now + _TOKEN_TTL_SECONDS,
             }
         transaction = _sign(payload, self._key)
+        self._epoch.issue(transaction)
         authorization_url = (
             f"{self._idp_public_url}/authorize?"
             + urlencode({"transaction": transaction})
@@ -264,16 +268,10 @@ class _LocalBrokerBase:
                 raise ValueError("authenticated_at is invalid")
             if not 0 <= int(time.time()) - authenticated_at_raw <= _TOKEN_TTL_SECONDS:
                 raise ValueError("authentication time is invalid")
-            LOCAL_USED_CODES_PATH.mkdir(mode=0o700, parents=True, exist_ok=True)
-            try:
-                descriptor = os.open(
-                    LOCAL_USED_CODES_PATH / transaction_hash,
-                    os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600,
-                )
-            except FileExistsError as error:
-                raise ValueError("authorization transaction already consumed") from error
-            else:
-                os.close(descriptor)
+            generation = _require_string(transaction, "generation")
+            if not generation.isascii():
+                raise ValueError("invalid LOCAL OIDC generation")
+            self._epoch.consume(public_transaction, generation)
         except ValueError as error:
             raise PermissionError(str(error)) from error
 
@@ -292,7 +290,10 @@ class _LocalBrokerBase:
 
 class LocalBackofficeOidcBroker(_LocalBrokerBase):
     async def begin_login(self) -> OidcAuthorizationStart:
-        authorization_url, transaction = self._start()
+        try:
+            authorization_url, transaction = self._start()
+        except PermissionError as error:
+            raise OidcLoginRejected(str(error)) from error
         return OidcAuthorizationStart(
             authorization_url=authorization_url,
             transaction_token=transaction,
@@ -317,7 +318,10 @@ class LocalBackofficeOidcBroker(_LocalBrokerBase):
 
 class LocalCustomerPortalOidcBroker(_LocalBrokerBase):
     async def begin_login(self) -> CustomerPortalOidcAuthorizationStart:
-        authorization_url, transaction = self._start()
+        try:
+            authorization_url, transaction = self._start()
+        except PermissionError as error:
+            raise CustomerPortalOidcRejected(str(error)) from error
         return CustomerPortalOidcAuthorizationStart(
             authorization_url=authorization_url,
             transaction_token=transaction,

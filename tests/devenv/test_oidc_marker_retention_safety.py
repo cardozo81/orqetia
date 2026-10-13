@@ -1,7 +1,9 @@
-"""#174 safety evidence, not a collector: all deletion is synthetic tmp_path only.
+"""Historical #173/#174 file-ledger model; NOT current production admission.
 
 Tests named counterexample intentionally demonstrate why the candidate must not
-ship. The signed-horizon helper is a test model, never used by runtime admission.
+ship. The old O_EXCL policy is injected explicitly; signatures and OIDC checks
+still use the real brokers. All files/keys are synthetic. The current epoch
+contract is tested separately in test_local_oidc_broker_epoch.py.
 """
 
 from __future__ import annotations
@@ -29,6 +31,29 @@ REJECTIONS = (OidcLoginRejected, CustomerPortalOidcRejected)
 ISSUED_AT = 1_800_000_000
 
 
+class HistoricalFileLedger:
+    """Only the pre-B admission policy, retained to characterize counterexamples."""
+
+    generation = "historical-test-model"
+
+    def __init__(self, *, ttl_seconds: int) -> None:
+        pass
+
+    def issue(self, public_transaction: str) -> None:
+        pass
+
+    def consume(self, public_transaction: str, generation: str) -> None:
+        digest = hashlib.sha256(public_transaction.encode()).hexdigest()
+        oidc.LOCAL_USED_CODES_PATH.mkdir(mode=0o700, parents=True, exist_ok=True)
+        try:
+            descriptor = os.open(oidc.LOCAL_USED_CODES_PATH / digest,
+                                 os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError as error:
+            raise PermissionError("authorization transaction already consumed") from error
+        else:
+            os.close(descriptor)
+
+
 @dataclass
 class Clock:
     now: int = ISSUED_AT
@@ -52,6 +77,10 @@ class Harness:
     audience: str
     clock: Clock
     key: str = field(default_factory=lambda: secrets.token_urlsafe(48), repr=False)
+    active: Broker = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self.active = self.broker()
 
     def broker(self, environment: str = "test") -> Broker:
         cls = (oidc.LocalBackofficeOidcBroker if self.audience == "backoffice"
@@ -64,7 +93,7 @@ class Harness:
 
     def issue(self, code_delay: int = 0) -> Login:
         async def begin() -> tuple[str, str]:
-            start = await self.broker().begin_login()
+            start = await self.active.begin_login()
             return start.authorization_url, start.transaction_token
 
         url, private_transaction = asyncio.run(begin())
@@ -84,7 +113,7 @@ class Harness:
         return Login(code, str(payload["state"]), private_transaction, digest, deadline)
 
     def complete(self, login: Login, broker: Broker | None = None) -> HumanAuthenticationContext:
-        return asyncio.run((broker or self.broker()).complete_login(
+        return asyncio.run((broker or self.active).complete_login(
             code=login.code, state=login.state, transaction_token=login.transaction_token,
         ))
 
@@ -96,6 +125,7 @@ class Harness:
 def harness(request: pytest.FixtureRequest, tmp_path: Path,
             monkeypatch: pytest.MonkeyPatch) -> Harness:
     clock = Clock()
+    monkeypatch.setattr(oidc, "LocalOidcEpochLedger", HistoricalFileLedger)
     result = Harness(tmp_path / "ledger", str(request.param), clock)
     monkeypatch.setattr(oidc, "LOCAL_USED_CODES_PATH", result.ledger)
     # Replace this module's clock, not asyncio's or the process-global time module.

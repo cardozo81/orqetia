@@ -10,7 +10,7 @@ Contract baseline: `cf8c00e6cafcce363dddac3b04fdecc845f9101c`.
 | --- | --- | --- | --- |
 | `postgres_data` | `/var/lib/postgresql`; postgres | Authoritative database: identities, sessions, tasks, queue/outbox/inbox, client-private artifacts, accounting and audit facts | Consistent PostgreSQL 18 dump, schema/Alembic compatibility and separate secret recovery material; empty storage loses durable facts, bootstrap is not restore |
 | `local_data` | `/var/lib/orqetia`; bootstrap/backoffice RW; worker/portal/local-idp RO | Installation-specific credentials, signing and secret-store material; sensitive, not safely replaceable by regenerating bootstrap | Protected matching backup plus database point and permissions; loss can invalidate access/signatures or secret resolution; do not rotate/reseed as a recovery shortcut |
-| `oidc_state` | `/var/lib/orqetia/oidc-used`; backoffice/portal RW, nested over local_data | Ephemeral anti-replay ledger, security-relevant while signed transactions remain valid; zero-content markers created atomically | Consistent short-lived ledger or controlled temporal invalidation before reopening login; missing/old ledger can permit replay of still-valid consumed transactions |
+| `oidc_state` | `/var/lib/orqetia/oidc-used`; backoffice/portal RW, nested over local_data | Historical file-backed anti-replay markers preserved unchanged; current #174 B brokers create no new persistent markers | Stop all old verifiers/IdP ingress before restore, then initialize fresh ephemeral generations; old pending logins reject even with restored disk/clock. Sessions remain in the independent database contract |
 | `caddy_data` | `/data`; gateway RW | Installation-specific PKI/private keys and TLS storage; preserve identity and trust | Protected verified backup; fresh generation is not equivalent to recovering the existing CA and may break trusted TLS |
 | `caddy_config` | `/config`; gateway RW | Derived configuration, verified against versioned Caddyfile and isolated startup below | Recreate from versioned Caddyfile and compatible Caddy image; existing startup uses that source, not resume; caddy_data is a separate PKI dependency |
 
@@ -30,7 +30,20 @@ oidc_state mount; copying the local_data volume directly need not include it.
 Verify aggregate archive coverage and capture topology before claiming parity.
 There was no independent caddy_config backup/reconstruction proof in #171.
 
-## OIDC expiry and safe recovery boundary
+## Current OIDC recovery delta — #174 (2026-10-13)
+
+[Approved Option B](../security/local-oidc-epoch-invalidations.md) replaces new
+file admission with a bounded process-owned registry. Restart invalidates pending
+login; users begin again. Existing sessions retain their independent contract.
+Backoffice and Portal each admit only transactions issued by their live verifier;
+multiple workers/replicas require an explicit affinity contract. Never restore
+process memory or reuse a generation from storage. Stop all original verifiers
+and IdP ingress before restoring authentication state; then start fresh processes.
+Legacy files and the #171 backup archives remain preserved. No operational purge
+is authorized. Runtime acceptance and exact SHA/image are recorded on #174.
+The following dated sections remain historical #173 evidence, not current policy.
+
+## Historical OIDC expiry and safe recovery boundary (#173 baseline)
 
 [local_oidc.py](../../src/orqetia/infrastructure/local_oidc.py) uses a 300-second
 TTL for signed transactions and authorization codes, validates signature,
@@ -136,10 +149,9 @@ Subsequent #174 analysis is recorded in the
 [marker retention safety specification](../security/local-oidc-marker-retention.md).
 Synthetic counterexamples show that finite waiting and a same-store signed
 rejection horizon do not establish safety when that horizon and the clock can
-both be restored backwards. Destructive implementation remains blocked pending
-an explicit non-rollback authority or restart/restore invalidation contract.
-The runtime still retains all markers; there is no collector or operational purge.
-The trusted-clock prerequisite of the recovery procedure above remains essential.
+both be restored backwards. That historical gate was resolved by the explicit #174 Option B approval and
+broker integration above. Its restart protocol replaces the old trusted-clock
+recovery prerequisite for B transactions; no legacy collector or purge is shipped.
 
 ### Caddy reconstruction evidence
 

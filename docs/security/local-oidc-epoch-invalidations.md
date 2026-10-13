@@ -1,6 +1,6 @@
 # ADR — LOCAL/TEST OIDC restart invalidation (Option B)
 
-**State:** APPROVED ARCHITECTURE / IMPLEMENTATION PENDING. **Issue:** #174. **Lifecycle:** DEVELOPMENT. **Decision recorded:** 2026-10-10, explicitly authorized by the repository user. **Historic baseline:** `e954ae6bad0391a494a581f59fb2311be75b4929`.
+**State:** IMPLEMENTED / operational evidence tracked in #174. **Issue:** #174. **Lifecycle:** DEVELOPMENT. **Decision recorded:** 2026-10-10, explicitly authorized by the repository user. **Historic baseline:** `e954ae6bad0391a494a581f59fb2311be75b4929`.
 
 This document authorizes the **security semantics** of restart invalidation, not a destructive cleanup of the existing Docker `oidc_state` volume, a release promotion or a change to production OIDC. The earlier [retention counterexamples](local-oidc-marker-retention.md) remain valid for any scheme that re-accepts restorable state.
 
@@ -47,17 +47,69 @@ Before changing any running Docker installation, test the actual brokers:
 7. Marker files from the real installation and the previous #171 archives are not accessed or altered during these tests. Local Windows symlink restrictions are not disguised as successful coverage.
 8. When code is integrated, confirm targeted Ruff/mypy/tests, all required GitHub CI checks on final `main` HEAD, and record in #174/#47/#48. Runtime update is a **separate** operational decision with backup point and narrow HTTPS login/RBAC checks.
 
-## Implementation checkpoint — security primitive only
+## Broker integration — 2026-10-13
 
-- `src/orqetia/infrastructure/local_oidc_epoch.py` supplies an ephemeral process-generation registry with bounded capacity (4,096), bounded heap sweep (64), monotonic 301-second expiry, atomic consume-once and PID/fork fail-closed.
-- `tests/devenv/test_local_oidc_epoch.py` exercises the primitive's restart generation, rollback, concurrent consume, bounded capacity and fork denial with generated synthetic inputs.
-- **The existing `LocalBackofficeOidcBroker` and `LocalCustomerPortalOidcBroker` are NOT wired to the new primitive.** Their existing file-backed replay policy is still operational, and the application continues to create file markers until that targeted integration is completed.
-- **No legacy marker has been deleted; no collector was added.** Do not interpret the existence of the primitive or its tests as a complete #174 fix or approval of a Docker rollout. Before wiring, adapt the previously accepted #173/#174 tests to the explicitly changed restart contract, retaining the old rollback counterexample as historical synthetic evidence. Run a real broker/IdP/callback regression and review CI before declaring completed.
-- The primitive's `ttl_seconds + 1` monotonic fence is deliberately conservative with respect to the existing wall-clock integer expiry, inclusive at the exact last second. Once its record is removed, an old token remains rejected as missing.
-- Security boundary remains: restore must stop ALL old verifiers first, and multi-replica/same-audience callback affinity is not implemented. No production OIDC guarantees are implied.
+Both `LocalBackofficeOidcBroker` and `LocalCustomerPortalOidcBroker` now construct
+one `LocalOidcEpochLedger` at verifier initialization. The existing application
+entry points construct one broker per process. The signed public/private
+transaction contains `generation`; the IdP's existing transaction-hash binding
+covers it without a second authentication mechanism. Only a digest issued by
+that same live verifier may atomically transition to consumed. Missing/legacy
+generation, another verifier, fork, unknown digest and replay all deny.
+
+The primitive is reused unchanged: at most **4,096 pending plus consumed entries**
+and 4,096 heap items per verifier; at most **64 expired entries removed per
+successful issue/consume operation**, each with O(log 4096) heap work. No disk
+scan or persistent write occurs during issuance/consumption. At capacity the
+public broker maps denial to its existing login exception (HTTP 503 on start),
+without evicting valid reservations. Failed initialization/clock operations never
+fall back to persistent admission. Existing legacy files are neither read nor
+removed. An idle process may keep expired entries until another successful
+operation or exit, but cannot exceed the fixed capacity.
+
+Signed wall-clock expiry remains inclusive at `int(time.time()) == exp`.
+Monotonic deadline is sampled on issuance as `monotonic() + 301`; equality at
+that fence is accepted if all other checks pass, strictly later is denied.
+The extra second conservatively covers the signed integer-second boundary.
+Civil-clock rollback cannot reverse monotonic expiry or consumption. Once swept,
+a digest is rejected as unknown even if the signed tuple appears valid again.
+This assumes the OS process-monotonic clock contract; restoring live process
+memory/VM snapshots is outside the approved recovery protocol.
+
+Directed evidence:
+- `test_local_oidc_broker_epoch.py`: both real public brokers, exact/late expiry,
+  replay, concurrent callbacks, restart/restored files, civil rollback before
+  and after bounded expiry, 4,096-entry capacity, fork, entropy/clock faults,
+  signature-bound field validation and zero legacy filesystem I/O.
+- `test_local_oidc_http_epoch.py`: real IdP and BFF routes, valid callback,
+  replay with original transaction cookie, pending callback after replacement,
+  and established session accepted by a fresh verifier with the same independent
+  session store. `test_local_oidc.py` also exercises both audiences and origin/PKCE.
+- `test_oidc_state_recovery.py` records the approved delta to #173; the earlier
+  filesystem/restore counterexamples remain explicitly injected **historical
+  admission models** in `test_oidc_marker_retention_safety.py`, not runtime code.
+- Primitive tests retain concurrency, bounded sweep and process ownership checks.
+
+## Authorized Windows runtime validation
+
+The 2026-10-13 user instruction explicitly authorizes operational rollout **after
+code review, directed tests and green final-HEAD CI**. Review the delta against
+installed code; compare aggregate credentials/CA/legacy hashes, volume identity,
+mounts and original local backups before/after. Rebuild the shared image and
+recreate only affected long-running application services without removing volumes.
+Preserve successful existing migrate/bootstrap jobs when their code/schema did
+not change; verify exit 0. Never rerun bootstrap as a credential recovery shortcut.
+Verify all eight services, HTTPS login/callback/replay for both audiences and
+preservation of established sessions across an actual verifier restart. Record
+image/content provenance and sanitized results on #174 before closure.
+
+No deletion or migration of historical markers is part of rollout. An old-image
+rollback reintroduces persistent writes and the old recovery contract; drain all
+verifiers/IdP ingress first and do not mix generations/policies as an availability
+workaround. A failed security smoke blocks runtime acceptance and issue closure.
 
 ## Release and ownership gates
 
-This architectural approval changes #174 from **BLOCKED_HUMAN** to **READY_FOR_SAFE_IMPLEMENTATION**; it does **not** close it. No code or garbage collector is considered delivered by the ADR alone. No operational deletion, credential/key rotation, CA/trust-store change, database migration, Docker reset, new service/cost or RASAi mutation is authorized.
+The approved B contract supersedes the earlier restore-freshness implementation gate. Close #174 only after broker integration, negative tests, green CI and explicitly authorized Docker acceptance are evidenced. No operational deletion, credential/key rotation, CA/trust-store change, database migration, Docker reset, new service/cost or RASAi mutation is authorized.
 
 Independent pre-RC gates #162 and #164 and the off-host recovery decision remain open. **DEVELOPMENT**.
