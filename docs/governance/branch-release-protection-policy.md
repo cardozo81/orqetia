@@ -1,15 +1,21 @@
 # Branch and release protection policy
 
 **Policy version:** `branch-release-v1`  
-**Issue:** #156  
-**External human gate:** #162  
+**Issue:** #156; administrative implementation #162 **CLOSED**  
+**Remaining pre-RC human gate:** #164; lifecycle decision: #46  
 **Product state:** DEVELOPMENT
 
-This policy is compatible with the current single-agent/direct-`main` development
-model. It does not claim that GitHub branch protection is enabled when the current
-integration cannot verify or write that setting.
+## Enforced integration policy — 2026-10-13 (authoritative)
 
-## Authorized sequencing decision — 2026-10-13 (supersedes prior #164-first instructions)
+- `main` is protected by active ruleset `24785675`, scoped to the default branch only, with `deletion`, `non_fast_forward`, `pull_request` and `required_status_checks`. No bypass actors are configured.
+- **Every new change to `main` must use a genuine, short-lived PR**, not a direct commit or force-push. Zero approving reviews are required for the single-agent workflow; disabling checks or using administrator bypass is prohibited.
+- The nine required GitHub Actions job contexts (app ID `15368`) are `baseline`, `pre-rc-security`, `schema-compatibility`, `supply-chain`, `postgres-restore-drill`, `availability-contract`, `observability-contract`, `operational-runbooks` and `quality`. Merge only after successful checks for the PR revision and GitHub's branch rules are satisfied.
+- `delete_branch_on_merge=true`; no merge queue. Representative enforcement was exercised by [PR #176](https://github.com/cardozo81/orqetia/pull/176) and [PR #177](https://github.com/cardozo81/orqetia/pull/177), 40/40 successful checks each. The final #162 checkpoint is [here](https://github.com/cardozo81/orqetia/issues/162#issuecomment-6150369672) at `main@a19799cf0184fea424683bb72306cfdf7c57e1ab` (35/35 successful push checks).
+- #162 is complete; **#164 remains OPEN and mandatory before any first RC**, alongside the explicit #46 lifecycle decision. No tag, RC or release is authorized.
+
+**Historical boundary:** Sections below describing direct-`main` commits as permitted, Phase B as not applied, or #162 as OPEN are preserved as **dated historical snapshots and procedures**, not current authorization. The enforced policy above takes precedence.
+
+## Historical authorization decision — 2026-10-13 (supersedes prior #164-first instructions)
 
 [Explicit authorization in #162](https://github.com/cardozo81/orqetia/issues/162#issuecomment-6144816554) separates **repository enforcement**
 from **security-intake operational acceptance**. #162 Phase B (require PR, nine
@@ -37,7 +43,7 @@ read-back and an objectively non-destructive enforcement demonstration to close
 enforcement is activated; afterward use short-lived PR integration. Automation
 may not silently disable the ruleset to accommodate direct pushes.
 
-## Current verification — 2026-10-13 (supersedes dated operational to-do items below)
+## Historical verification — 2026-10-13, before #162 enforcement
 
 - The Phase A repository ruleset `24785675` is **active** for the default branch and enforces `deletion` and `non_fast_forward`, with no bypass actors; `main.protected=true`. It deliberately does not require PRs or status checks during single-agent DEVELOPMENT.
 - The technical representative PR stage **was completed**, not left pending: [PR #172](https://github.com/cardozo81/orqetia/pull/172), head `97dac6539669a52f38b6d8126d7673c6da9bcd9c`, demonstrated **41/41 successful GitHub Actions checks**, including all eight uniquely named, substantive release contexts and additional `quality`. The PR was squash-merged as `cf8c00e6cafcce363dddac3b04fdecc845f9101c`; its temporary branch was deleted after content-equivalence verification. See [#162 evidence](https://github.com/cardozo81/orqetia/issues/162#issuecomment-6086075629).
@@ -98,7 +104,7 @@ particular change does not trigger them. Do not weaken the release criteria to
 work around the status-check configuration problem.
 
 
-## DEVELOPMENT policy
+## Superseded DEVELOPMENT direct-main policy (historical)
 
 While the project remains DEVELOPMENT and one autonomous agent is the only writer:
 
@@ -132,7 +138,7 @@ Additional boundary-specific checks may remain required when they protect code
 touched by the release candidate. Required checks are not permission to run paid
 providers.
 
-## Main branch protection target
+## Historical main branch protection target (fulfilled by #162)
 
 Before first RC, #162 must be completed using repository-administration access:
 
@@ -163,7 +169,7 @@ An exception to a required check or protection must be explicit, bounded to one
 release/change, and record reason, owner, affected control and expiry. Disabling a
 gate because it is inconvenient is not an acceptable permanent exception.
 
-## Verification responsibility
+## Historical verification responsibility (before #162 closure)
 
 The agent can verify repository metadata and visible rulesets but cannot currently
 read `main` protection or write repository settings with the available connector.
