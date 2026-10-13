@@ -2,6 +2,16 @@
 
 **Scope:** issue #162; roadmap #47; lifecycle remains **DEVELOPMENT** until #46 explicitly authorizes a release. This document is a technical readiness runbook, not authorization to issue a tag, prerelease or RC.
 
+## Verified current state — 2026-10-13 (authoritative)
+
+The administrative enforcement in **#162 is complete (CLOSED)**, not an outstanding action. GitHub ruleset `24785675` is active only for `main`, requires genuine pull requests and the nine named GitHub Actions checks below (integration ID `15368`), retains deletion/non-fast-forward protection, and has no bypass actors or required approving reviews. `delete_branch_on_merge=true`; merge queue is disabled. [Final #162 evidence](https://github.com/cardozo81/orqetia/issues/162#issuecomment-6150369672) records 40/40 passing checks on each of PRs #176 and #177, and 35/35 on the checkpoint commit. [PR #178](https://github.com/cardozo81/orqetia/pull/178) subsequently integrated the branch-policy reconciliation with 41/41 passing PR checks and 36/36 on `main@18dd4ff0db2595be86307e85391c7e612fec9df1`.
+
+**Current procedure:** use a scoped temporary branch and a real PR for each `main` change. Verify the required checks against the actual tested revision before merging. Never use direct commits to `main` or repeat the admin helper simply to reproduce #162. The old sequencing, temporary direct-`main` allowance, administrative activation and demonstration steps below are retained as historical procedures and are **not outstanding work or current authorization**.
+
+**Still unresolved:** #164 requires a genuine external non-admin security reporter and explicit acceptance by primary and fallback/on-call personnel. The #46 release-lifecycle decision is separate. These remain mandatory before the first RC; product stays **DEVELOPMENT**, with no RC, tag or release authorized. Disaster recovery after complete host loss is independently tracked in #48.
+
+---
+
 ## Authorized sequencing — 2026-10-13 (supersedes older #164-first gate)
 
 The responsible party explicitly authorized [independent completion of #162](https://github.com/cardozo81/orqetia/issues/162#issuecomment-6144816554).
@@ -41,7 +51,7 @@ The Phase B **technical PR check-evidence exercise is already DONE**: [PR #172](
 
 **Do not repeat the demonstration PR as an outstanding task.** The procedure below is reusable if the actual release candidate or future policy change needs fresh check evidence. A new candidate must pass on its own evaluated SHA; historical #172 results do not approve a new RC revision.
 
-The remaining Phase B gate is **not a missing technical test**: obtain explicit authorization to switch release integration to PRs, apply and read back branch rules with the nine exact required contexts, and verify non-destructive enforcement. #164's external security reporter and accepted real owner/fallback, and the #46 lifecycle decision, remain independent human gates. Before enforcement, direct-`main` DEVELOPMENT continues; after verified enforcement, integration uses PRs with the nine checks. No RC/tag/release is authorized.
+**Historical Phase B preparation (now completed by #162):** This paragraph previously instructed the administrator to authorize PR integration and install the nine required checks. That enforcement is now active and verified as described above. #164 and #46 remain independent pre-RC gates. Direct-`main` updates are no longer permitted; no RC/tag/release is authorized.
 
 ## Representative PR evidence (technical dry run; reusable procedure)
 
