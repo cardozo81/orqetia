@@ -6,6 +6,16 @@ The private-reporting feature was enabled and read back on 2026-10-09 according
 to #164. Public button visibility alone does not prove external access or human
 triage readiness. The gate remains OPEN until both criteria below are satisfied.
 
+## Independent administrative enforcement — approved 2026-10-13
+
+An [explicit #162 sequencing decision](https://github.com/cardozo81/orqetia/issues/162#issuecomment-6144816554) allows
+repository PR/required-check enforcement to be applied and closed **before**
+this private-intake human gate is satisfied. **#164 does not block #162
+administrative enforcement**, but **does continue to block the first RC**
+and must remain OPEN until both independent operational acceptance criteria
+below are actually evidenced. No alternative accounts, invented owners,
+security reports or private disclosure details are created by this decision.
+
 ## External access acceptance
 
 An authorized coordinator invites a real external non-admin reporter to sign in

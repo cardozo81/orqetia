@@ -9,6 +9,34 @@ This policy is compatible with the current single-agent/direct-`main` developmen
 model. It does not claim that GitHub branch protection is enabled when the current
 integration cannot verify or write that setting.
 
+## Authorized sequencing decision — 2026-10-13 (supersedes prior #164-first instructions)
+
+[Explicit authorization in #162](https://github.com/cardozo81/orqetia/issues/162#issuecomment-6144816554) separates **repository enforcement**
+from **security-intake operational acceptance**. #162 Phase B (require PR, nine
+exact substantive required checks from GitHub Actions, and verified automatic PR
+branch cleanup) may be administered, read back and closed **independently of
+#164**. A completed #164 is **not a prerequisite for enforcing #162**.
+This supersedes any earlier phase-B procedure/checklist/comment requiring
+external security-intake evidence before GitHub branch rules are activated.
+
+The security-intake human gate #164 **remains OPEN and mandatory before the first
+Release Candidate**: an actual external non-admin reporter must verify access to
+the private form, and real owner and fallback/on-call must explicitly accept
+their responsibilities. Never invent an identity, acceptance or test report.
+#46 still requires a separate explicit lifecycle/release decision; **DEVELOPMENT**
+continues, with no RC, tags, prerelease, release or GA authorized.
+
+The technical proof from PR #172 (41/41 successful checks) and administrative
+preflight (nine named contexts from the GitHub Actions app, integration ID
+`15368`) can be reused; do not create another empty or artificial PR. Protect
+`main` against deletion/force push, preserve existing ruleset `24785675`,
+and apply nine checks only after verifying actual PR job identity and continuity.
+Single-agent PR integration must not demand impossible self-review. Require
+read-back and an objectively non-destructive enforcement demonstration to close
+#162. Existing direct-`main` instructions below are historical *until* this
+enforcement is activated; afterward use short-lived PR integration. Automation
+may not silently disable the ruleset to accommodate direct pushes.
+
 ## Current verification — 2026-10-13 (supersedes dated operational to-do items below)
 
 - The Phase A repository ruleset `24785675` is **active** for the default branch and enforces `deletion` and `non_fast_forward`, with no bypass actors; `main.protected=true`. It deliberately does not require PRs or status checks during single-agent DEVELOPMENT.

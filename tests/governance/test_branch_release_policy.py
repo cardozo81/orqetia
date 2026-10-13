@@ -130,3 +130,23 @@ def test_release_pr_runbook_requires_all_substantive_checks_and_human_gates() ->
         "delete_branch_on_merge=true",
     ):
         assert condition in text
+
+def test_phase_b_enforcement_is_independent_from_private_intake_before_rc() -> None:
+    """#162 may enforce PRs without pretending #164 is accepted or permitting RC."""
+    policy = POLICY.read_text(encoding="utf-8")
+    runbook = (
+        ROOT / "docs" / "governance" / "rc-check-evidence-runbook.md"
+    ).read_text(encoding="utf-8")
+    intake = (
+        ROOT / "docs" / "security" / "private-intake-operational-acceptance.md"
+    ).read_text(encoding="utf-8")
+
+    assert "not a prerequisite for enforcing #162" in policy
+    assert "#164 is not a prerequisite for applying #162" in runbook
+    assert "Do not wait for #164 to administer #162" in runbook
+    assert "#164 does not block #162" in intake
+    assert "mandatory before the first" in policy
+    assert "mandatory pre-RC gate" in runbook
+    assert "does continue to block the first RC" in intake
+    assert "no RC, tag" in runbook
+    assert "1. Confirm #164's private reporter access" not in runbook

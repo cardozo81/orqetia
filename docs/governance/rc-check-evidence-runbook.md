@@ -2,6 +2,22 @@
 
 **Scope:** issue #162; roadmap #47; lifecycle remains **DEVELOPMENT** until #46 explicitly authorizes a release. This document is a technical readiness runbook, not authorization to issue a tag, prerelease or RC.
 
+## Authorized sequencing — 2026-10-13 (supersedes older #164-first gate)
+
+The responsible party explicitly authorized [independent completion of #162](https://github.com/cardozo81/orqetia/issues/162#issuecomment-6144816554).
+**#164 is not a prerequisite for applying #162 administrative enforcement**:
+the single-agent PR-based integration and all nine substantive GitHub Actions
+required checks may be enabled and verified with existing administrator access.
+The old operational condition to finish external private vulnerability intake
+**before setting repository rules** no longer applies.
+
+This is **not** permission to close #164 or release the product. #164 remains an
+independent **mandatory pre-RC gate** requiring real external non-admin reporter
+verification and separately accepted security owner/fallback/on-call. #46 is
+another independent lifecycle decision; DEVELOPMENT persists and **no RC, tag
+or release** is authorized here. A GitHub ruleset read-back or CI pass cannot
+substitute for #164's human acceptance. Do not fabricate identities or evidence.
+
 ## Contexts that must succeed
 
 The following are **GitHub Actions job/check-run names**, not workflow display names. All eight must run their original substantive steps on every PR targeting `main`, and the separate quality gate must also succeed.
@@ -25,7 +41,7 @@ The Phase B **technical PR check-evidence exercise is already DONE**: [PR #172](
 
 **Do not repeat the demonstration PR as an outstanding task.** The procedure below is reusable if the actual release candidate or future policy change needs fresh check evidence. A new candidate must pass on its own evaluated SHA; historical #172 results do not approve a new RC revision.
 
-The remaining Phase B gate is **not a missing technical test**: obtain explicit authorization to switch release integration to PRs, apply and read back branch rules with the nine exact required contexts, and verify non-destructive enforcement. #164's external security reporter and accepted real owner/fallback, and the #46 lifecycle decision, remain independent human gates. Until then maintain direct-`main` DEVELOPMENT, no required checks, no RC/tag/release.
+The remaining Phase B gate is **not a missing technical test**: obtain explicit authorization to switch release integration to PRs, apply and read back branch rules with the nine exact required contexts, and verify non-destructive enforcement. #164's external security reporter and accepted real owner/fallback, and the #46 lifecycle decision, remain independent human gates. Before enforcement, direct-`main` DEVELOPMENT continues; after verified enforcement, integration uses PRs with the nine checks. No RC/tag/release is authorized.
 
 ## Representative PR evidence (technical dry run; reusable procedure)
 
@@ -48,7 +64,7 @@ Cross-check PR-triggered workflow run event, revision, job ID and app; GitHub ma
 
 ## Administrative enforcement, only when RC integration is explicitly authorized
 
-1. Confirm #164's private reporter access, real accepted security owner and on-call fallback; obtain #46 release-transition authorization separately. No implied RC from green CI.
+1. Confirm the explicit #162 sequencing/enforcement authorization and nine real PR job contexts, including GitHub Actions app identity. **Do not wait for #164 to administer #162**; independently keep #164 OPEN as a non-waivable pre-RC operational gate. Obtain #46 release-transition authorization separately before any RC/tag/release. No implied RC from green CI.
 2. Designate PR-based integration for release candidates, including an explicit handling strategy for the single-agent author/reviewer and emergency changes. Do not require self-review that GitHub cannot accept.
 3. In GitHub repository ruleset administration, read back the existing active Phase A ruleset ID `24785675`, targeting only the default branch, with `deletion` and `non_fast_forward` and zero bypass actors. Preserve those restrictions.
 4. Once the PR workflow and all nine exact contexts have been verified, enforce requiring a PR and requiring successful status checks for release integration. Bind checks to the GitHub Actions app; never require a path-skipped workflow. Avoid merge queue until its separate integration checks are actually tested.
