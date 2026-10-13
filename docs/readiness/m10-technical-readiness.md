@@ -3,7 +3,7 @@
 **Pack:** `m10-readiness-v1`  
 **Issue:** #163  
 **Product lifecycle:** DEVELOPMENT  
-**Release-governance human gate:** #162
+**Release-governance enforcement:** #162 CLOSED (verified); **remaining pre-RC human gate:** #164
 
 This pack records technical integration evidence only. It does **not** declare RC,
 GA, production readiness or authorize a release.
@@ -49,9 +49,8 @@ synthetic/deterministic. No paid provider or external identity service is used.
 
 ## Residual gates deliberately not closed by this pack
 
-- #162 — repository branch protection/settings require administration access not
-  available to the current connector and still block first RC/M10 final release
-  governance;
+- #162 — repository branch protection and nine required checks are **already applied and verified** (CLOSED). [Final administrative evidence](https://github.com/cardozo81/orqetia/issues/162#issuecomment-6150369672); all new `main` changes use genuine PRs. This is not a remaining release gate;
+- #164 — external non-admin private security intake verification and explicitly accepted primary/fallback-on-call remain **OPEN and mandatory before the first RC**;
 - #28 — visual brand approval is human-gated and non-blocking for technical
   integration;
 - #41 and #135 remain FUTURE/outside the first delivery;
