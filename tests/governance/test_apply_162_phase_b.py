@@ -76,7 +76,7 @@ class FakeGitHub:
             pull_request["parameters"].update(
                 {
                     "required_reviewers": [],
-                    "require_extra_approval_for_unattributed_changes": False,
+                    "require_extra_approval_for_unattributed_changes": True,
                     "allowed_merge_methods": ["merge", "squash", "rebase"],
                 }
             )
@@ -136,7 +136,7 @@ def test_apply_and_readback_preserve_protections_and_all_nine_checks() -> None:
     assert rules["pull_request"]["parameters"]["required_reviewers"] == []
     assert rules["pull_request"]["parameters"][
         "require_extra_approval_for_unattributed_changes"
-    ] is False
+    ] is True
     assert rules["pull_request"]["parameters"]["allowed_merge_methods"] == [
         "merge", "squash", "rebase"
     ]

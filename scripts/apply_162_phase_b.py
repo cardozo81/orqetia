@@ -126,7 +126,9 @@ def _target(ruleset: dict[str, Any]) -> dict[str, Any]:
                     "required_approving_review_count": 0,
                     "required_review_thread_resolution": False,
                     "required_reviewers": [],
-                    "require_extra_approval_for_unattributed_changes": False,
+                    # GitHub returns this default as true. Its own ruleset
+                    # docs state it has no effect when zero approvals are required.
+                    "require_extra_approval_for_unattributed_changes": True,
                     "allowed_merge_methods": ["merge", "squash", "rebase"],
                 },
             },
