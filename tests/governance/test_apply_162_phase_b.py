@@ -70,6 +70,16 @@ class FakeGitHub:
             assert resource == f"/rulesets/{RULESET_ID}"
             assert isinstance(payload, dict)
             self.ruleset = {"id": RULESET_ID, **copy.deepcopy(payload)}
+            pull_request = next(
+                rule for rule in self.ruleset["rules"] if rule["type"] == "pull_request"
+            )
+            pull_request["parameters"].update(
+                {
+                    "required_reviewers": [],
+                    "require_extra_approval_for_unattributed_changes": False,
+                    "allowed_merge_methods": ["merge", "squash", "rebase"],
+                }
+            )
             return copy.deepcopy(self.ruleset)
         if method == "PATCH":
             assert resource == "" and payload == {"delete_branch_on_merge": True}
@@ -123,6 +133,13 @@ def test_apply_and_readback_preserve_protections_and_all_nine_checks() -> None:
         "deletion", "non_fast_forward", "pull_request", "required_status_checks"
     }
     assert rules["pull_request"]["parameters"]["required_approving_review_count"] == 0
+    assert rules["pull_request"]["parameters"]["required_reviewers"] == []
+    assert rules["pull_request"]["parameters"][
+        "require_extra_approval_for_unattributed_changes"
+    ] is False
+    assert rules["pull_request"]["parameters"]["allowed_merge_methods"] == [
+        "merge", "squash", "rebase"
+    ]
     assert rules["required_status_checks"]["parameters"]["required_status_checks"] == [
         {"context": context, "integration_id": ACTIONS_APP_ID} for context in CONTEXTS
     ]
