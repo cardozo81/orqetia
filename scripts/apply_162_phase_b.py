@@ -125,6 +125,9 @@ def _target(ruleset: dict[str, Any]) -> dict[str, Any]:
                     "require_last_push_approval": False,
                     "required_approving_review_count": 0,
                     "required_review_thread_resolution": False,
+                    "required_reviewers": [],
+                    "require_extra_approval_for_unattributed_changes": False,
+                    "allowed_merge_methods": ["merge", "squash", "rebase"],
                 },
             },
             {
