@@ -56,3 +56,18 @@ def test_human_acceptance_and_recovery_evidence_are_separate() -> None:
     assert "equality is still accepted" in inventory
     assert "No operational purge is authorized" in inventory
     assert "14 were OIDC markers" in inventory
+
+
+def test_m10_m11_readiness_reflect_completed_pr_enforcement() -> None:
+    m10 = (ROOT / "docs/readiness/m10-technical-readiness.md").read_text(
+        encoding="utf-8"
+    )
+    m11 = DOCUMENTS[0].read_text(encoding="utf-8")
+    for text in (m10, m11):
+        assert "#162" in text and "CLOSED" in text
+        assert "#164" in text and "OPEN" in text
+        assert "DEVELOPMENT" in text
+    assert "genuine PRs" in m10
+    assert "nine required" in m11
+    assert "Single-agent integration uses main directly" not in m11
+    assert "Phase B integration decision and administrative enforcement remain open" not in m11
