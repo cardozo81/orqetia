@@ -110,6 +110,6 @@ workaround. A failed security smoke blocks runtime acceptance and issue closure.
 
 ## Release and ownership gates
 
-The approved B contract supersedes the earlier restore-freshness implementation gate. Close #174 only after broker integration, negative tests, green CI and explicitly authorized Docker acceptance are evidenced. No operational deletion, credential/key rotation, CA/trust-store change, database migration, Docker reset, new service/cost or RASAi mutation is authorized.
+The approved B contract supersedes the earlier restore-freshness implementation gate. **#174 is CLOSED, with the broker integration, negative tests, green CI and authorized Windows Docker acceptance recorded in the [final acceptance checkpoint](https://github.com/cardozo81/orqetia/issues/174#issuecomment-6143500792).** The rollout instructions above are historical evidence boundaries, not authorization for a new deployment. No operational deletion, credential/key rotation, CA/trust-store change, database migration, Docker reset, new service/cost or RASAi mutation is authorized.
 
-Independent pre-RC gates #162 and #164 and the off-host recovery decision remain open. **DEVELOPMENT**.
+**#162 is CLOSED:** PR enforcement and nine required GitHub Actions checks on `main` are verified ([checkpoint](https://github.com/cardozo81/orqetia/issues/162#issuecomment-6150369672)). **#164 remains OPEN** for genuine external security intake and responsible owner/fallback acceptance. The off-host recovery decision is also outstanding. **DEVELOPMENT**.
